@@ -45,6 +45,24 @@ describe.skipIf(!live)("Amego live lifecycle", () => {
     expect(res.code).toBe(0);
   });
 
+  it("queries by orderId (type:'order')", async () => {
+    const orderId = String((await provider.query({ invoiceNumber })).orderId);
+    const res = await provider.query({ orderId });
+    expect(res.invoiceNumber).toBe(invoiceNumber);
+  });
+
+  it("lists invoices with real date filters and returns data (regression: was silently empty)", async () => {
+    const res = await provider.invoice.list({
+      startDate: "2026-06-01",
+      endDate: "2026-06-30",
+      limit: 20,
+    });
+    expect(res.code).toBe(0);
+    // The bug returned data_total:0 with wrong field names; correct fields return rows.
+    expect(Number(res.data_total)).toBeGreaterThan(0);
+    expect(Array.isArray(res.data)).toBe(true);
+  });
+
   it("voids the invoice (array payload, no CancelReason)", async () => {
     const res = await provider.void({ invoiceNumber, reason: "整合測試作廢" });
     expect(res.status).toBe("VOIDED");

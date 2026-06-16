@@ -196,6 +196,19 @@ describe("query (invoice_query) — type discriminator + nested data", () => {
     expect(res.status).toBe("ISSUED");
   });
 
+  it("queries by orderId via { type:'order', order_id }", async () => {
+    let data: Record<string, unknown> | undefined;
+    server.use(
+      http.post(`${BASE}/json/invoice_query`, async ({ request }) => {
+        data = parseBody(await request.text()).data;
+        return HttpResponse.json(INVOICE_QUERY_OK);
+      }),
+    );
+    const res = await testProvider().query({ orderId: "LC1781650039" });
+    expect(data).toEqual({ type: "order", order_id: "LC1781650039" });
+    expect(res.invoiceNumber).toBe("AA26513024");
+  });
+
   it("derives VOIDED when cancel_date > 0", async () => {
     server.use(
       http.post(`${BASE}/json/invoice_query`, () =>

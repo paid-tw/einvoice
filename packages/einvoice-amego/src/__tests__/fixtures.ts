@@ -90,6 +90,24 @@ export const ALLOWANCE_QUERY_OK = {
   },
 };
 
+export const INVOICE_LIST_OK = {
+  code: 0,
+  msg: "",
+  page_total: 299,
+  page_now: 1,
+  data_total: 5968,
+  data: [
+    {
+      invoice_number: "AA26505593",
+      invoice_type: "C0401",
+      invoice_status: 99,
+      invoice_date: 20260601,
+      invoice_time: "09:50:59",
+      total_amount: 105,
+    },
+  ],
+};
+
 export const VOID_OK = { code: 0, msg: "" };
 export const BAN_QUERY_OK = {
   code: 0,

@@ -27,10 +27,10 @@ const CASES: Array<{
     expectData: { type: "invoice", invoice_number: "AA1" },
   },
   {
-    name: "invoice.list (snake_case)",
+    name: "invoice.list (date_select/date_start/date_end/limit, numeric YYYYMMDD)",
     path: ENDPOINTS.invoiceList,
-    invoke: (p) => p.invoice.list({ startDate: "2026-06-01", page: 2 }),
-    expectData: { date_select: 1, start_date: "2026-06-01", page: 2 },
+    invoke: (p) => p.invoice.list({ startDate: "2026-06-01", endDate: "2026-06-30", page: 2 }),
+    expectData: { date_select: 1, date_start: 20260601, date_end: 20260630, limit: 20, page: 2 },
   },
   {
     name: "invoice.print (PascalCase)",
@@ -99,10 +99,10 @@ const CASES: Array<{
     expectData: { barCode: "/TRM+O+P" },
   },
   {
-    name: "allowances.list (snake_case)",
+    name: "allowances.list (date_select/date_start/date_end/limit)",
     path: ENDPOINTS.allowanceList,
-    invoke: (p) => p.allowances.list({ startDate: "2026-06-01", pageSize: 50 }),
-    expectData: { start_date: "2026-06-01", page_size: 50 },
+    invoke: (p) => p.allowances.list({ startDate: "2026-06-01", endDate: 20260630, limit: 50 }),
+    expectData: { date_select: 1, date_start: 20260601, date_end: 20260630, limit: 50, page: 1 },
   },
   {
     name: "lottery.type (no data)",

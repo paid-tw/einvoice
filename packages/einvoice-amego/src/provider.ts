@@ -179,14 +179,12 @@ export class AmegoProvider implements InvoiceProvider {
 
   async query(input: QueryInvoiceInput): Promise<QueryInvoiceResult> {
     const parsed = queryInvoiceInputSchema.parse(input);
-    if (!parsed.invoiceNumber) {
-      // invoice_query is keyed by invoice number; orderId lookup isn't supported.
-      throw new Error("Amego query requires invoiceNumber");
-    }
-    const res = await amegoRequest(this.config, ENDPOINTS.invoiceQuery, {
-      type: "invoice",
-      invoice_number: parsed.invoiceNumber,
-    });
+    // invoice_query supports both invoice-number and order-id lookups via the
+    // `type` discriminator (verified live).
+    const payload = parsed.invoiceNumber
+      ? { type: "invoice", invoice_number: parsed.invoiceNumber }
+      : { type: "order", order_id: parsed.orderId };
+    const res = await amegoRequest(this.config, ENDPOINTS.invoiceQuery, payload);
     const d = (res.data ?? {}) as Record<string, unknown>;
     return {
       invoiceNumber: String(d.invoice_number ?? parsed.invoiceNumber),
@@ -239,20 +237,25 @@ export class AmegoProvider implements InvoiceProvider {
     /** 發票查詢 — snake_case + `type` discriminator; returns nested `data`. */
     query: (invoiceNumber: string) =>
       this.raw(ENDPOINTS.invoiceQuery, { type: "invoice", invoice_number: invoiceNumber }),
-    /** 發票列表 — snake_case range filters. */
+    /**
+     * 發票列表. Fields are `date_select` + `date_start`/`date_end` (numeric
+     * YYYYMMDD) + `limit` (20–500) + `page`; response paginates as
+     * `page_total`/`page_now`/`data_total` (verified live).
+     */
     list: (opts: {
-      startDate?: string;
-      endDate?: string;
+      startDate?: string | number;
+      endDate?: string | number;
       page?: number;
-      pageSize?: number;
+      limit?: number;
+      /** 1: 發票日期 (default), 2: 建立日期. */
       dateSelect?: 1 | 2;
     } = {}) =>
       this.raw(ENDPOINTS.invoiceList, {
         date_select: opts.dateSelect ?? 1,
-        ...(opts.startDate ? { start_date: opts.startDate } : {}),
-        ...(opts.endDate ? { end_date: opts.endDate } : {}),
-        ...(opts.page ? { page: opts.page } : {}),
-        ...(opts.pageSize ? { page_size: opts.pageSize } : {}),
+        ...(opts.startDate != null ? { date_start: toYmdNumber(opts.startDate) } : {}),
+        ...(opts.endDate != null ? { date_end: toYmdNumber(opts.endDate) } : {}),
+        limit: opts.limit ?? 20,
+        page: opts.page ?? 1,
       }),
     /** 發票列印 — PascalCase + printer fields. */
     print: (invoiceNumber: string, printerType: number, lang: 1 | 2 | 3 = 3) =>
@@ -281,12 +284,20 @@ export class AmegoProvider implements InvoiceProvider {
     /** 折讓查詢 — snake_case `allowance_number`; returns nested `data`. */
     query: (allowanceNumber: string) =>
       this.raw(ENDPOINTS.allowanceQuery, { allowance_number: allowanceNumber }),
-    list: (opts: { startDate?: string; endDate?: string; page?: number; pageSize?: number } = {}) =>
+    /** 折讓列表 — same `date_select`/`date_start`/`date_end`/`limit`/`page` shape as invoice_list. */
+    list: (opts: {
+      startDate?: string | number;
+      endDate?: string | number;
+      page?: number;
+      limit?: number;
+      dateSelect?: 1 | 2;
+    } = {}) =>
       this.raw(ENDPOINTS.allowanceList, {
-        ...(opts.startDate ? { start_date: opts.startDate } : {}),
-        ...(opts.endDate ? { end_date: opts.endDate } : {}),
-        ...(opts.page ? { page: opts.page } : {}),
-        ...(opts.pageSize ? { page_size: opts.pageSize } : {}),
+        date_select: opts.dateSelect ?? 1,
+        ...(opts.startDate != null ? { date_start: toYmdNumber(opts.startDate) } : {}),
+        ...(opts.endDate != null ? { date_end: toYmdNumber(opts.endDate) } : {}),
+        limit: opts.limit ?? 20,
+        page: opts.page ?? 1,
       }),
     print: (allowanceNumber: string, printerType: number, lang: 1 | 2 | 3 = 3) =>
       this.raw(ENDPOINTS.allowancePrint, {
@@ -373,6 +384,13 @@ function carrierFields(carrier?: Carrier): Record<string, unknown> {
 function fromUnix(value: unknown): Date {
   const n = typeof value === "number" ? value : Number(value);
   return Number.isFinite(n) && n > 0 ? new Date(n * 1000) : new Date();
+}
+
+/** Coerce a date input (`Date` not accepted here) to a numeric `YYYYMMDD`. */
+function toYmdNumber(value: string | number): number {
+  if (typeof value === "number") return value;
+  const digits = value.replace(/\D/g, ""); // "2026-06-01" → "20260601"
+  return Number(digits);
 }
 
 /** Amego `YYYYMMDD` (int or string) → Date at Asia/Taipei midnight. */
