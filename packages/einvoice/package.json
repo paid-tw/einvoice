@@ -1,0 +1,42 @@
+{
+  "name": "@paid-tw/einvoice",
+  "version": "0.1.0",
+  "description": "Provider-agnostic core for Taiwan e-invoice: unified types, InvoiceProvider interface, validation schemas, and a MockProvider.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "files": ["dist"],
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "tsup": "^8.3.0",
+    "typescript": "^5.6.0"
+  },
+  "keywords": [
+    "einvoice",
+    "e-invoice",
+    "taiwan",
+    "電子發票",
+    "invoice",
+    "fapiao"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}

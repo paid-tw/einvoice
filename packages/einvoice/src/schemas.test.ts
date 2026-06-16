@@ -1,0 +1,51 @@
+import { describe, expect, it } from "vitest";
+import { carrierSchema, issueInvoiceInputSchema } from "./schemas.js";
+import type { IssueInvoiceInput } from "./types.js";
+
+const valid: IssueInvoiceInput = {
+  orderId: "o1",
+  buyer: {},
+  items: [{ description: "x", quantity: 1, unitPrice: 100, amount: 100 }],
+  amount: { salesAmount: 100, taxAmount: 5, totalAmount: 105 },
+  taxType: "TAXABLE",
+  priceMode: "TAX_INCLUSIVE",
+};
+
+describe("issueInvoiceInputSchema", () => {
+  it("accepts a well-formed invoice", () => {
+    expect(issueInvoiceInputSchema.safeParse(valid).success).toBe(true);
+  });
+
+  it("rejects when total ≠ sales + tax", () => {
+    const r = issueInvoiceInputSchema.safeParse({
+      ...valid,
+      amount: { salesAmount: 100, taxAmount: 5, totalAmount: 999 },
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it("rejects carrier + donation together", () => {
+    const r = issueInvoiceInputSchema.safeParse({
+      ...valid,
+      carrier: { type: "MOBILE_BARCODE", code: "/ABC1234" },
+      donation: { npoban: "168" },
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it("rejects donating a B2B invoice", () => {
+    const r = issueInvoiceInputSchema.safeParse({
+      ...valid,
+      buyer: { taxId: "28080623" },
+      donation: { npoban: "168" },
+    });
+    expect(r.success).toBe(false);
+  });
+});
+
+describe("carrierSchema", () => {
+  it("validates a mobile-barcode format", () => {
+    expect(carrierSchema.safeParse({ type: "MOBILE_BARCODE", code: "/ABC1234" }).success).toBe(true);
+    expect(carrierSchema.safeParse({ type: "MOBILE_BARCODE", code: "bad" }).success).toBe(false);
+  });
+});
