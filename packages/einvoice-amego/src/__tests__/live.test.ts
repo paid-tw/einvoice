@@ -63,6 +63,20 @@ describe.skipIf(!live)("Amego live lifecycle", () => {
     expect(Array.isArray(res.data)).toBe(true);
   });
 
+  it("issues a foreign-currency (USD) invoice — amounts stay TWD", async () => {
+    const res = await provider.issue({
+      orderId: `IU${Date.now()}`,
+      buyer: {},
+      items: [{ description: "cross-border", quantity: 1, unitPrice: 105, amount: 105 }],
+      amount: { salesAmount: 105, taxAmount: 0, totalAmount: 105 },
+      taxType: "TAXABLE",
+      priceMode: "TAX_INCLUSIVE",
+      currency: "USD",
+      exchangeRate: 31.5,
+    });
+    expect(res.invoiceNumber).toMatch(/^[A-Z]{2}\d{8}$/);
+  });
+
   it("voids the invoice (array payload, no CancelReason)", async () => {
     const res = await provider.void({ invoiceNumber, reason: "整合測試作廢" });
     expect(res.status).toBe("VOIDED");

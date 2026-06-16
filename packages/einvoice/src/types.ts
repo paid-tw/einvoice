@@ -5,7 +5,11 @@
  * its own wire format. Business code should depend ONLY on these types so that
  * switching providers never touches application logic.
  *
- * Money convention: all amounts are integers in New Taiwan Dollars (no decimals).
+ * Money convention: the invoice's statutory amount fields are integers in New
+ * Taiwan Dollars (no decimals) — this is a MIG invariant: even cross-border
+ * invoices are filed to the government platform in TWD. For a foreign-currency
+ * sale, set `currency` (ISO 4217) and `exchangeRate` on the invoice to annotate
+ * the original transaction; the amount fields stay TWD.
  */
 
 // ---------------------------------------------------------------------------
@@ -148,6 +152,14 @@ export interface IssueInvoiceInput {
   donation?: Donation;
   /** 備註. */
   remark?: string;
+  /**
+   * ISO 4217 currency of the original transaction (e.g. `"USD"`). Defaults to
+   * `"TWD"`. The statutory amount fields remain TWD regardless — this annotates
+   * a cross-border sale. Providers that don't support it ignore it.
+   */
+  currency?: string;
+  /** Exchange rate to TWD (≤3-decimal precision), required when `currency` ≠ TWD. */
+  exchangeRate?: number;
   /** Issue date. Defaults to "now" in Asia/Taipei when omitted. */
   date?: Date;
   /** Escape hatch for provider-specific fields not covered by the unified model. */

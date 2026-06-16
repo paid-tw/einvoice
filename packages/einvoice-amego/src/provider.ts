@@ -77,6 +77,9 @@ export class AmegoProvider implements InvoiceProvider {
       ...carrierFields(parsed.carrier),
       NPOBAN: parsed.donation?.npoban,
       ...amounts,
+      // Foreign-currency annotation; statutory amounts above stay TWD.
+      ...(parsed.currency && parsed.currency !== "TWD" ? { Currency: parsed.currency } : {}),
+      ...(parsed.exchangeRate != null ? { ExchangeRate: parsed.exchangeRate } : {}),
       DetailVat: priceExclusive ? 0 : 1,
       ProductItem: parsed.items.map((item) => ({
         Description: item.description,

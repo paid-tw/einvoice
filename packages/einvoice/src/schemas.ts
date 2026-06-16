@@ -94,10 +94,22 @@ export const issueInvoiceInputSchema = z
     carrier: carrierSchema.optional(),
     donation: donationSchema.optional(),
     remark: z.string().optional(),
+    currency: z
+      .string()
+      .regex(/^[A-Z]{3}$/, "currency must be a 3-letter ISO 4217 code")
+      .optional(),
+    exchangeRate: z.number().positive().optional(),
     date: z.date().optional(),
     providerOptions: z.record(z.unknown()).optional(),
   })
   .superRefine((input, ctx) => {
+    if (input.currency && input.currency !== "TWD" && input.exchangeRate == null) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "exchangeRate is required when currency is not TWD",
+        path: ["exchangeRate"],
+      });
+    }
     if (input.carrier && input.donation) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,

@@ -41,6 +41,25 @@ describe("issueInvoiceInputSchema", () => {
     });
     expect(r.success).toBe(false);
   });
+
+  it("accepts a foreign currency with an exchange rate", () => {
+    const r = issueInvoiceInputSchema.safeParse({ ...valid, currency: "USD", exchangeRate: 31.5 });
+    expect(r.success).toBe(true);
+  });
+
+  it("requires exchangeRate when currency is not TWD", () => {
+    const r = issueInvoiceInputSchema.safeParse({ ...valid, currency: "USD" });
+    expect(r.success).toBe(false);
+  });
+
+  it("rejects a malformed currency code", () => {
+    expect(issueInvoiceInputSchema.safeParse({ ...valid, currency: "usd" }).success).toBe(false);
+    expect(issueInvoiceInputSchema.safeParse({ ...valid, currency: "DOLLAR" }).success).toBe(false);
+  });
+
+  it("allows TWD without an exchange rate", () => {
+    expect(issueInvoiceInputSchema.safeParse({ ...valid, currency: "TWD" }).success).toBe(true);
+  });
 });
 
 describe("carrierSchema", () => {

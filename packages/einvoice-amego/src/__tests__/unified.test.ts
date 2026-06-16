@@ -84,6 +84,32 @@ describe("issue (f0401)", () => {
     expect(data?.TaxAmount).toBe(5);
   });
 
+  it("annotates a foreign-currency sale with Currency + ExchangeRate (amounts stay TWD)", async () => {
+    let data: Record<string, unknown> | undefined;
+    server.use(
+      http.post(`${BASE}/json/f0401`, async ({ request }) => {
+        data = parseBody(await request.text()).data;
+        return HttpResponse.json(ISSUE_OK);
+      }),
+    );
+    await testProvider().issue(issueInput({ currency: "USD", exchangeRate: 31.5 }));
+    expect(data?.Currency).toBe("USD");
+    expect(data?.ExchangeRate).toBe(31.5);
+    expect(data?.TotalAmount).toBe(105); // statutory amount remains TWD
+  });
+
+  it("omits Currency for the default TWD", async () => {
+    let data: Record<string, unknown> | undefined;
+    server.use(
+      http.post(`${BASE}/json/f0401`, async ({ request }) => {
+        data = parseBody(await request.text()).data;
+        return HttpResponse.json(ISSUE_OK);
+      }),
+    );
+    await testProvider().issue(issueInput({ currency: "TWD" }));
+    expect(data?.Currency).toBeUndefined();
+  });
+
   it("maps member carrier to the literal 'amego' code", async () => {
     let data: Record<string, unknown> | undefined;
     server.use(
