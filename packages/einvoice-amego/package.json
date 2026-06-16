@@ -1,0 +1,35 @@
+{
+  "name": "@paid-tw/einvoice-amego",
+  "version": "0.1.0",
+  "description": "Amego (amego.tw) adapter for @paid-tw/einvoice — implements InvoiceProvider over the Amego e-invoice API.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "files": ["dist"],
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@paid-tw/einvoice": "workspace:*"
+  },
+  "devDependencies": {
+    "tsup": "^8.3.0",
+    "typescript": "^5.6.0"
+  },
+  "keywords": ["einvoice", "電子發票", "amego", "taiwan"],
+  "publishConfig": {
+    "access": "public"
+  }
+}
