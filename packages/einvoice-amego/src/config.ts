@@ -25,6 +25,12 @@ export interface AmegoConfig extends BaseProviderConfig {
    * `true` uses defaults; pass options to tune; omit/`false` to disable.
    */
   retry?: boolean | AmegoRetryOptions;
+  /**
+   * Validate the built f0401 payload locally before sending (default `true`).
+   * Catches field errors — including ones Amego silently accepts (bad email,
+   * malformed Currency, etc.) — with a clear message. Set `false` to bypass.
+   */
+  validatePayload?: boolean;
 }
 
 /**

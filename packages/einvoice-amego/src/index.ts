@@ -4,6 +4,14 @@ export { AMEGO_BASE_URL } from "./config.js";
 export { ENDPOINTS as AMEGO_ENDPOINTS } from "./endpoints.js";
 export { sign, mapAmegoErrorCode, clearTimeSyncCache } from "./client.js";
 export type { AmegoResponse } from "./client.js";
+export {
+  amegoIssuePayloadSchema,
+  amegoCustomIssuePayloadSchema,
+  amegoProductItemSchema,
+  assertValidIssuePayload,
+  assertValidCustomIssuePayload,
+} from "./validation.js";
+export type { AmegoIssuePayload, AmegoCustomIssuePayload } from "./validation.js";
 export { computeAmegoAmounts, amegoTaxType } from "./amounts.js";
 export type {
   AmegoAmounts,

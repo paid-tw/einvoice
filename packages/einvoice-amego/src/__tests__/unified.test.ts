@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { http, HttpResponse } from "msw";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import type { IssueInvoiceInput } from "@paid-tw/einvoice";
+import { createAmegoProvider } from "../provider.js";
 import { APP_KEY, BASE, parseBody, SELLER, server, testProvider } from "./server.js";
 import {
   ALLOWANCE_OK,
@@ -120,6 +121,69 @@ describe("issue (f0401)", () => {
     );
     await testProvider().issue(issueInput({ carrier: { type: "MEMBER", code: "member@x.com" } }));
     expect(data?.CarrierType).toBe("amego");
+  });
+});
+
+describe("issue — local payload validation", () => {
+  it("rejects an invalid built payload before any network call (VALIDATION)", async () => {
+    // onUnhandledRequest:'error' would throw if a request escaped — so this also
+    // proves no request is made.
+    await expect(
+      testProvider().issue(
+        issueInput({ items: [{ description: "字".repeat(257), quantity: 1, unitPrice: 105, amount: 105 }] }),
+      ),
+    ).rejects.toMatchObject({ code: "VALIDATION", provider: "amego" });
+  });
+
+  it("can bypass local validation with validatePayload:false", async () => {
+    let hit = false;
+    server.use(
+      http.post(`${BASE}/json/f0401`, () => {
+        hit = true;
+        return HttpResponse.json(ISSUE_OK);
+      }),
+    );
+    const provider = createAmegoProvider({ sellerTaxId: "12345678", appKey: "k", baseUrl: BASE, validatePayload: false });
+    await provider.issue(issueInput({ items: [{ description: "字".repeat(257), quantity: 1, unitPrice: 105, amount: 105 }] }));
+    expect(hit).toBe(true);
+  });
+});
+
+describe("issueCustom (f0401_custom) — array + validation", () => {
+  const validRecord = {
+    OrderId: "o1",
+    InvoiceDate: "20260617",
+    InvoiceTime: "16:40:42",
+    BuyerIdentifier: "0000000000",
+    BuyerName: "消費者",
+    ProductItem: [{ Description: "x", Quantity: 1, UnitPrice: 105, Amount: 105, TaxType: 1 }],
+    SalesAmount: 105,
+    FreeTaxSalesAmount: 0,
+    ZeroTaxSalesAmount: 0,
+    TaxType: 1,
+    TaxRate: "0.05",
+    TaxAmount: 0,
+    TotalAmount: 105,
+  };
+
+  it("posts an ARRAY with the merchant InvoiceNumber", async () => {
+    let body: ReturnType<typeof parseBody> | undefined;
+    server.use(
+      http.post(`${BASE}/json/f0401_custom`, async ({ request }) => {
+        body = parseBody(await request.text());
+        return HttpResponse.json({ code: 0, msg: "" });
+      }),
+    );
+    await testProvider().invoice.issueCustom("AA00000010", validRecord);
+    const arr = body?.data as unknown as Array<Record<string, unknown>>;
+    expect(Array.isArray(arr)).toBe(true);
+    expect(arr[0]?.InvoiceNumber).toBe("AA00000010");
+  });
+
+  it("rejects a malformed InvoiceDate locally", async () => {
+    await expect(
+      testProvider().invoice.issueCustom("AA00000010", { ...validRecord, InvoiceDate: "2026-06-17" }),
+    ).rejects.toMatchObject({ code: "VALIDATION" });
   });
 });
 

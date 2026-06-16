@@ -51,12 +51,6 @@ const CASES: Array<{
     expectData: [{ InvoiceNumber: "AA1" }, { InvoiceNumber: "AA2" }],
   },
   {
-    name: "invoice.issueCustom (PascalCase InvoiceNumber)",
-    path: ENDPOINTS.issueCustom,
-    invoke: (p) => p.invoice.issueCustom("AA1", { OrderId: "o1" }),
-    expectData: { OrderId: "o1", InvoiceNumber: "AA1" },
-  },
-  {
     name: "allowances.query (snake_case)",
     path: ENDPOINTS.allowanceQuery,
     invoke: (p) => p.allowances.query("ALW1"),

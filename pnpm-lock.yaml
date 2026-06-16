@@ -48,6 +48,9 @@ importers:
       '@paid-tw/einvoice':
         specifier: workspace:*
         version: link:../einvoice
+      zod:
+        specifier: ^3.23.8
+        version: 3.25.76
     devDependencies:
       tsup:
         specifier: ^8.3.0

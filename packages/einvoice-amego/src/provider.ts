@@ -29,6 +29,7 @@ import {
 import { type AmegoResponse, amegoRequest } from "./client.js";
 import type { AmegoConfig } from "./config.js";
 import { ENDPOINTS } from "./endpoints.js";
+import { assertValidCustomIssuePayload, assertValidIssuePayload } from "./validation.js";
 
 /** Amego/MIG carrier type codes (member carrier is the literal `amego`). */
 const CARRIER_TYPE: Record<Carrier["type"], string> = {
@@ -92,6 +93,8 @@ export class AmegoProvider implements InvoiceProvider {
       })),
       ...(parsed.providerOptions ?? {}),
     };
+
+    if (this.config.validatePayload !== false) assertValidIssuePayload(data);
 
     const res = await amegoRequest(this.config, ENDPOINTS.issue, data);
     return {
@@ -277,9 +280,15 @@ export class AmegoProvider implements InvoiceProvider {
     /** 發票狀態 — ARRAY payload, nested `data[]`. */
     status: (invoiceNumbers: string[]) =>
       this.raw(ENDPOINTS.invoiceStatus, invoiceNumbers.map((InvoiceNumber) => ({ InvoiceNumber }))),
-    /** 開立發票 (自訂配號). */
-    issueCustom: (invoiceNumber: string, data: Record<string, unknown>) =>
-      this.raw(ENDPOINTS.issueCustom, { ...data, InvoiceNumber: invoiceNumber }),
+    /**
+     * 開立發票 (自訂配號). Takes an ARRAY payload (verified live); validates the
+     * record (InvoiceNumber/InvoiceDate YYYYMMDD/InvoiceTime hh:mm:ss, etc.).
+     */
+    issueCustom: async (invoiceNumber: string, data: Record<string, unknown>) => {
+      const record = { ...data, InvoiceNumber: invoiceNumber };
+      if (this.config.validatePayload !== false) assertValidCustomIssuePayload(record);
+      return this.raw(ENDPOINTS.issueCustom, [record]);
+    },
   };
 
   /** 折讓 management endpoints. */

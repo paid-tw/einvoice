@@ -165,6 +165,9 @@ export function mapAmegoErrorCode(code: number): InvoiceErrorCode {
   if (code === 23 || code === 31 || code === 33 || code === 3050112)
     return InvoiceErrorCode.VALIDATION;
 
+  // f0401_custom per-record field errors are returned as code 99 (verified live).
+  if (code === 99) return InvoiceErrorCode.VALIDATION;
+
   // Empty data / malformed JSON / field & amount validation (30401xx, 30402xx…)
   if (code === 17 || code === 20) return InvoiceErrorCode.VALIDATION;
   if (code >= 3040100 && code < 3050000) return InvoiceErrorCode.VALIDATION;

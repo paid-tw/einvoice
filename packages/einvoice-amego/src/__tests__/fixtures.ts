@@ -116,7 +116,16 @@ export const BAN_QUERY_OK = {
 };
 export const TIME_OK = { timestamp: 1781650038, text: "2026/06/17 06:47:18" };
 
-/** Real error envelopes (code !== 0). */
+/** Real error envelopes (code !== 0), captured live by sending invalid values. */
 export const ERR_VOID_NOT_ARRAY = { code: 3050112, msg: "此 API 支援傳輸多張發票，data 欄位資料應為陣列字串" };
 export const ERR_QUERY_NO_TYPE = { code: 31, msg: "type 查詢類型不存在" };
 export const ERR_ALREADY_ALLOWANCE = { code: 3050141, msg: "AA26513024 已存在折讓單" };
+export const ERR_BUYER_NAME = { code: 3040123, msg: "BuyerName 不可為空或過長" };
+export const ERR_BUYER_ID_LEN = { code: 3040121, msg: "BuyerIdentifier 字數錯誤" };
+export const ERR_BUYER_ID_FMT = { code: 3040122, msg: "BuyerIdentifier 格式錯誤" };
+export const ERR_ITEM_TAXTYPE = { code: 3040144, msg: "第1品項 TaxType 錯誤" };
+export const ERR_DETAILVAT = { code: 3040162, msg: "只有打統編發票， 才可以用未稅單價及小計" };
+export const ERR_ZERORATE_CCM = { code: 3040179, msg: "若為零稅率發票，通關方式註記必填" };
+export const ERR_CARRIER = { code: 3040132, msg: "載具號碼不存在" };
+export const ERR_NPOBAN = { code: 3040137, msg: "NPOBAN 不存在" };
+export const ERR_CUSTOM_INVOICEDATE = { code: 99, msg: "第1筆 發票號碼AA00000010 InvoiceDate 錯誤", data: [] };

@@ -82,3 +82,55 @@ describe.skipIf(!live)("Amego live lifecycle", () => {
     expect(res.status).toBe("VOIDED");
   });
 });
+
+/**
+ * Deliberately send invalid field values straight to the real API (via raw(),
+ * bypassing local validation) and assert the exact error code Amego returns.
+ * These are the source-of-truth for the offline error fixtures.
+ */
+describe.skipIf(!live)("Amego live — server rejects invalid values", () => {
+  const provider = createAmegoProvider({
+    sellerTaxId: process.env.AMEGO_SELLER ?? "12345678",
+    appKey: process.env.AMEGO_APP_KEY ?? "",
+  });
+  const item = { Description: "x", Quantity: "1", UnitPrice: "105", Amount: "105", TaxType: "1" };
+  const base = (extra: Record<string, unknown>) => ({
+    OrderId: `BAD${Date.now()}${Math.floor(performance.now())}`,
+    BuyerIdentifier: "0000000000",
+    BuyerName: "消費者",
+    ProductItem: [item],
+    SalesAmount: "105",
+    FreeTaxSalesAmount: "0",
+    ZeroTaxSalesAmount: "0",
+    TaxType: "1",
+    TaxRate: "0.05",
+    TaxAmount: "0",
+    TotalAmount: "105",
+    ...extra,
+  });
+
+  it.each([
+    ["empty BuyerName", { BuyerName: "" }, "3040123"],
+    ["bad 統編 length", { BuyerIdentifier: "123" }, "3040121"],
+    ["bad 統編 format", { BuyerIdentifier: "1234567x" }, "3040122"],
+    ["item TaxType 5", { ProductItem: [{ ...item, TaxType: "5" }] }, "3040144"],
+    ["DetailVat 0 no 統編", { DetailVat: 0 }, "3040162"],
+  ])("rejects %s with code %s", async (_label, extra, code) => {
+    const err = await provider.raw("/json/f0401", base(extra)).catch((e) => e);
+    expect(err.rawCode).toBe(code);
+    expect(err.code).toBe("VALIDATION");
+  });
+
+  it("rejects a zero-rated invoice missing the customs mark (3040179)", async () => {
+    const err = await provider
+      .raw("/json/f0401", base({
+        ProductItem: [{ ...item, UnitPrice: "100", Amount: "100", TaxType: "2" }],
+        SalesAmount: "0",
+        ZeroTaxSalesAmount: "100",
+        TaxType: "2",
+        TotalAmount: "100",
+      }))
+      .catch((e) => e);
+    expect(err.rawCode).toBe("3040179");
+  });
+});

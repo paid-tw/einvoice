@@ -3,6 +3,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { InvoiceError, isInvoiceError } from "@paid-tw/einvoice";
 import { mapAmegoErrorCode } from "../client.js";
 import { BASE, server, testProvider } from "./server.js";
+import { ERR_CUSTOM_INVOICEDATE } from "./fixtures.js";
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => server.resetHandlers());
@@ -25,6 +26,13 @@ describe("mapAmegoErrorCode (from info_detail?mid=71)", () => {
     [3040171, "CONFLICT"], // OrderId 重複
     [3050122, "CONFLICT"], // 發票已作廢
     [3050141, "CONFLICT"], // 已存在折讓單
+    [3040121, "VALIDATION"], // BuyerIdentifier 字數錯誤
+    [3040122, "VALIDATION"], // BuyerIdentifier 格式錯誤
+    [3040132, "VALIDATION"], // 載具號碼不存在
+    [3040137, "VALIDATION"], // NPOBAN 不存在
+    [3040162, "VALIDATION"], // DetailVat 0 無統編
+    [3040179, "VALIDATION"], // 零稅率缺通關註記
+    [99, "VALIDATION"], // f0401_custom per-record field error
     [71, "NOT_FOUND"], // 查無資料
     [3050125, "NOT_FOUND"], // 發票不存在
     [999999, "PROVIDER"], // unknown
@@ -57,5 +65,29 @@ describe("error propagation", () => {
       .void({ invoiceNumber: "AA1", reason: "x" })
       .catch((e) => e);
     expect(err.code).toBe("NETWORK");
+  });
+
+  it("propagates a real f0401_custom field error (code 99) as VALIDATION", async () => {
+    server.use(http.post(`${BASE}/json/f0401_custom`, () => HttpResponse.json(ERR_CUSTOM_INVOICEDATE)));
+    // A locally-valid record so it reaches the server, which then rejects it.
+    const err = await testProvider()
+      .invoice.issueCustom("AA00000010", {
+        OrderId: "o1",
+        InvoiceDate: "20260617",
+        InvoiceTime: "16:40:42",
+        BuyerIdentifier: "0000000000",
+        BuyerName: "消費者",
+        ProductItem: [{ Description: "x", Quantity: 1, UnitPrice: 105, Amount: 105, TaxType: 1 }],
+        SalesAmount: 105,
+        FreeTaxSalesAmount: 0,
+        ZeroTaxSalesAmount: 0,
+        TaxType: 1,
+        TaxRate: "0.05",
+        TaxAmount: 0,
+        TotalAmount: 105,
+      })
+      .catch((e) => e);
+    expect(err.code).toBe("VALIDATION");
+    expect(err.rawCode).toBe("99");
   });
 });
