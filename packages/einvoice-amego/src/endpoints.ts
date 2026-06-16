@@ -38,3 +38,12 @@ export const ENDPOINTS = {
 } as const;
 
 export type EndpointKey = keyof typeof ENDPOINTS;
+
+/** 字軌狀態 codes returned by `track_status`. */
+export const TRACK_STATUS = {
+  IN_USE: 1, // 使用
+  DISABLED: 2, // 停用
+  EXPIRED: 3, // 過期
+  EXHAUSTED: 9, // 用畢
+} as const;
+export type TrackStatus = (typeof TRACK_STATUS)[keyof typeof TRACK_STATUS];

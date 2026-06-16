@@ -129,6 +129,17 @@ export const CUSTOM_ISSUE_OK = {
   ],
 };
 
+/** Real track_status response (Year 2026, Period 2) — current-period API tracks. */
+export const TRACK_STATUS_OK = {
+  code: 0,
+  msg: "",
+  data: [
+    { code: "EE", start: "00000000", end: "00009999", now: "00006849", total_booklet: 200, used_booklet: 137, status: 1 },
+    { code: "EF", start: "00000000", end: "00009999", now: "", total_booklet: 200, used_booklet: 0, status: 1 },
+    { code: "IT", start: "62008000", end: "62009099", now: "62009099", total_booklet: 22, used_booklet: 22, status: 3 },
+  ],
+};
+
 export const VOID_OK = { code: 0, msg: "" };
 export const BAN_QUERY_OK = {
   code: 0,

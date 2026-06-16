@@ -1,8 +1,9 @@
 import { http, HttpResponse } from "msw";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import type { AmegoProvider } from "../provider.js";
-import { ENDPOINTS } from "../endpoints.js";
+import { ENDPOINTS, TRACK_STATUS } from "../endpoints.js";
 import { BASE, parseBody, server, testProvider } from "./server.js";
+import { TRACK_STATUS_OK } from "./fixtures.js";
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => server.resetHandlers());
@@ -123,10 +124,10 @@ const CASES: Array<{
     expectData: { count: 50 },
   },
   {
-    name: "track.status (pass-through)",
+    name: "track.status (Year/Period PascalCase)",
     path: ENDPOINTS.trackStatus,
-    invoke: (p) => p.track.status({ year: 2026 }),
-    expectData: { year: 2026 },
+    invoke: (p) => p.track.status({ year: 2026, period: 2, trackApiCode: "API01" }),
+    expectData: { Year: 2026, Period: 2, TrackApiCode: "API01" },
   },
 ];
 
@@ -148,5 +149,22 @@ describe("Amego endpoint contracts (verified live shapes)", () => {
   it("raw() can call any endpoint directly", async () => {
     server.use(http.post(`${BASE}/json/anything`, () => HttpResponse.json({ code: 0, ok: true })));
     expect(await testProvider().raw("/json/anything", { foo: "bar" })).toMatchObject({ ok: true });
+  });
+
+  it("track.status omits Period/TrackApiCode when not given", async () => {
+    let data: unknown;
+    server.use(
+      http.post(`${BASE}${ENDPOINTS.trackStatus}`, async ({ request }) => {
+        data = parseBody(await request.text()).data;
+        return HttpResponse.json(TRACK_STATUS_OK);
+      }),
+    );
+    const res = await testProvider().track.status({ year: 2026 });
+    expect(data).toEqual({ Year: 2026 });
+    // response: data[] with status codes (1 使用 / 3 過期 …)
+    const rows = res.data as Array<Record<string, unknown>>;
+    expect(rows[0]?.code).toBe("EE");
+    expect(rows[0]?.used_booklet).toBe(137);
+    expect(rows.map((r) => r.status)).toContain(TRACK_STATUS.EXPIRED);
   });
 });

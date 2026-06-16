@@ -346,7 +346,18 @@ export class AmegoProvider implements InvoiceProvider {
   readonly track = {
     all: (data: Record<string, unknown>) => this.raw(ENDPOINTS.trackAll, data),
     get: (data: Record<string, unknown>) => this.raw(ENDPOINTS.trackGet, data),
-    status: (data: Record<string, unknown>) => this.raw(ENDPOINTS.trackStatus, data),
+    /**
+     * 字軌狀態 — status of "API 配號" tracks. `period` is 0:01-02 … 5:11-12.
+     * Returns `data[]` of { code, start, end, now, total_booklet, used_booklet,
+     * status } where status is 1 使用 / 2 停用 / 3 過期 / 9 用畢 (verified live;
+     * note: the field is `Year` PascalCase — lowercase yields an empty list).
+     */
+    status: (opts: { year: number; period?: 0 | 1 | 2 | 3 | 4 | 5; trackApiCode?: string }) =>
+      this.raw(ENDPOINTS.trackStatus, {
+        Year: opts.year,
+        ...(opts.period !== undefined ? { Period: opts.period } : {}),
+        ...(opts.trackApiCode ? { TrackApiCode: opts.trackApiCode } : {}),
+      }),
   };
 
   /** 公司名稱查詢 — look up company names by 統一編號 (batch). */

@@ -45,6 +45,16 @@ describe.skipIf(!live)("Amego live lifecycle", () => {
     expect(res.code).toBe(0);
   });
 
+  it("reads API-numbering track status (Year/Period)", async () => {
+    const res = await provider.track.status({ year: 2026, period: 2 });
+    expect(res.code).toBe(0);
+    expect(Array.isArray(res.data)).toBe(true);
+    const rows = res.data as Array<Record<string, unknown>>;
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows[0]).toHaveProperty("total_booklet");
+    expect(rows[0]).toHaveProperty("status");
+  });
+
   it("queries by orderId (type:'order')", async () => {
     const orderId = String((await provider.query({ invoiceNumber })).orderId);
     const res = await provider.query({ orderId });
