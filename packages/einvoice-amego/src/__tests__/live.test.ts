@@ -1,50 +1,52 @@
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import { createAmegoProvider } from "../provider.js";
 
 /**
- * Live smoke test against the real Amego sandbox. Skipped unless AMEGO_LIVE=1 to
- * keep the normal/CI suite offline and deterministic.
+ * Live lifecycle test against the real Amego sandbox. Skipped unless AMEGO_LIVE=1
+ * so the normal/CI suite stays offline and deterministic.
  *
  *   AMEGO_LIVE=1 \
  *   AMEGO_SELLER=12345678 \
- *   AMEGO_APP_KEY=sHeq7t8G1wiQvhAuIM27 \
+ *   AMEGO_APP_KEY=... \
  *   pnpm --filter @paid-tw/einvoice-amego exec vitest run live
  */
 const live = process.env.AMEGO_LIVE === "1";
 
-describe.skipIf(!live)("Amego live sandbox", () => {
+describe.skipIf(!live)("Amego live lifecycle", () => {
   const provider = createAmegoProvider({
     sellerTaxId: process.env.AMEGO_SELLER ?? "12345678",
-    appKey: process.env.AMEGO_APP_KEY ?? "sHeq7t8G1wiQvhAuIM27",
+    appKey: process.env.AMEGO_APP_KEY ?? "",
   });
 
-  it("returns server time", async () => {
-    const res = await provider.time();
+  let invoiceNumber: string;
+
+  beforeAll(async () => {
+    const res = await provider.issue({
+      orderId: `IT${Date.now()}`,
+      buyer: { taxId: "28080623", name: "光貿科技有限公司" },
+      items: [{ description: "整合測試商品", quantity: 1, unitPrice: 105, amount: 105 }],
+      amount: { salesAmount: 100, taxAmount: 5, totalAmount: 105 },
+      taxType: "TAXABLE",
+      priceMode: "TAX_INCLUSIVE",
+    });
+    invoiceNumber = res.invoiceNumber;
+    expect(invoiceNumber).toMatch(/^[A-Z]{2}\d{8}$/);
+  });
+
+  it("queries the issued invoice (nested data, type discriminator)", async () => {
+    const res = await provider.query({ invoiceNumber });
+    expect(res.amount.totalAmount).toBe(105);
+    expect(res.buyer.taxId).toBe("28080623");
+    expect(res.items.length).toBeGreaterThan(0);
+  });
+
+  it("looks up a company name (array payload)", async () => {
+    const res = await provider.banQuery("28080623");
     expect(res.code).toBe(0);
   });
 
-  it("issues a real B2C invoice and gets a number back", async () => {
-    const res = await provider.issue({
-      orderId: `IT${Date.now()}`,
-      buyer: {},
-      items: [{ description: "整合測試商品", quantity: 1, unitPrice: 105, amount: 105 }],
-      amount: { salesAmount: 105, taxAmount: 0, totalAmount: 105 },
-      taxType: "TAXABLE",
-      priceMode: "TAX_INCLUSIVE",
-    });
-    expect(res.invoiceNumber).toMatch(/^[A-Z]{2}\d{8}$/);
-    expect(res.randomCode).toMatch(/^\d{4}$/);
-  });
-
-  it("issues a real B2B invoice (statutory number)", async () => {
-    const res = await provider.issue({
-      orderId: `IB${Date.now()}`,
-      buyer: { taxId: "28080623", name: "光貿科技有限公司" },
-      items: [{ description: "整合測試商品", quantity: 1, unitPrice: 168, amount: 168 }],
-      amount: { salesAmount: 160, taxAmount: 8, totalAmount: 168 },
-      taxType: "TAXABLE",
-      priceMode: "TAX_INCLUSIVE",
-    });
-    expect(res.invoiceNumber).toMatch(/^[A-Z]{2}\d{8}$/);
+  it("voids the invoice (array payload, no CancelReason)", async () => {
+    const res = await provider.void({ invoiceNumber, reason: "整合測試作廢" });
+    expect(res.status).toBe("VOIDED");
   });
 });
