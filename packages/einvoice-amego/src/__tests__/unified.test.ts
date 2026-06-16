@@ -6,6 +6,7 @@ import { createAmegoProvider } from "../provider.js";
 import { APP_KEY, BASE, parseBody, SELLER, server, testProvider } from "./server.js";
 import {
   ALLOWANCE_OK,
+  CUSTOM_ISSUE_OK,
   INVOICE_QUERY_OK,
   ISSUE_OK,
   VOID_OK,
@@ -166,18 +167,25 @@ describe("issueCustom (f0401_custom) — array + validation", () => {
     TotalAmount: 105,
   };
 
-  it("posts an ARRAY with the merchant InvoiceNumber", async () => {
+  it("posts an ARRAY with the merchant InvoiceNumber and returns the data[] response", async () => {
     let body: ReturnType<typeof parseBody> | undefined;
     server.use(
       http.post(`${BASE}/json/f0401_custom`, async ({ request }) => {
         body = parseBody(await request.text());
-        return HttpResponse.json({ code: 0, msg: "" });
+        return HttpResponse.json(CUSTOM_ISSUE_OK);
       }),
     );
-    await testProvider().invoice.issueCustom("AA00000010", validRecord);
+    const res = await testProvider().invoice.issueCustom("SD30001200", validRecord);
+    // request: array carrying the InvoiceNumber
     const arr = body?.data as unknown as Array<Record<string, unknown>>;
     expect(Array.isArray(arr)).toBe(true);
-    expect(arr[0]?.InvoiceNumber).toBe("AA00000010");
+    expect(arr[0]?.InvoiceNumber).toBe("SD30001200");
+    // response: data[] array (no invoice_time/random_number), incl. base64_data slot
+    const out = (res.data as Array<Record<string, unknown>>)[0]!;
+    expect(out.invoice_number).toBe("SD30001200");
+    expect(out.qrcode_right).toContain("自訂配號");
+    expect("base64_data" in out).toBe(true);
+    expect("invoice_time" in out).toBe(false);
   });
 
   it("rejects a malformed InvoiceDate locally", async () => {

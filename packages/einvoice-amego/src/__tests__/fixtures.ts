@@ -108,6 +108,27 @@ export const INVOICE_LIST_OK = {
   ],
 };
 
+/**
+ * f0401_custom success. Unlike f0401, the response is a `data[]` array (one
+ * entry per uploaded invoice) and carries NO invoice_time / random_number —
+ * those are merchant-supplied. Shape per the official spec; a live success
+ * couldn't be captured because the sandbox's tracks aren't configured for
+ * current-period API custom numbering (error paths were verified live).
+ */
+export const CUSTOM_ISSUE_OK = {
+  code: 0,
+  msg: "",
+  data: [
+    {
+      invoice_number: "SD30001200",
+      barcode: "11506SD300012001234",
+      qrcode_left: "SD30001200115061712340000006400000069...",
+      qrcode_right: "**自訂配號測試:1:105",
+      base64_data: "",
+    },
+  ],
+};
+
 export const VOID_OK = { code: 0, msg: "" };
 export const BAN_QUERY_OK = {
   code: 0,
