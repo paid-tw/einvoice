@@ -22,10 +22,30 @@ await invoices.issue({ /* IssueInvoiceInput */ });
 
 ## Status
 
-> ⚠️ **Field mapping is not yet verified.** The request signing and plumbing are
-> implemented, but the unified→Amego field names, endpoint paths, and response
-> parsing are marked with `// VERIFY:` and must be confirmed against the official
-> docs at <https://invoice.amego.tw/api_doc/> before production use.
+Request signing, the per-endpoint field contracts, and response parsing are
+**verified against the live Amego sandbox**. Amego is deliberately inconsistent
+across endpoints — this adapter encodes the verified reality so you don't have to:
+
+| Concern | Detail |
+| --- | --- |
+| Casing | `f0401` / `*_print` use **PascalCase**; `invoice_query` / `*_file` / `*_list` / `allowance_query` use **snake_case** |
+| Array payloads | `f0501`, `g0401`, `g0501`, `*_status`, `ban_query` take a **JSON array** |
+| Discriminator | `invoice_query` / `invoice_file` require `type: "invoice"` |
+| Tax split | B2B 三聯式 splits untaxed sales + tax; B2C 二聯式 keeps the 含稅 total with tax 0; mixed item tax types ⇒ invoice TaxType 9 |
+| Allowance | tax-**exclusive** amounts with a per-line `Tax`; returns no number (the supplied `AllowanceNumber` is the id) |
+| Dates | issue returns unix `invoice_time`; query returns `invoice_date` (YYYYMMDD) + `invoice_time` (HH:MM:SS) |
+
+Run the live lifecycle test yourself with `AMEGO_LIVE=1` (see `src/__tests__/live.test.ts`).
+
+### Resilience (opt-in)
+
+```ts
+createAmegoProvider({
+  sellerTaxId, appKey,
+  syncTime: true,                       // sync clock vs /json/time (avoids error 15)
+  retry: { maxRetries: 3, baseDelayMs: 500 }, // retry transient network failures only
+});
+```
 
 ## Config
 
