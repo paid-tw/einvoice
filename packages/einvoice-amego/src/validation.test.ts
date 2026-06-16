@@ -97,6 +97,32 @@ describe("amegoIssuePayloadSchema — conditional rules", () => {
     expect(ok({ GroupMark: "x" })).toBe(false);
     expect(ok({ GroupMark: "*" })).toBe(true);
   });
+
+  it("accepts PrinterLang 3 (UTF-8) and a model-code PrinterType (verified live)", () => {
+    expect(ok({ PrinterLang: 3 })).toBe(true);
+    expect(ok({ PrinterType: 2, PrintDetail: 2 })).toBe(true);
+    expect(ok({ PrintDetail: 5 })).toBe(false);
+  });
+
+  it("accepts TrackApiCode and BrandName", () =>
+    expect(ok({ TrackApiCode: "API01", BrandName: "品牌" })).toBe(true));
+
+  it("enforces TaxAdjustment=1 preconditions (server silently accepts violations)", () => {
+    const b2bUntaxed = {
+      BuyerIdentifier: "28080623",
+      BuyerName: "光貿科技有限公司",
+      DetailVat: 0,
+      ProductItem: [{ Description: "x", Quantity: 1, UnitPrice: 110, Amount: 110, TaxType: 1 }],
+      SalesAmount: 110, // 尾數 10 → 5% lands on x.5
+      TaxAmount: 5,
+      TotalAmount: 115,
+    };
+    expect(ok({ ...b2bUntaxed, TaxAdjustment: 1 })).toBe(true);
+    // B2C / 含稅 → invalid even though Amego accepts it
+    expect(ok({ TaxAdjustment: 1 })).toBe(false);
+    // 統編 + DetailVat=0 but SalesAmount tail not in {10,30,50,70,90}
+    expect(ok({ ...b2bUntaxed, SalesAmount: 100, TaxAdjustment: 1 })).toBe(false);
+  });
 });
 
 describe("amegoCustomIssuePayloadSchema (f0401_custom)", () => {

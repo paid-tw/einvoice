@@ -55,6 +55,8 @@ const carrierTypes = ["3J0002", "CQ0001", "amego"] as const;
 /** Shared f0401 / f0401_custom fields. */
 const issueBaseObject = z.object({
   OrderId: z.string().min(1, "OrderId is required").max(40, "OrderId must be ≤40 chars"),
+  TrackApiCode: z.string().optional(),
+  BrandName: z.string().optional(),
   BuyerIdentifier: z
     .string()
     .refine((v) => v === "0000000000" || /^\d{8}$/.test(v), "BuyerIdentifier must be 8 digits or 0000000000"),
@@ -95,10 +97,14 @@ const issueBaseObject = z.object({
   BondedAreaConfirm: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]).optional(),
   GroupMark: z.enum(["*", ""]).optional(),
   PrintMark: z.enum(["Y", "N"]).optional(),
-  PrinterType: z.union([z.literal(1), z.literal(2)]).optional(),
-  PrinterLang: z.union([z.literal(1), z.literal(2)]).optional(),
+  // PrinterType is a model code (1, 2, …) — not limited to {1,2}; PrinterLang
+  // is 1 BIG5 / 2 GBK / 3 UTF-8 (verified live).
+  PrinterType: z.number().int().positive().optional(),
+  PrinterLang: z.union([z.literal(1), z.literal(2), z.literal(3)]).optional(),
+  PrintDetail: z.union([z.literal(0), z.literal(1), z.literal(2)]).optional(),
   DetailVat: z.union([z.literal(0), z.literal(1)]).optional(),
   DetailAmountRound: z.union([z.literal(0), z.literal(1)]).optional(),
+  TaxAdjustment: z.union([z.literal(0), z.literal(1)]).optional(),
 });
 
 type IssueLike = {
@@ -107,6 +113,8 @@ type IssueLike = {
   CarrierId1?: string;
   DetailVat?: number;
   TaxType: number;
+  TaxAdjustment?: number;
+  SalesAmount: number;
   CustomsClearanceMark?: number;
   ZeroTaxRateReason?: number;
   ProductItem: Array<{ TaxType: number }>;
@@ -143,6 +151,21 @@ function refineIssue(p: IssueLike, ctx: z.RefinementCtx): void {
           path: ["CarrierId1"],
         });
       }
+    }
+  }
+
+  // TaxAdjustment=1 (營業稅額減 1) is only valid for a 統編 invoice with
+  // DetailVat=0 (未稅) whose SalesAmount ends in 10/30/50/70/90 (where 5% lands
+  // on x.5). Amego silently accepts violations (verified live) — we reject them.
+  if (p.TaxAdjustment === 1) {
+    const tail = Math.abs(Math.round(p.SalesAmount)) % 100;
+    if (!hasTaxId || p.DetailVat !== 0 || ![10, 30, 50, 70, 90].includes(tail)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          "TaxAdjustment=1 requires a 統編 invoice with DetailVat=0 and SalesAmount ending in 10/30/50/70/90",
+        path: ["TaxAdjustment"],
+      });
     }
   }
 
