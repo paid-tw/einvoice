@@ -1,6 +1,10 @@
 import { createHash } from "node:crypto";
 import { InvoiceError, InvoiceErrorCode } from "@paid-tw/einvoice";
-import { type AmegoConfig, resolveBaseUrl } from "./config.js";
+import {
+  type AmegoConfig,
+  resolveBaseUrl,
+  resolveRetry,
+} from "./config.js";
 
 /**
  * Amego signs every request with `md5(data + time + appKey)` and posts it as
@@ -20,21 +24,52 @@ export interface AmegoResponse {
   [key: string]: unknown;
 }
 
-export async function amegoRequest(
+/** Cached server-clock offset (seconds) per base URL, 5 min TTL. */
+const timeOffsetCache = new Map<string, { offset: number; at: number }>();
+const TIME_TTL_MS = 5 * 60 * 1000;
+
+/** Clear the time-sync cache (for tests / forced resync). */
+export function clearTimeSyncCache(): void {
+  timeOffsetCache.clear();
+}
+
+async function getTimestamp(config: AmegoConfig, now: number): Promise<number> {
+  if (!config.syncTime) return now;
+  const baseUrl = resolveBaseUrl(config);
+  const cached = timeOffsetCache.get(baseUrl);
+  if (cached && Date.now() - cached.at < TIME_TTL_MS) return now + cached.offset;
+
+  const doFetch = config.fetch ?? fetch;
+  try {
+    const res = await doFetch(`${baseUrl}/json/time`, { method: "POST" });
+    const json = (await res.json()) as { timestamp?: number };
+    if (typeof json.timestamp === "number") {
+      const offset = json.timestamp - now;
+      timeOffsetCache.set(baseUrl, { offset, at: Date.now() });
+      return json.timestamp;
+    }
+  } catch {
+    // fall through to local time on sync failure
+  }
+  return now;
+}
+
+async function doRequest(
   config: AmegoConfig,
   path: string,
   data: unknown,
-  now: number = Math.floor(Date.now() / 1000),
+  now: number,
 ): Promise<AmegoResponse> {
   const baseUrl = resolveBaseUrl(config);
   const doFetch = config.fetch ?? fetch;
   const dataJson = JSON.stringify(data ?? {});
+  const time = await getTimestamp(config, now);
 
   const body = new URLSearchParams({
     invoice: config.sellerTaxId,
     data: dataJson,
-    time: String(now),
-    sign: sign(dataJson, now, config.appKey),
+    time: String(time),
+    sign: sign(dataJson, time, config.appKey),
   });
 
   let res: Response;
@@ -78,9 +113,35 @@ export async function amegoRequest(
   return json;
 }
 
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+export async function amegoRequest(
+  config: AmegoConfig,
+  path: string,
+  data: unknown,
+  now: number = Math.floor(Date.now() / 1000),
+): Promise<AmegoResponse> {
+  const retry = resolveRetry(config);
+  if (!retry) return doRequest(config, path, data, now);
+
+  let attempt = 0;
+  for (;;) {
+    try {
+      return await doRequest(config, path, data, now);
+    } catch (err) {
+      // Only transient transport failures are retried — never business errors.
+      const retryable = err instanceof InvoiceError && err.code === InvoiceErrorCode.NETWORK;
+      if (!retryable || attempt >= retry.maxRetries) throw err;
+      const delay = Math.min(retry.baseDelayMs * 2 ** attempt, retry.maxDelayMs);
+      await sleep(delay);
+      attempt++;
+    }
+  }
+}
+
 /**
  * Map Amego error codes onto normalized {@link InvoiceErrorCode}s.
- * Source: https://invoice.amego.tw/info_detail?mid=71.
+ * Source: https://invoice.amego.tw/info_detail?mid=71 + live sandbox.
  */
 export function mapAmegoErrorCode(code: number): InvoiceErrorCode {
   // Auth / signature / time / IP
@@ -94,14 +155,20 @@ export function mapAmegoErrorCode(code: number): InvoiceErrorCode {
   // Number track (字軌) exhausted
   if (code === 3040111) return InvoiceErrorCode.NUMBER_EXHAUSTED;
 
-  // Duplicate OrderId / invoice already in a terminal state / allowance conflict
+  // Duplicate OrderId / invoice state conflict / already has an allowance
   if (code === 3040171) return InvoiceErrorCode.CONFLICT;
+  if (code === 3050141) return InvoiceErrorCode.CONFLICT; // 已存在折讓單
   if (code >= 3050121 && code <= 3050123) return InvoiceErrorCode.CONFLICT;
   if (code >= 4040161 && code <= 4040162) return InvoiceErrorCode.CONFLICT;
+
+  // Payload shape errors: "data 欄位資料應為陣列字串" (23 / 3050112) — caller bug
+  if (code === 23 || code === 31 || code === 33 || code === 3050112)
+    return InvoiceErrorCode.VALIDATION;
 
   // Empty data / malformed JSON / field & amount validation (30401xx, 30402xx…)
   if (code === 17 || code === 20) return InvoiceErrorCode.VALIDATION;
   if (code >= 3040100 && code < 3050000) return InvoiceErrorCode.VALIDATION;
+  if (code >= 9000000) return InvoiceErrorCode.VALIDATION; // barcode/carrier field errors
 
   return InvoiceErrorCode.PROVIDER;
 }

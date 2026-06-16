@@ -1,14 +1,17 @@
 import {
   type AllowanceInput,
   type AllowanceResult,
+  type Buyer,
   type Carrier,
   deriveCategory,
+  type InvoiceItem,
   type InvoiceProvider,
   InvoiceStatus,
   type IssueInvoiceInput,
   type IssueInvoiceResult,
   type QueryInvoiceInput,
   type QueryInvoiceResult,
+  type TaxType,
   type VoidAllowanceInput,
   type VoidAllowanceResult,
   type VoidInvoiceInput,
@@ -19,24 +22,20 @@ import {
   voidAllowanceInputSchema,
   voidInvoiceInputSchema,
 } from "@paid-tw/einvoice";
-import { computeAmegoAmounts } from "./amounts.js";
+import {
+  type AmegoProductTaxType,
+  computeAmegoAmounts,
+} from "./amounts.js";
 import { type AmegoResponse, amegoRequest } from "./client.js";
 import type { AmegoConfig } from "./config.js";
 import { ENDPOINTS } from "./endpoints.js";
 
-/** Amego/MIG carrier type codes. */
+/** Amego/MIG carrier type codes (member carrier is the literal `amego`). */
 const CARRIER_TYPE: Record<Carrier["type"], string> = {
   MOBILE_BARCODE: "3J0002",
   CITIZEN_CERTIFICATE: "CQ0001",
-  MEMBER: "EJ0113",
+  MEMBER: "amego",
 };
-
-/** Convert an Amego unix `*_time` field to a Date. */
-function fromAmegoTime(value: unknown): Date {
-  if (typeof value === "number") return new Date(value * 1000);
-  const n = Number(value);
-  return Number.isFinite(n) ? new Date(n * 1000) : new Date();
-}
 
 export class AmegoProvider implements InvoiceProvider {
   readonly name = "amego";
@@ -44,7 +43,7 @@ export class AmegoProvider implements InvoiceProvider {
   constructor(private readonly config: AmegoConfig) {}
 
   /** Escape hatch: call any Amego endpoint directly with a raw payload. */
-  raw(path: string, data?: Record<string, unknown>): Promise<AmegoResponse> {
+  raw(path: string, data?: unknown): Promise<AmegoResponse> {
     return amegoRequest(this.config, path, data ?? {});
   }
 
@@ -55,30 +54,38 @@ export class AmegoProvider implements InvoiceProvider {
   async issue(input: IssueInvoiceInput): Promise<IssueInvoiceResult> {
     const parsed = issueInvoiceInputSchema.parse(input);
     const category = parsed.category ?? deriveCategory(parsed.buyer);
+    const priceExclusive = parsed.priceMode === "TAX_EXCLUSIVE";
+
+    const lines = parsed.items.map((item) => ({
+      amount: item.amount,
+      taxType: resolveItemTaxType(item, parsed.taxType),
+    }));
     const amounts = computeAmegoAmounts({
-      total: parsed.amount.totalAmount,
-      taxType: parsed.taxType,
-      category,
+      lines,
+      buyerHasTaxId: category === "B2B",
       taxRate: parsed.taxRate,
+      priceExclusive,
     });
 
     const data: Record<string, unknown> = {
       OrderId: parsed.orderId,
       BuyerIdentifier: parsed.buyer.taxId ?? "0000000000",
       BuyerName: parsed.buyer.name ?? (category === "B2B" ? "" : "消費者"),
-      BuyerEmailAddress: parsed.buyer.email,
       BuyerAddress: parsed.buyer.address,
+      BuyerTelephoneNumber: parsed.buyer.phone,
+      BuyerEmailAddress: parsed.buyer.email,
       ...carrierFields(parsed.carrier),
       NPOBAN: parsed.donation?.npoban,
       ...amounts,
+      DetailVat: priceExclusive ? 0 : 1,
       ProductItem: parsed.items.map((item) => ({
         Description: item.description,
         Quantity: item.quantity,
         UnitPrice: item.unitPrice,
-        Amount: item.amount, // tax-inclusive; must sum to TotalAmount
+        Amount: item.amount,
         Unit: item.unit,
         Remark: item.remark,
-        TaxType: item.taxType ? String(amounts.TaxType) : undefined,
+        TaxType: resolveItemTaxType(item, parsed.taxType),
       })),
       ...(parsed.providerOptions ?? {}),
     };
@@ -86,10 +93,10 @@ export class AmegoProvider implements InvoiceProvider {
     const res = await amegoRequest(this.config, ENDPOINTS.issue, data);
     return {
       invoiceNumber: String(res.invoice_number ?? ""),
-      invoiceDate: fromAmegoTime(res.invoice_time),
+      invoiceDate: fromUnix(res.invoice_time),
       randomCode: String(res.random_number ?? ""),
       orderId: parsed.orderId,
-      totalAmount: parsed.amount.totalAmount,
+      totalAmount: amounts.TotalAmount,
       status: InvoiceStatus.ISSUED,
       raw: res,
     };
@@ -97,11 +104,10 @@ export class AmegoProvider implements InvoiceProvider {
 
   async void(input: VoidInvoiceInput): Promise<VoidInvoiceResult> {
     const parsed = voidInvoiceInputSchema.parse(input);
-    const res = await amegoRequest(this.config, ENDPOINTS.void, {
-      InvoiceNumber: parsed.invoiceNumber,
-      CancelReason: parsed.reason,
-      ...(parsed.providerOptions ?? {}),
-    });
+    // f0501 takes an ARRAY of { CancelInvoiceNumber }.
+    const res = await amegoRequest(this.config, ENDPOINTS.void, [
+      { CancelInvoiceNumber: parsed.invoiceNumber },
+    ]);
     return {
       invoiceNumber: parsed.invoiceNumber,
       status: InvoiceStatus.VOIDED,
@@ -111,25 +117,52 @@ export class AmegoProvider implements InvoiceProvider {
 
   async allowance(input: AllowanceInput): Promise<AllowanceResult> {
     const parsed = allowanceInputSchema.parse(input);
-    const res = await amegoRequest(this.config, ENDPOINTS.allowance, {
-      InvoiceNumber: parsed.invoiceNumber,
-      AllowanceId: parsed.allowanceId,
-      TotalAmount: parsed.amount.totalAmount,
-      TaxAmount: parsed.amount.taxAmount,
-      SalesAmount: parsed.amount.salesAmount,
-      ProductItem: parsed.items.map((item) => ({
-        Description: item.description,
-        Quantity: item.quantity,
-        UnitPrice: item.unitPrice,
-        Amount: item.amount,
-        TaxType: item.taxType,
-      })),
-      ...(parsed.providerOptions ?? {}),
-    });
+    const opts = (parsed.providerOptions ?? {}) as Record<string, unknown>;
+    const taxRate = typeof opts.taxRate === "number" ? opts.taxRate : 0.05;
+
+    // Original invoice date (YYYYMMDD) is required by Amego; accept it via
+    // providerOptions, otherwise resolve it from invoice_query.
+    const originalDate =
+      (opts.originalInvoiceDate as number | string | undefined) ??
+      (await this.resolveInvoiceDate(parsed.invoiceNumber));
+    const allowanceDate = (opts.allowanceDate as number | string) ?? originalDate;
+
+    const buyer = (opts.buyer as Buyer | undefined) ?? {};
+
+    // g0401 takes an ARRAY; amounts are tax-EXCLUSIVE with a per-line Tax.
+    const data = [
+      {
+        AllowanceNumber: parsed.allowanceId,
+        AllowanceDate: allowanceDate,
+        AllowanceType: (opts.allowanceType as string) ?? "2",
+        BuyerIdentifier: buyer.taxId ?? "0000000000",
+        BuyerName: buyer.name ?? "",
+        BuyerEmailAddress: buyer.email,
+        ProductItem: parsed.items.map((item) => {
+          const tt = resolveItemTaxType(item, "TAXABLE");
+          return {
+            OriginalInvoiceNumber: parsed.invoiceNumber,
+            OriginalInvoiceDate: originalDate,
+            OriginalDescription: item.description,
+            Quantity: item.quantity,
+            UnitPrice: item.unitPrice,
+            Amount: item.amount,
+            Tax: amegoLineTax(item.amount, tt, taxRate),
+            TaxType: tt,
+          };
+        }),
+        TaxAmount: parsed.amount.taxAmount,
+        TotalAmount: parsed.amount.salesAmount, // 未稅 合計
+        ...(opts.extra as Record<string, unknown> | undefined),
+      },
+    ];
+
+    const res = await amegoRequest(this.config, ENDPOINTS.allowance, data);
     return {
-      allowanceNumber: String(res.allowance_number ?? ""),
+      // g0401 returns no number; the supplied AllowanceNumber is the id.
+      allowanceNumber: parsed.allowanceId,
       invoiceNumber: parsed.invoiceNumber,
-      allowanceDate: fromAmegoTime(res.allowance_time),
+      allowanceDate: fromYmd(allowanceDate),
       totalAmount: parsed.amount.totalAmount,
       raw: res,
     };
@@ -137,99 +170,175 @@ export class AmegoProvider implements InvoiceProvider {
 
   async voidAllowance(input: VoidAllowanceInput): Promise<VoidAllowanceResult> {
     const parsed = voidAllowanceInputSchema.parse(input);
-    const res = await amegoRequest(this.config, ENDPOINTS.voidAllowance, {
-      InvoiceNumber: parsed.invoiceNumber,
-      AllowanceNumber: parsed.allowanceNumber,
-      CancelReason: parsed.reason,
-      ...(parsed.providerOptions ?? {}),
-    });
+    // g0501 takes an ARRAY of { CancelAllowanceNumber }.
+    const res = await amegoRequest(this.config, ENDPOINTS.voidAllowance, [
+      { CancelAllowanceNumber: parsed.allowanceNumber },
+    ]);
     return { allowanceNumber: parsed.allowanceNumber, raw: res };
   }
 
   async query(input: QueryInvoiceInput): Promise<QueryInvoiceResult> {
     const parsed = queryInvoiceInputSchema.parse(input);
+    if (!parsed.invoiceNumber) {
+      // invoice_query is keyed by invoice number; orderId lookup isn't supported.
+      throw new Error("Amego query requires invoiceNumber");
+    }
     const res = await amegoRequest(this.config, ENDPOINTS.invoiceQuery, {
-      InvoiceNumber: parsed.invoiceNumber,
-      OrderId: parsed.orderId,
-      ...(parsed.providerOptions ?? {}),
+      type: "invoice",
+      invoice_number: parsed.invoiceNumber,
     });
+    const d = (res.data ?? {}) as Record<string, unknown>;
     return {
-      invoiceNumber: String(res.invoice_number ?? parsed.invoiceNumber ?? ""),
-      invoiceDate: fromAmegoTime(res.invoice_time),
-      randomCode: String(res.random_number ?? ""),
-      orderId: parsed.orderId,
-      status: mapInvoiceStatus(res),
+      invoiceNumber: String(d.invoice_number ?? parsed.invoiceNumber),
+      invoiceDate: fromYmd(d.invoice_date),
+      randomCode: String(d.random_number ?? ""),
+      orderId: d.order_id ? String(d.order_id) : parsed.orderId,
+      status: deriveStatus(d),
       amount: {
-        salesAmount: Number(res.SalesAmount ?? res.sales_amount ?? 0),
-        taxAmount: Number(res.TaxAmount ?? res.tax_amount ?? 0),
-        totalAmount: Number(res.TotalAmount ?? res.total_amount ?? 0),
+        salesAmount: Number(d.sales_amount ?? 0),
+        taxAmount: Number(d.tax_amount ?? 0),
+        totalAmount: Number(d.total_amount ?? 0),
       },
       buyer: {
-        name: res.BuyerName ? String(res.BuyerName) : undefined,
+        name: d.buyer_name ? String(d.buyer_name) : undefined,
         taxId:
-          res.BuyerIdentifier && res.BuyerIdentifier !== "0000000000"
-            ? String(res.BuyerIdentifier)
+          d.buyer_identifier && d.buyer_identifier !== "0000000000"
+            ? String(d.buyer_identifier)
             : undefined,
+        email: d.buyer_email_address ? String(d.buyer_email_address) : undefined,
       },
-      items: [],
+      items: Array.isArray(d.product_item)
+        ? (d.product_item as Array<Record<string, unknown>>).map((it) => ({
+            description: String(it.description ?? ""),
+            quantity: Number(it.quantity ?? 0),
+            unitPrice: Number(it.unit_price ?? 0),
+            amount: Number(it.amount ?? 0),
+            unit: it.unit ? String(it.unit) : undefined,
+          }))
+        : [],
       raw: res,
     };
   }
 
+  /** Fetch an invoice's 開立日期 (YYYYMMDD) — used to fill allowance fields. */
+  private async resolveInvoiceDate(invoiceNumber: string): Promise<number> {
+    const res = await amegoRequest(this.config, ENDPOINTS.invoiceQuery, {
+      type: "invoice",
+      invoice_number: invoiceNumber,
+    });
+    const d = (res.data ?? {}) as Record<string, unknown>;
+    return Number(d.invoice_date ?? 0);
+  }
+
   // -------------------------------------------------------------------------
-  // Amego-specific extensions (not part of the cross-provider interface)
+  // Amego-specific extensions (verified field shapes; not cross-provider)
   // -------------------------------------------------------------------------
 
   /** 發票 management endpoints. */
   readonly invoice = {
-    query: (data: { invoiceNumber?: string; orderId?: string } & Record<string, unknown>) =>
-      this.raw(ENDPOINTS.invoiceQuery, normalizeRef(data)),
-    list: (data?: Record<string, unknown>) => this.raw(ENDPOINTS.invoiceList, data),
-    print: (data: { invoiceNumber: string } & Record<string, unknown>) =>
-      this.raw(ENDPOINTS.invoicePrint, normalizeRef(data)),
-    file: (data: { invoiceNumber: string } & Record<string, unknown>) =>
-      this.raw(ENDPOINTS.invoiceFile, normalizeRef(data)),
-    status: (data: { invoiceNumber: string } & Record<string, unknown>) =>
-      this.raw(ENDPOINTS.invoiceStatus, normalizeRef(data)),
+    /** 發票查詢 — snake_case + `type` discriminator; returns nested `data`. */
+    query: (invoiceNumber: string) =>
+      this.raw(ENDPOINTS.invoiceQuery, { type: "invoice", invoice_number: invoiceNumber }),
+    /** 發票列表 — snake_case range filters. */
+    list: (opts: {
+      startDate?: string;
+      endDate?: string;
+      page?: number;
+      pageSize?: number;
+      dateSelect?: 1 | 2;
+    } = {}) =>
+      this.raw(ENDPOINTS.invoiceList, {
+        date_select: opts.dateSelect ?? 1,
+        ...(opts.startDate ? { start_date: opts.startDate } : {}),
+        ...(opts.endDate ? { end_date: opts.endDate } : {}),
+        ...(opts.page ? { page: opts.page } : {}),
+        ...(opts.pageSize ? { page_size: opts.pageSize } : {}),
+      }),
+    /** 發票列印 — PascalCase + printer fields. */
+    print: (invoiceNumber: string, printerType: number, lang: 1 | 2 | 3 = 3) =>
+      this.raw(ENDPOINTS.invoicePrint, {
+        InvoiceNumber: invoiceNumber,
+        PrinterType: printerType,
+        PrinterLang: lang,
+      }),
+    /** 發票檔案 — returns `data.file_url`. */
+    file: (invoiceNumber: string, downloadStyle: 0 | 1 | 2 | 3 = 0) =>
+      this.raw(ENDPOINTS.invoiceFile, {
+        type: "invoice",
+        invoice_number: invoiceNumber,
+        download_style: downloadStyle,
+      }),
+    /** 發票狀態 — ARRAY payload, nested `data[]`. */
+    status: (invoiceNumbers: string[]) =>
+      this.raw(ENDPOINTS.invoiceStatus, invoiceNumbers.map((InvoiceNumber) => ({ InvoiceNumber }))),
     /** 開立發票 (自訂配號). */
-    issueCustom: (data: Record<string, unknown>) => this.raw(ENDPOINTS.issueCustom, data),
+    issueCustom: (invoiceNumber: string, data: Record<string, unknown>) =>
+      this.raw(ENDPOINTS.issueCustom, { ...data, InvoiceNumber: invoiceNumber }),
   };
 
   /** 折讓 management endpoints. */
   readonly allowances = {
-    query: (data: Record<string, unknown>) => this.raw(ENDPOINTS.allowanceQuery, data),
-    list: (data?: Record<string, unknown>) => this.raw(ENDPOINTS.allowanceList, data),
-    print: (data: Record<string, unknown>) => this.raw(ENDPOINTS.allowancePrint, data),
-    file: (data: Record<string, unknown>) => this.raw(ENDPOINTS.allowanceFile, data),
-    status: (data: Record<string, unknown>) => this.raw(ENDPOINTS.allowanceStatus, data),
+    /** 折讓查詢 — snake_case `allowance_number`; returns nested `data`. */
+    query: (allowanceNumber: string) =>
+      this.raw(ENDPOINTS.allowanceQuery, { allowance_number: allowanceNumber }),
+    list: (opts: { startDate?: string; endDate?: string; page?: number; pageSize?: number } = {}) =>
+      this.raw(ENDPOINTS.allowanceList, {
+        ...(opts.startDate ? { start_date: opts.startDate } : {}),
+        ...(opts.endDate ? { end_date: opts.endDate } : {}),
+        ...(opts.page ? { page: opts.page } : {}),
+        ...(opts.pageSize ? { page_size: opts.pageSize } : {}),
+      }),
+    print: (allowanceNumber: string, printerType: number, lang: 1 | 2 | 3 = 3) =>
+      this.raw(ENDPOINTS.allowancePrint, {
+        AllowanceNumber: allowanceNumber,
+        PrinterType: printerType,
+        PrinterLang: lang,
+      }),
+    file: (allowanceNumber: string, downloadStyle: 0 | 1 | 2 | 3 = 0) =>
+      this.raw(ENDPOINTS.allowanceFile, {
+        allowance_number: allowanceNumber,
+        download_style: downloadStyle,
+      }),
+    /** 折讓狀態 — ARRAY payload, nested `data[]`. */
+    status: (allowanceNumbers: string[]) =>
+      this.raw(
+        ENDPOINTS.allowanceStatus,
+        allowanceNumbers.map((AllowanceNumber) => ({ AllowanceNumber })),
+      ),
   };
 
   /** 中獎 endpoints. */
   readonly lottery = {
-    status: (data?: Record<string, unknown>) => this.raw(ENDPOINTS.lotteryStatus, data),
-    type: (data?: Record<string, unknown>) => this.raw(ENDPOINTS.lotteryType, data),
+    /** 中獎發票 — Year + Period (0:01-02 … 5:11-12). */
+    status: (year: number, period: 0 | 1 | 2 | 3 | 4 | 5) =>
+      this.raw(ENDPOINTS.lotteryStatus, { Year: year, Period: period }),
+    /**
+     * 獎項定義. NOTE: Amego's sandbox currently returns code 16 (sign error)
+     * for this endpoint regardless of payload — a known server-side quirk.
+     */
+    type: () => this.raw(ENDPOINTS.lotteryType, {}),
   };
 
   /** 字軌 (number track) endpoints for self-numbering merchants. */
   readonly track = {
-    all: (data?: Record<string, unknown>) => this.raw(ENDPOINTS.trackAll, data),
+    all: (data: Record<string, unknown>) => this.raw(ENDPOINTS.trackAll, data),
     get: (data: Record<string, unknown>) => this.raw(ENDPOINTS.trackGet, data),
-    status: (data?: Record<string, unknown>) => this.raw(ENDPOINTS.trackStatus, data),
+    status: (data: Record<string, unknown>) => this.raw(ENDPOINTS.trackStatus, data),
   };
 
-  /** 公司名稱查詢 — look up a company name by 統一編號. */
-  banQuery(ban: string): Promise<AmegoResponse> {
-    return this.raw(ENDPOINTS.banQuery, { ban });
+  /** 公司名稱查詢 — look up company names by 統一編號 (batch). */
+  banQuery(...bans: string[]): Promise<AmegoResponse> {
+    return this.raw(ENDPOINTS.banQuery, bans.map((ban) => ({ ban })));
   }
 
-  /** 手機條碼查詢 — validate a mobile barcode carrier. */
-  barcodeQuery(barcode: string): Promise<AmegoResponse> {
-    return this.raw(ENDPOINTS.barcode, { barcode });
+  /** 手機條碼查詢 — validate a mobile barcode carrier (field is `barCode`). */
+  barcodeQuery(barCode: string): Promise<AmegoResponse> {
+    return this.raw(ENDPOINTS.barcode, { barCode });
   }
 
-  /** 伺服器時間 — useful to detect clock skew before signing. */
+  /** 伺服器時間. */
   time(): Promise<AmegoResponse> {
-    return this.raw(ENDPOINTS.time);
+    return this.raw(ENDPOINTS.time, {});
   }
 }
 
@@ -240,32 +349,43 @@ export function createAmegoProvider(config: AmegoConfig): AmegoProvider {
 
 // --- helpers ---------------------------------------------------------------
 
+function resolveItemTaxType(item: InvoiceItem, fallback: TaxType): AmegoProductTaxType {
+  const t = item.taxType ?? fallback;
+  if (t === "ZERO_RATED") return 2;
+  if (t === "TAX_FREE") return 3;
+  return 1; // TAXABLE / SPECIAL → 應稅 line
+}
+
+function amegoLineTax(amount: number, taxType: AmegoProductTaxType, rate: number): number {
+  return taxType === 1 ? Math.round(amount * rate) : 0;
+}
+
 function carrierFields(carrier?: Carrier): Record<string, unknown> {
   if (!carrier) return {};
   return {
     CarrierType: CARRIER_TYPE[carrier.type],
-    CarrierId1: carrier.code,
-    CarrierId2: carrier.code,
+    CarrierId1: carrier.code, // 顯碼
+    CarrierId2: carrier.code, // 隱碼 (same as 顯碼 for mobile barcode)
   };
 }
 
-function normalizeRef(
-  data: { invoiceNumber?: string; orderId?: string } & Record<string, unknown>,
-): Record<string, unknown> {
-  const { invoiceNumber, orderId, ...rest } = data;
-  return {
-    ...(invoiceNumber ? { InvoiceNumber: invoiceNumber } : {}),
-    ...(orderId ? { OrderId: orderId } : {}),
-    ...rest,
-  };
+/** Amego unix `*_time` → Date. */
+function fromUnix(value: unknown): Date {
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(n) && n > 0 ? new Date(n * 1000) : new Date();
 }
 
-function mapInvoiceStatus(res: AmegoResponse): InvoiceStatus {
-  // VERIFY: confirm Amego's status field/values for invoice_query. Defaults to
-  // ISSUED when the field is absent.
-  const status = res.status ?? res.invoice_status;
-  if (status === "V" || status === "voided" || status === 2)
-    return InvoiceStatus.VOIDED;
-  if (status === "A" || status === "allowance") return InvoiceStatus.ALLOWANCE;
+/** Amego `YYYYMMDD` (int or string) → Date at Asia/Taipei midnight. */
+function fromYmd(value: unknown): Date {
+  const s = String(value ?? "");
+  const m = /^(\d{4})(\d{2})(\d{2})$/.exec(s);
+  if (!m) return new Date();
+  return new Date(`${m[1]}-${m[2]}-${m[3]}T00:00:00+08:00`);
+}
+
+function deriveStatus(d: Record<string, unknown>): InvoiceStatus {
+  if (Number(d.cancel_date ?? 0) > 0) return InvoiceStatus.VOIDED;
+  if (Array.isArray(d.allowance) && d.allowance.length > 0)
+    return InvoiceStatus.ALLOWANCE;
   return InvoiceStatus.ISSUED;
 }
