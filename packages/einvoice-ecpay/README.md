@@ -118,9 +118,12 @@ await invoices.setInvoiceWordStatus(trackId, "ENABLE"); // or "PAUSE" / "DISABLE
 - `void` and `allowance` need the invoice's date — pass it via
   `providerOptions: { invoiceDate: "YYYY-MM-DD" }` (the issue result carries it).
   It defaults to today (Asia/Taipei) when omitted.
-- `allowance` uses 協議折讓 (`AllowanceByCollegiate`): the buyer confirms it via a
-  notification (so it requires a `providerOptions.notifyMail`), and it becomes
-  voidable only after confirmation.
+- `allowance` uses 一般開立折讓 (`/B2CInvoice/Allowance`, 紙本): it returns a real
+  折讓單號 immediately and is voidable right away (綠界 uploads to the MOF next
+  day). It defaults to no buyer notification; pass
+  `providerOptions: { allowanceNotify: "E"|"S"|"A", notifyMail, notifyPhone, reason }`
+  to notify. (協議折讓 `AllowanceByCollegiate` / 線上折讓 are also in
+  `ECPAY_ENDPOINTS` for the buyer-confirmation flows.)
 - Live tests run with `ECPAY_LIVE=1` (defaulting to `ECPAY_SANDBOX`).
 
 ## License

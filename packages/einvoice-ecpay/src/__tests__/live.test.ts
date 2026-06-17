@@ -52,6 +52,19 @@ describe.skipIf(!live)("ECPay live (stage) — issue → query → void", LIVE_O
     expect(res.items.length).toBeGreaterThan(0);
   });
 
+  it("issues an allowance then voids it (full 折讓 lifecycle, no buyer confirm)", async () => {
+    const al = await p.allowance({
+      invoiceNumber,
+      allowanceId: orderId,
+      items: [{ description: "整合測試商品", quantity: 2, unitPrice: 50, amount: 100 }],
+      amount: { salesAmount: 100, taxAmount: 0, totalAmount: 100 },
+      providerOptions: { invoiceDate },
+    });
+    expect(al.allowanceNumber).toMatch(/^\d+$/);
+    const va = await p.voidAllowance({ invoiceNumber, allowanceNumber: al.allowanceNumber, reason: "測試作廢" });
+    expect(va.raw.RtnCode).toBe(1);
+  });
+
   it("voids it (Invalid)", async () => {
     const res = await p.void({ invoiceNumber, reason: "整合測試作廢", providerOptions: { invoiceDate } });
     expect(res.status).toBe("VOIDED");

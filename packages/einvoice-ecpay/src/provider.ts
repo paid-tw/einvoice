@@ -295,10 +295,11 @@ export class EcpayProvider implements InvoiceProvider {
   }
 
   /**
-   * 協議折讓 (AllowanceByCollegiate): opens an allowance the buyer confirms via
-   * the notification (it carries an IA_TempExpireDate). It becomes effective —
-   * and {@link EcpayProvider.voidAllowance}-able — only after confirmation.
-   * Requires a buyer email (live-verified).
+   * 一般開立折讓 (Allowance, 紙本): create a real allowance (綠界 uploads to the
+   * MOF the next day) and return its 折讓單號 immediately — it can be voided right
+   * away with {@link EcpayProvider.voidAllowance}. Defaults to no buyer
+   * notification (`AllowanceNotify="N"`); to notify, pass
+   * `providerOptions: { allowanceNotify: "E" | "S" | "A", notifyMail, notifyPhone }`.
    */
   async allowance(input: AllowanceInput): Promise<AllowanceResult> {
     const parsed = allowanceInputSchema.parse(input);
@@ -306,17 +307,18 @@ export class EcpayProvider implements InvoiceProvider {
     const result = await ecpayRequest(this.config, ENDPOINTS.allowance, {
       InvoiceNo: parsed.invoiceNumber,
       InvoiceDate: (opts.invoiceDate as string) ?? taipeiDate(parsed.date),
-      // AllowanceByCollegiate always requires a buyer email (live-verified).
-      AllowanceNotify: (opts.allowanceNotify as string) ?? "E", // S簡訊 / E信箱 / N不通知
+      AllowanceNotify: (opts.allowanceNotify as string) ?? "N", // S簡訊 / E信箱 / A皆通知 / N不通知
       CustomerName: opts.customerName as string | undefined,
       NotifyMail: opts.notifyMail as string | undefined,
+      NotifyPhone: opts.notifyPhone as string | undefined,
       AllowanceAmount: parsed.amount.totalAmount,
+      Reason: opts.reason as string | undefined,
       Items: toEcpayItems(parsed.items, parsed.providerOptions),
     });
     return {
       allowanceNumber: String(result.IA_Allow_No ?? ""),
       invoiceNumber: parsed.invoiceNumber,
-      allowanceDate: parseEcpayDate(result.IA_TempDate),
+      allowanceDate: parseEcpayDate(result.IA_Date),
       totalAmount: parsed.amount.totalAmount,
       raw: result,
     };

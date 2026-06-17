@@ -11,8 +11,9 @@ export const ENDPOINTS = {
   cancelDelayIssue: "/B2CInvoice/CancelDelayIssue", // 取消延遲開立
   invalid: "/B2CInvoice/Invalid", // 作廢
   voidWithReIssue: "/B2CInvoice/VoidWithReIssue", // 註銷重開
-  allowance: "/B2CInvoice/AllowanceByCollegiate", // 協議折讓(賣方自行)
-  allowanceOnline: "/B2CInvoice/AllowanceOnline", // 線上折讓(買方確認)
+  allowance: "/B2CInvoice/Allowance", // 一般開立折讓(紙本, 隔日上傳, 立即可作廢)
+  allowanceByCollegiate: "/B2CInvoice/AllowanceByCollegiate", // 協議折讓(買方線上確認, 暫存)
+  allowanceOnline: "/B2CInvoice/AllowanceOnline", // 線上折讓
   allowanceInvalid: "/B2CInvoice/AllowanceInvalid", // 作廢折讓
   getIssue: "/B2CInvoice/GetIssue", // 查詢開立
   getAllowance: "/B2CInvoice/GetAllowance", // 查詢折讓

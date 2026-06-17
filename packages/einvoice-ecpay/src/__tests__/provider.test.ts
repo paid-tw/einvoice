@@ -144,12 +144,12 @@ describe("void / allowance / voidAllowance", () => {
     expect(data?.InvoiceDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 
-  it("allowance posts AllowanceByCollegiate and returns the IA_Allow_No", async () => {
+  it("allowance posts /Allowance (default AllowanceNotify=N) and returns IA_Allow_No + IA_Date", async () => {
     let data: Record<string, unknown> | undefined;
     server.use(
       http.post(url(ECPAY_ENDPOINTS.allowance), async ({ request }) => {
         data = parseRequest(await request.text()).data;
-        return HttpResponse.json(ecSuccess({ IA_Allow_No: "2606171224534134", IA_TempDate: "2026-06-17 12:24:53" }));
+        return HttpResponse.json(ecSuccess({ IA_Allow_No: "2026061721545183", IA_Date: "2026-06-17 21:54:51", IA_Remain_Allowance_Amt: 0 }));
       }),
     );
     const res = await testProvider().allowance({
@@ -157,10 +157,29 @@ describe("void / allowance / voidAllowance", () => {
       allowanceId: "ORDER_1",
       items: [{ description: "商品一", quantity: 1, unitPrice: 100, amount: 100 }],
       amount: { salesAmount: 100, taxAmount: 0, totalAmount: 100 },
-      providerOptions: { invoiceDate: "2026-06-17", notifyMail: "b@x.com" },
+      providerOptions: { invoiceDate: "2026-06-17" },
     });
-    expect(data).toMatchObject({ InvoiceNo: "JU11082062", AllowanceAmount: 100, AllowanceNotify: "E", NotifyMail: "b@x.com" });
-    expect(res.allowanceNumber).toBe("2606171224534134");
+    expect(data).toMatchObject({ InvoiceNo: "JU11082062", AllowanceAmount: 100, AllowanceNotify: "N" });
+    expect(res.allowanceNumber).toBe("2026061721545183");
+    expect(res.allowanceDate.getFullYear()).toBe(2026);
+  });
+
+  it("allowance can notify by email (AllowanceNotify=E + NotifyMail)", async () => {
+    let data: Record<string, unknown> | undefined;
+    server.use(
+      http.post(url(ECPAY_ENDPOINTS.allowance), async ({ request }) => {
+        data = parseRequest(await request.text()).data;
+        return HttpResponse.json(ecSuccess({ IA_Allow_No: "A1", IA_Date: "2026-06-17 21:54:51" }));
+      }),
+    );
+    await testProvider().allowance({
+      invoiceNumber: "JU1",
+      allowanceId: "O1",
+      items: [{ description: "x", quantity: 1, unitPrice: 100, amount: 100 }],
+      amount: { salesAmount: 100, taxAmount: 0, totalAmount: 100 },
+      providerOptions: { invoiceDate: "2026-06-17", allowanceNotify: "E", notifyMail: "b@x.com", reason: "退款" },
+    });
+    expect(data).toMatchObject({ AllowanceNotify: "E", NotifyMail: "b@x.com", Reason: "退款" });
   });
 
   it("voidAllowance posts InvoiceNo + AllowanceNo + Reason", async () => {
