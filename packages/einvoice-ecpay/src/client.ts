@@ -112,7 +112,11 @@ export async function ecpayRequest(
  * live), so the Chinese `RtnMsg` is the reliable signal; everything unmatched is
  * treated as field/business validation (the common case).
  */
-export function mapEcpayError(_rtnCode: number, rtnMsg = ""): InvoiceErrorCode {
+export function mapEcpayError(rtnCode: number, rtnMsg = ""): InvoiceErrorCode {
+  // 9000001 = 呼叫財政部API失敗 (財政部 maintenance) — transient, retryable, NOT
+  // an input error. Surface it as NETWORK so callers don't reject a valid value.
+  if (rtnCode === 9000001 || /財政部.*(失敗|維護)|呼叫.*API失敗/.test(rtnMsg))
+    return InvoiceErrorCode.NETWORK;
   if (/特店.*不存在|平台商.*不存在|金鑰|簽章|未授權/.test(rtnMsg)) return InvoiceErrorCode.AUTH;
   if (/字軌.*(用罄|用完|不足|已滿)|號碼.*(用罄|用完)/.test(rtnMsg))
     return InvoiceErrorCode.NUMBER_EXHAUSTED;

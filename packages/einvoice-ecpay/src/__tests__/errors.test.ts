@@ -13,6 +13,7 @@ describe("mapEcpayError (keyword-based, ECPay RtnMsg)", () => {
     [5000022, "驗證發票金額發現錯誤，與商品合計金額不符", "VALIDATION"],
     [2020001, "捐贈碼為3~7碼純數字", "VALIDATION"],
     [9999999, "系統異常，請稍後再試", "PROVIDER"],
+    [9000001, "呼叫財政部API失敗", "NETWORK"], // 財政部 maintenance — transient
   ])("maps RtnCode %s (%s) → %s", (code, msg, expected) => {
     expect(mapEcpayError(code, msg)).toBe(expected);
   });
