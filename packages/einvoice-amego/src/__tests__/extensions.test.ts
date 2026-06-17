@@ -53,16 +53,16 @@ const CASES: Array<{
     expectData: { date_select: 1, date_start: 20260601, date_end: 20260630, limit: 20, page: 2 },
   },
   {
-    name: "invoice.print (type + snake_case)",
+    name: "invoice.print by invoiceNumber (type:invoice)",
     path: ENDPOINTS.invoicePrint,
-    invoke: (p) => p.invoice.print("AA1", 7),
-    expectData: { type: "invoice", invoice_number: "AA1", printer_type: 7 },
+    invoke: (p) => p.invoice.print({ invoiceNumber: "AA1", printerType: 7, printerLang: 3 }),
+    expectData: { type: "invoice", invoice_number: "AA1", printer_type: 7, printer_lang: 3 },
   },
   {
-    name: "invoice.print with printer_lang",
+    name: "invoice.print by orderId + print_invoice_type/detail",
     path: ENDPOINTS.invoicePrint,
-    invoke: (p) => p.invoice.print("AA1", 7, 3),
-    expectData: { type: "invoice", invoice_number: "AA1", printer_type: 7, printer_lang: 3 },
+    invoke: (p) => p.invoice.print({ orderId: "O1", printerType: 2, printInvoiceType: 1, printInvoiceDetail: 1 }),
+    expectData: { type: "order", order_id: "O1", printer_type: 2, print_invoice_type: 1, print_invoice_detail: 1 },
   },
   {
     name: "invoice.file (snake_case + type)",

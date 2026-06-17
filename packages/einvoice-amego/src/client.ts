@@ -204,8 +204,14 @@ export function mapAmegoErrorCode(rawCode: number | string): InvoiceErrorCode {
   if (code >= 4040152 && code <= 4040154) return InvoiceErrorCode.CONFLICT;
   if (code >= 4040161 && code <= 4040163) return InvoiceErrorCode.CONFLICT;
 
-  // Payload shape errors: "data 欄位資料應為陣列字串" (23 / 3050112 / 4050112) — caller bug
-  if (code === 23 || code === 31 || code === 33 || code === 3050112 || code === 4050112)
+  // Payload shape / query-param errors: "data 應為陣列字串" (23/3050112/4050112),
+  // print/query type & param errors (31–36 — verified live).
+  if (
+    code === 23 ||
+    (code >= 31 && code <= 36) ||
+    code === 3050112 ||
+    code === 4050112
+  )
     return InvoiceErrorCode.VALIDATION;
 
   // f0401_custom per-record field errors are returned as code 99 (verified live).

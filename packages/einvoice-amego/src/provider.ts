@@ -282,15 +282,29 @@ export class AmegoProvider implements InvoiceProvider {
         page: opts.page ?? 1,
       }),
     /**
-     * 發票列印 — snake_case + `type` discriminator (verified live; PascalCase
-     * gives "type 查詢類型不存在"). Returns `data.base64_data` for PrinterType ≥ 2.
+     * 發票列印 — generate a printer-format string. Look up by `invoiceNumber` or
+     * `orderId` (snake_case + `type` discriminator; verified live). Returns
+     * `data.base64_data` (XML for printerType 1, ESC/POS for ≥2). NOTE: a $0
+     * invoice cannot be printed.
      */
-    print: (invoiceNumber: string, printerType: number, lang?: 1 | 2 | 3) =>
+    print: (opts: {
+      invoiceNumber?: string;
+      orderId?: string;
+      printerType: number;
+      printerLang?: 1 | 2 | 3;
+      /** 1 發票正本 / 2 發票補印 / 3 單印明細. */
+      printInvoiceType?: 1 | 2 | 3;
+      /** 0 不列印明細 / 1 明細(裁切, default) / 2 明細(不裁切). */
+      printInvoiceDetail?: 0 | 1 | 2;
+    }) =>
       this.raw(ENDPOINTS.invoicePrint, {
-        type: "invoice",
-        invoice_number: invoiceNumber,
-        printer_type: printerType,
-        ...(lang !== undefined ? { printer_lang: lang } : {}),
+        ...(opts.orderId
+          ? { type: "order", order_id: opts.orderId }
+          : { type: "invoice", invoice_number: opts.invoiceNumber }),
+        printer_type: opts.printerType,
+        ...(opts.printerLang !== undefined ? { printer_lang: opts.printerLang } : {}),
+        ...(opts.printInvoiceType !== undefined ? { print_invoice_type: opts.printInvoiceType } : {}),
+        ...(opts.printInvoiceDetail !== undefined ? { print_invoice_detail: opts.printInvoiceDetail } : {}),
       }),
     /** 發票檔案 — returns `data.file_url`. */
     file: (invoiceNumber: string, downloadStyle: 0 | 1 | 2 | 3 = 0) =>

@@ -46,6 +46,10 @@ describe("mapAmegoErrorCode (from info_detail?mid=71)", () => {
     [4040156, "NOT_FOUND"], // 原發票不存在
     [4040161, "CONFLICT"], // 已存在折讓開立
     [4040171, "VALIDATION"], // 折讓金額大於原發票
+    [32, "VALIDATION"], // invoice_print order_id 不可為空
+    [34, "VALIDATION"], // type 查詢類型錯誤
+    [35, "VALIDATION"], // printer_type 錯誤
+    [36, "VALIDATION"], // 不支援單印明細
     [71, "NOT_FOUND"], // 查無資料
     [3050125, "NOT_FOUND"], // 發票不存在
     [999999, "PROVIDER"], // unknown

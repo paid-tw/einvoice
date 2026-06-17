@@ -141,6 +141,13 @@ describe.skipIf(!live)("Amego live lifecycle", () => {
     expect((res.data as { file_url?: string }).file_url).toMatch(/^https:\/\//);
   });
 
+  it("prints the invoice (invoice.print → data.base64_data, ESC/POS for printer_type 2)", async () => {
+    const res = await provider.invoice.print({ invoiceNumber, printerType: 2, printInvoiceType: 1, printInvoiceDetail: 1 });
+    expect(res.code).toBe(0);
+    expect(typeof (res.data as { base64_data?: string }).base64_data).toBe("string");
+    expect((res.data as { base64_data: string }).base64_data.length).toBeGreaterThan(0);
+  });
+
   it("voids the invoice (array payload, no CancelReason)", async () => {
     const res = await provider.void({ invoiceNumber, reason: "整合測試作廢" });
     expect(res.status).toBe("VOIDED");
