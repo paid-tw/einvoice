@@ -1,7 +1,7 @@
 import { http, HttpResponse } from "msw";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { ECPAY_ENDPOINTS } from "../index.js";
-import { BASE, ecError, ecSuccess, parseRequest, server, testProvider } from "./server.js";
+import { BASE, ecError, ecPlainSuccess, ecSuccess, parseRequest, server, testProvider } from "./server.js";
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => server.resetHandlers());
@@ -417,6 +417,64 @@ describe("線上開立折讓 (allowanceOnline)", () => {
     await expect(
       testProvider().cancelAllowanceOnline({ invoiceNumber: "JU1", allowanceNumber: "A1", reason: "x".repeat(21) }),
     ).rejects.toMatchObject({ code: "VALIDATION" });
+  });
+});
+
+describe("查詢多筆發票 (listInvoices / GetIssueList)", () => {
+  const ROW = {
+    IIS_Number: "JU11083134",
+    IIS_Relate_Number: "ORDER_1",
+    IIS_Identifier: "0000000000",
+    IIS_Category: "B2C",
+    IIS_Tax_Type: "1",
+    IIS_Tax_Amount: 0,
+    IIS_Sales_Amount: 100,
+    IIS_Create_Date: "2026-06-17 22:17:00",
+    IIS_Invalid_Status: "0",
+    IIS_Upload_Status: "1",
+    IIS_Remain_Allowance_Amt: 100,
+  };
+
+  it("posts the date range + pagination + filters, parses the plain-JSON page", async () => {
+    let data: Record<string, unknown> | undefined;
+    server.use(
+      http.post(url(ECPAY_ENDPOINTS.getIssueList), async ({ request }) => {
+        data = parseRequest(await request.text()).data;
+        return HttpResponse.json(ecPlainSuccess({ TotalCount: 3718, ShowingPage: 2, InvoiceData: [ROW] }));
+      }),
+    );
+    const res = await testProvider().listInvoices({
+      beginDate: "2026-06-17",
+      endDate: "2026-06-17",
+      numPerPage: 30,
+      page: 2,
+      filters: { Query_Invalid: "2" },
+    });
+    expect(data).toMatchObject({ BeginDate: "2026-06-17", EndDate: "2026-06-17", NumPerPage: 30, ShowingPage: 2, DataType: "1", Query_Invalid: "2" });
+    expect(res.totalCount).toBe(3718);
+    expect(res.page).toBe(2);
+    expect(res.invoices[0]).toMatchObject({
+      invoiceNumber: "JU11083134",
+      orderId: "ORDER_1",
+      category: "B2C",
+      salesAmount: 100,
+      voided: false,
+      uploaded: true,
+    });
+    expect(res.invoices[0]?.ubn).toBeUndefined();
+    expect(res.invoices[0]?.createdAt.getFullYear()).toBe(2026);
+  });
+
+  it("rejects an out-of-range numPerPage locally", async () => {
+    await expect(
+      testProvider().listInvoices({ beginDate: "2026-06-17", endDate: "2026-06-17", numPerPage: 201 }),
+    ).rejects.toMatchObject({ code: "VALIDATION" });
+  });
+
+  it("returns an empty page when there's no InvoiceData", async () => {
+    server.use(http.post(url(ECPAY_ENDPOINTS.getIssueList), () => HttpResponse.json(ecPlainSuccess({ TotalCount: 0 }))));
+    const res = await testProvider().listInvoices({ beginDate: "2026-06-17", endDate: "2026-06-17" });
+    expect(res.invoices).toEqual([]);
   });
 });
 

@@ -196,12 +196,21 @@ describe.skipIf(!live)("ECPay live (stage) — 載具驗證", LIVE_OPTS, () => {
 describe.skipIf(!live)("ECPay live (stage) — 查詢財政部配號", LIVE_OPTS, () => {
   const p = provider();
   const thisYear = String(new Date().getFullYear() - 1911); // 民國年
+  const thisYearDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Taipei" }).format(new Date());
 
   it("lists the allocated 字軌 ranges for the current 民國年", async () => {
     const ranges = await p.getGovInvoiceWordSetting(thisYear);
     expect(ranges.length).toBeGreaterThan(0);
     expect(ranges[0]?.header).toMatch(/^[A-Z]{2}$/);
     expect(ranges[0]?.start).toMatch(/^\d{8}$/);
+  });
+
+  it("lists multiple invoices in a date range (GetIssueList, paginated, plain JSON)", async () => {
+    const page = await p.listInvoices({ beginDate: thisYearDate, endDate: thisYearDate, numPerPage: 3, page: 1 });
+    expect(page.totalCount).toBeGreaterThan(0);
+    expect(page.invoices.length).toBeGreaterThan(0);
+    expect(page.invoices[0]?.invoiceNumber).toMatch(/^[A-Z]{2}\d{8}$/);
+    expect(page.invoices[0]?.createdAt.getFullYear()).toBeGreaterThan(2024);
   });
 
   it("lists this merchant's own 字軌 with a use status", async () => {

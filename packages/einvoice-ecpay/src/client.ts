@@ -34,6 +34,11 @@ export interface EcpayRequestOptions {
    * whose "開立發票成功" replies use 4000003/4000004 (live-verified).
    */
   successCodes?: number[];
+  /**
+   * The response `Data` is an unencrypted JSON object (not the usual AES base64
+   * string). Used by GetIssueList (live-verified — the doc's "AES解密" is wrong).
+   */
+  plainData?: boolean;
 }
 
 export async function ecpayRequest(
@@ -89,7 +94,9 @@ export async function ecpayRequest(
     });
   }
 
-  const result = decryptData<EcpayResult>(envelope.Data, config.hashKey, config.hashIV);
+  const result = options.plainData
+    ? (envelope.Data as unknown as EcpayResult)
+    : decryptData<EcpayResult>(envelope.Data, config.hashKey, config.hashIV);
 
   // RtnCode is the business result (1 = success, plus any opted-in extras).
   const ok = new Set([1, ...(options.successCodes ?? [])]);

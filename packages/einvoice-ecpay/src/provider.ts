@@ -124,6 +124,44 @@ export interface OnlineAllowanceResult {
   raw: EcpayResult;
 }
 
+/** Filter for {@link EcpayProvider.listInvoices} (查詢多筆發票). */
+export interface ListInvoicesInput {
+  /** 查詢起始日期 yyyy-MM-dd (by issue date). */
+  beginDate: string;
+  /** 查詢結束日期 yyyy-MM-dd. */
+  endDate: string;
+  /** 單頁筆數 (≤200; recommend ≤30). Default 30. */
+  numPerPage?: number;
+  /** 頁數 (1-based). Default 1. Sorted newest issue date first. */
+  page?: number;
+  /** Raw ECPay `Query_*` filters, passed through (e.g. `{ Query_Invalid: "1" }`). */
+  filters?: Record<string, string | number>;
+}
+
+/** One row from {@link EcpayProvider.listInvoices}. */
+export interface InvoiceListItem {
+  invoiceNumber: string;
+  orderId: string;
+  ubn?: string;
+  category: string; // B2B / B2C
+  taxType: string;
+  taxAmount: number;
+  salesAmount: number; // 含稅 total
+  createdAt: Date;
+  voided: boolean;
+  uploaded: boolean;
+  remainingAllowance: number;
+  raw: Record<string, unknown>;
+}
+
+/** A page of {@link EcpayProvider.listInvoices} results. */
+export interface InvoiceListPage {
+  /** Total rows across all pages (use to drive pagination). */
+  totalCount: number;
+  page: number;
+  invoices: InvoiceListItem[];
+}
+
 /** Outcome of {@link EcpayProvider.triggerIssue} (觸發開立). */
 export interface TriggerIssueResult {
   /** `true` when issued immediately (4000004); `false` when it will auto-issue after the delay (4000003). */
@@ -478,6 +516,56 @@ export class EcpayProvider implements InvoiceProvider {
         remark: stringOrUndef(it.ItemRemark),
       })),
       raw: result,
+    };
+  }
+
+  /**
+   * 查詢多筆發票 (GetIssueList): list issued invoices in a date range, newest
+   * first, paginated. Call once to read `totalCount`, then iterate `page`. Note
+   * this endpoint's response `Data` is unencrypted JSON (handled internally).
+   */
+  async listInvoices(input: ListInvoicesInput): Promise<InvoiceListPage> {
+    const numPerPage = input.numPerPage ?? 30;
+    if (this.config.validatePayload !== false && (numPerPage < 1 || numPerPage > 200)) {
+      throw new InvoiceError(`Invalid numPerPage: ${numPerPage}`, {
+        provider: "ecpay",
+        code: InvoiceErrorCode.VALIDATION,
+        rawMessage: "numPerPage must be 1–200",
+      });
+    }
+    const result = await ecpayRequest(
+      this.config,
+      ENDPOINTS.getIssueList,
+      {
+        BeginDate: input.beginDate,
+        EndDate: input.endDate,
+        NumPerPage: numPerPage,
+        ShowingPage: input.page ?? 1,
+        DataType: "1", // JSON (CSV not supported)
+        ...input.filters,
+      },
+      { plainData: true },
+    );
+    const rows = Array.isArray(result.InvoiceData)
+      ? (result.InvoiceData as Array<Record<string, unknown>>)
+      : [];
+    return {
+      totalCount: Number(result.TotalCount ?? 0),
+      page: Number(result.ShowingPage ?? input.page ?? 1),
+      invoices: rows.map((w) => ({
+        invoiceNumber: String(w.IIS_Number ?? ""),
+        orderId: String(w.IIS_Relate_Number ?? ""),
+        ubn: stringOrUndef(w.IIS_Identifier, "0000000000"),
+        category: String(w.IIS_Category ?? ""),
+        taxType: String(w.IIS_Tax_Type ?? ""),
+        taxAmount: Number(w.IIS_Tax_Amount ?? 0),
+        salesAmount: Number(w.IIS_Sales_Amount ?? 0),
+        createdAt: parseEcpayDate(w.IIS_Create_Date),
+        voided: w.IIS_Invalid_Status === "1" || w.IIS_Invalid_Status === 1,
+        uploaded: w.IIS_Upload_Status === "1" || w.IIS_Upload_Status === 1,
+        remainingAllowance: Number(w.IIS_Remain_Allowance_Amt ?? 0),
+        raw: w,
+      })),
     };
   }
 

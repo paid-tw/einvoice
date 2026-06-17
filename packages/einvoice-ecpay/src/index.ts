@@ -12,6 +12,9 @@ export type {
   EcpayWordTrackStatus,
   GetWordSettingInput,
   IssuePendingOptions,
+  ListInvoicesInput,
+  InvoiceListItem,
+  InvoiceListPage,
   OnlineAllowanceResult,
   TriggerIssueResult,
 } from "./provider.js";

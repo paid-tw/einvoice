@@ -53,3 +53,13 @@ export function ecError(rtnCode: number, rtnMsg: string) {
 export function ecTransError(transCode: number, transMsg: string) {
   return { MerchantID: MERCHANT, TransCode: transCode, TransMsg: transMsg };
 }
+
+/** A success envelope whose Data is a plain (unencrypted) object — for GetIssueList. */
+export function ecPlainSuccess(result: Record<string, unknown>) {
+  return {
+    MerchantID: MERCHANT,
+    TransCode: 1,
+    TransMsg: "",
+    Data: { RtnCode: 1, RtnMsg: "", ...result },
+  };
+}

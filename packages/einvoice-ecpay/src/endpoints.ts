@@ -15,7 +15,8 @@ export const ENDPOINTS = {
   allowanceByCollegiate: "/B2CInvoice/AllowanceByCollegiate", // 線上折讓(買方 email 點連結確認)
   allowanceInvalid: "/B2CInvoice/AllowanceInvalid", // 作廢折讓(已確認)
   allowanceInvalidByCollegiate: "/B2CInvoice/AllowanceInvalidByCollegiate", // 取消線上折讓(買方確認前)
-  getIssue: "/B2CInvoice/GetIssue", // 查詢開立
+  getIssue: "/B2CInvoice/GetIssue", // 查詢開立(單筆)
+  getIssueList: "/B2CInvoice/GetIssueList", // 查詢多筆(分頁, 回應 Data 為未加密 JSON)
   getAllowance: "/B2CInvoice/GetAllowance", // 查詢折讓
   getInvalid: "/B2CInvoice/GetInvalid", // 查詢作廢
   getAllowanceInvalid: "/B2CInvoice/GetAllowanceInvalid", // 查詢作廢折讓
