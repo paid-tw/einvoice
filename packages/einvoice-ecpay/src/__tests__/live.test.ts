@@ -287,8 +287,20 @@ describe.skipIf(!live)("ECPay live (stage) — 查詢財政部配號", LIVE_OPTS
   it("lists the allocated 字軌 ranges for the current 民國年", async () => {
     const ranges = await p.getGovInvoiceWordSetting(thisYear);
     expect(ranges.length).toBeGreaterThan(0);
-    expect(ranges[0]?.header).toMatch(/^[A-Z]{2}$/);
-    expect(ranges[0]?.start).toMatch(/^\d{8}$/);
+    const r = ranges[0]!;
+    expect(r.header).toMatch(/^[A-Z]{2}$/);
+    expect(r.invType).toMatch(/^0[78]$/);
+    expect(r.term).toBeGreaterThanOrEqual(1);
+    expect(r.term).toBeLessThanOrEqual(6);
+    expect(r.start).toMatch(/^\d{8}$/);
+    expect(r.end).toMatch(/^\d{8}$/);
+    // Verified live: 1 本 = 50 numbers, so the range spans count × 50 numbers.
+    expect(Number(r.end) - Number(r.start) + 1).toBe(r.count * 50);
+  });
+
+  it("rejects an out-of-range 民國年 (only last/current/next)", async () => {
+    // 110 is too old → ECPay returns 字軌年份錯誤.
+    await expect(p.getGovInvoiceWordSetting("110")).rejects.toMatchObject({ provider: "ecpay" });
   });
 
   it("lists multiple invoices in a date range (GetIssueList, paginated, plain JSON)", async () => {
