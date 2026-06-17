@@ -39,8 +39,14 @@ describe("ezreceiptTaxType + endpoints", () => {
   it("builds path endpoints (invID/awID/stID in the path)", () => {
     expect(EP.view(999)).toBe("/eInvoice/invoice/view/999");
     expect(EP.void(999)).toBe("/eInvoice/invoice/void/999");
-    expect(EP.allowanceCreate(1)).toBe("/eInvoice/allowance/create/1");
+    expect(EP.allowanceCreate).toBe("/eInvoice/allowance/create");
     expect(EP.allowanceVoid(2)).toBe("/eInvoice/allowance/void/2");
+    expect(EP.allowanceConfirm(3)).toBe("/eInvoice/allowance/confirm/3");
+    expect(EP.allowanceBuyerConfirm(4)).toBe("/eInvoice/allowance/buyerConfirm/4");
+    expect(EP.allowanceConfirmVoid(5)).toBe("/eInvoice/allowance/confirmVoid/5");
+    expect(EP.allowanceView(7)).toBe("/eInvoice/allowance/view/7");
+    expect(EP.allowanceList).toBe("/eInvoice/allowance/list");
+    expect(EP.allowanceUpdateItems(6)).toBe("/eInvoice/allowance/updateItems/6");
     expect(EP.invNumberList(9905)).toBe("/eInvoice/invNumber/list/9905");
     expect(EP.invNumberList()).toBe("/eInvoice/invNumber/list");
   });
@@ -220,7 +226,7 @@ describe("allowance", () => {
       loginHandler(),
       listResolves("SX60721900", 999),
       http.post(url(EP.view(999)), () => ok({ prodList: [{ soiID: 236520, saleTax: 5 }] })),
-      http.post(url(EP.allowanceCreate(999)), async ({ request }) => {
+      http.post(url(EP.allowanceCreate), async ({ request }) => {
         allowBody = (await request.json()) as Record<string, unknown>;
         return ok({ awID: 883, awNo: "S26SX607219001", createTime: "2026-06-18 06:39:52" });
       }),
@@ -235,12 +241,32 @@ describe("allowance", () => {
     expect(allowBody?.prodList).toMatchObject([{ soiID: 236520, qty: 1, amount: 100, tax: 5 }]);
   });
 
+  it("passes allowTime and needConfirm through from providerOptions", async () => {
+    let body: Record<string, unknown> | undefined;
+    server.use(
+      loginHandler(),
+      http.post(url(EP.view(7)), () => ok({ prodList: [{ soiID: 1, saleTax: 5 }] })),
+      http.post(url(EP.allowanceCreate), async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>;
+        return ok({ awID: 1, awNo: "A" });
+      }),
+    );
+    await testProvider().allowance({
+      invoiceNumber: "SX1",
+      allowanceId: "A1",
+      items: [{ description: "x", quantity: 1, unitPrice: 100, amount: 100 }],
+      amount: { salesAmount: 100, taxAmount: 5, totalAmount: 105 },
+      providerOptions: { invID: 7, allowTime: "2026-06-18 07:00:00", needConfirm: true },
+    });
+    expect(body).toMatchObject({ allowTime: "2026-06-18 07:00:00", needConfirm: true });
+  });
+
   it("honours a per-line tax override via providerOptions.itemTax", async () => {
     let allowBody: Record<string, unknown> | undefined;
     server.use(
       loginHandler(),
       http.post(url(EP.view(999)), () => ok({ prodList: [{ soiID: 1, saleTax: 5 }] })),
-      http.post(url(EP.allowanceCreate(999)), async ({ request }) => {
+      http.post(url(EP.allowanceCreate), async ({ request }) => {
         allowBody = (await request.json()) as Record<string, unknown>;
         return ok({ awID: 1, awNo: "A" });
       }),
@@ -271,9 +297,24 @@ describe("voidAllowance", () => {
     expect(body).toMatchObject({ voidReason: "測試" });
   });
 
-  it("requires providerOptions.awID", async () => {
-    server.use(loginHandler());
-    await expect(testProvider().voidAllowance({ invoiceNumber: "SX1", allowanceNumber: "A" })).rejects.toMatchObject({ code: "VALIDATION" });
+  it("resolves the awID by allowance number via allowance/list", async () => {
+    let voidedAw: string | undefined;
+    server.use(
+      loginHandler(),
+      http.post(url(EP.allowanceList), () => ok({ list: [{ awNo: "S26SX607219001", awID: 883 }], entries: 1 })),
+      http.post(url(EP.allowanceVoid(883)), () => {
+        voidedAw = "883";
+        return ok({ awID: "883" });
+      }),
+    );
+    const res = await testProvider().voidAllowance({ invoiceNumber: "SX1", allowanceNumber: "S26SX607219001", reason: "x" });
+    expect(res.allowanceNumber).toBe("S26SX607219001");
+    expect(voidedAw).toBe("883");
+  });
+
+  it("throws NOT_FOUND when the allowance number can't be resolved", async () => {
+    server.use(loginHandler(), http.post(url(EP.allowanceList), () => ok({ list: [], entries: 0 })));
+    await expect(testProvider().voidAllowance({ invoiceNumber: "SX1", allowanceNumber: "NOPE" })).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 
   it("rejects a reason longer than 20 chars", async () => {

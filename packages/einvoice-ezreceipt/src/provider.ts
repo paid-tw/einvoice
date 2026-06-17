@@ -113,18 +113,24 @@ export class EzreceiptProvider implements InvoiceProvider {
    * invoice unless supplied). `amount` is the tax-exclusive credit per line.
    */
   async allowance(input: AllowanceInput): Promise<AllowanceResult> {
+    const opts = (input.providerOptions ?? {}) as { invID?: number; itemTax?: number[]; allowTime?: string; needConfirm?: boolean };
     const invID = await this.resolveInvID(input.invoiceNumber, input.providerOptions);
+    // The invoice line ids (soiID) come from a view; the create call keys off
+    // those (no path id), so the credited invoice is identified per line.
     const invoice = await this.client.request<Record<string, unknown>>(ENDPOINTS.view(invID), {});
     const lines = (invoice.prodList as Array<Record<string, unknown>> | undefined) ?? [];
-    const overrideTax = (input.providerOptions as { itemTax?: number[] } | undefined)?.itemTax;
     const prodList = input.items.map((item, i) => ({
       soiID: lines[i]?.soiID,
       qty: item.quantity,
       amount: item.amount, // 稅前小計
       // Full-line credit: reuse the invoice line's tax; override per line via providerOptions.itemTax.
-      tax: overrideTax?.[i] ?? Number(lines[i]?.saleTax ?? 0),
+      tax: opts.itemTax?.[i] ?? Number(lines[i]?.saleTax ?? 0),
     }));
-    const r = await this.client.request<Record<string, unknown>>(ENDPOINTS.allowanceCreate(invID), { prodList });
+    const r = await this.client.request<Record<string, unknown>>(ENDPOINTS.allowanceCreate, {
+      prodList,
+      ...(opts.allowTime ? { allowTime: opts.allowTime } : {}),
+      ...(opts.needConfirm ? { needConfirm: true } : {}),
+    });
     return {
       allowanceNumber: String(r.awNo ?? ""),
       invoiceNumber: input.invoiceNumber,
@@ -142,10 +148,7 @@ export class EzreceiptProvider implements InvoiceProvider {
     if (this.config.validatePayload !== false && (input.reason ?? "").length > 20) {
       throw fail("作廢原因 (voidReason) must be ≤20 chars");
     }
-    const awID = (input.providerOptions as { awID?: string | number } | undefined)?.awID;
-    if (awID == null) {
-      throw fail("ezReceipt voidAllowance needs providerOptions.awID (from the allowance result's raw.awID)");
-    }
+    const awID = await this.resolveAwID(input.allowanceNumber, input.providerOptions);
     const r = await this.client.request(ENDPOINTS.allowanceVoid(awID), { voidReason: input.reason ?? "作廢折讓" });
     return { allowanceNumber: input.allowanceNumber, raw: r };
   }
@@ -203,6 +206,32 @@ export class EzreceiptProvider implements InvoiceProvider {
         provider: "ezreceipt",
         code: InvoiceErrorCode.NOT_FOUND,
         rawMessage: "invoice not found",
+      });
+    }
+    return found;
+  }
+
+  /**
+   * Resolve the internal awID: `providerOptions.awID` if given, else look it up
+   * by allowance number (awNo) via `allowance/list { awNo }`.
+   */
+  private async resolveAwID(
+    allowanceNumber: string | undefined,
+    providerOptions: Record<string, unknown> | undefined,
+  ): Promise<string | number> {
+    const awID = providerOptions?.awID;
+    if (awID != null) return awID as string | number;
+    if (!allowanceNumber) throw fail("either allowanceNumber or providerOptions.awID is required");
+    const r = await this.client.request<{ list?: Array<{ awNo?: string; awID?: number }> }>(ENDPOINTS.allowanceList, {
+      awNo: allowanceNumber,
+      _ps: 1,
+    });
+    const found = (r.list ?? []).find((x) => x.awNo === allowanceNumber)?.awID;
+    if (found == null) {
+      throw new InvoiceError(`ezReceipt allowance ${allowanceNumber} not found`, {
+        provider: "ezreceipt",
+        code: InvoiceErrorCode.NOT_FOUND,
+        rawMessage: "allowance not found",
       });
     }
     return found;

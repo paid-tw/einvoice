@@ -37,8 +37,9 @@ export function mapEzreceiptError(code: number): InvoiceErrorCode {
     case 331:
     case 1016:
       return InvoiceErrorCode.AUTH;
-    // unknown order / store / invoice / item id
+    // unknown order / store / invoice / allowance / item id
     case 10:
+    case 11:
     case 12:
     case 30:
     case 122:
@@ -47,8 +48,14 @@ export function mapEzreceiptError(code: number): InvoiceErrorCode {
     // no usable 字軌 segment
     case 1015:
       return InvoiceErrorCode.NUMBER_EXHAUSTED;
-    // invalid state for the operation
+    // invalid state for the operation (invoice / allowance already confirmed,
+    // voided, expired, closed period, B2B/B2C number conflict, …)
+    case 1003:
+    case 1004:
+    case 1005:
+    case 1008:
     case 1010:
+    case 1023:
     case 1017:
     case 1020:
     case 1039:

@@ -59,11 +59,11 @@ describe.skipIf(!live)("ezReceipt live (test env) — B2C lifecycle", LIVE_OPTS,
     });
     expect(al.allowanceNumber).toMatch(/^S/);
 
+    // No providerOptions.awID — the provider resolves it from awNo via allowance/list.
     const va = await p.voidAllowance({
       invoiceNumber: inv.invoiceNumber,
       allowanceNumber: al.allowanceNumber,
       reason: "live測試",
-      providerOptions: { awID: (al.raw as { awID: number }).awID },
     });
     expect(va.allowanceNumber).toBe(al.allowanceNumber);
 

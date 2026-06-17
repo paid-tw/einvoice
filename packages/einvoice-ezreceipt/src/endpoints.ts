@@ -13,10 +13,28 @@ export const ENDPOINTS = {
   list: "/eInvoice/invoice/list",
   /** 作廢發票 (by invID, in the path). Body: `{ voidReason }`. */
   void: (invID: string | number) => `/eInvoice/invoice/void/${invID}`,
-  /** 開立折讓證明單 (by the credited invoice's invID, in the path). */
-  allowanceCreate: (invID: string | number) => `/eInvoice/allowance/create/${invID}`,
+  /**
+   * 開立折讓證明單. The credited invoice is determined PER prodList item (its
+   * `soiID`, or `invID`+`title`+`taxType` for a custom line) — NOT a path id.
+   */
+  allowanceCreate: "/eInvoice/allowance/create",
   /** 作廢折讓 (by the allowance's awID, in the path). Body: `{ voidReason }`. */
   allowanceVoid: (awID: string | number) => `/eInvoice/allowance/void/${awID}`,
+  /**
+   * 確認折讓單 (by awID). Only for 交換 (msgType=2) allowances — a 存證 allowance is
+   * confirmed on creation. Body: `{ allowTime? }`.
+   */
+  allowanceConfirm: (awID: string | number) => `/eInvoice/allowance/confirm/${awID}`,
+  /** 買方確認/不同意「存證」折讓單 (非財政部標準作法). */
+  allowanceBuyerConfirm: (awID: string | number) => `/eInvoice/allowance/buyerConfirm/${awID}`,
+  /** 賣方確認折讓作廢 (by awID). Only for 交換 allowances — after the buyer voids it. */
+  allowanceConfirmVoid: (awID: string | number) => `/eInvoice/allowance/confirmVoid/${awID}`,
+  /** 折讓單明細 (by awID). Body: `{ byOperator? }`. */
+  allowanceView: (awID: string | number) => `/eInvoice/allowance/view/${awID}`,
+  /** 條列折讓單 (filters: invNo / awNo / isVoid / msgType / …, paginated). */
+  allowanceList: "/eInvoice/allowance/list",
+  /** 修改折讓單品項 (by awID; replaces all items). 交換 allowances only, before confirm. */
+  allowanceUpdateItems: (awID: string | number) => `/eInvoice/allowance/updateItems/${awID}`,
   /** 字軌分段清單 (一般用戶不帶 stID；合作廠商帶 stID 查指定店家). */
   invNumberList: (stID?: string | number) => `/eInvoice/invNumber/list${stID != null ? `/${stID}` : ""}`,
 } as const;
