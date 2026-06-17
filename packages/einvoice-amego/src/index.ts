@@ -16,11 +16,18 @@ export {
   amegoIssuePayloadSchema,
   amegoCustomIssuePayloadSchema,
   amegoProductItemSchema,
+  amegoAllowancePayloadSchema,
+  amegoAllowanceItemSchema,
   assertValidIssuePayload,
   assertValidCustomIssuePayload,
+  assertValidAllowancePayload,
   isValidUbn,
 } from "./validation.js";
-export type { AmegoIssuePayload, AmegoCustomIssuePayload } from "./validation.js";
+export type {
+  AmegoIssuePayload,
+  AmegoCustomIssuePayload,
+  AmegoAllowancePayload,
+} from "./validation.js";
 export { computeAmegoAmounts, amegoTaxType } from "./amounts.js";
 export type {
   AmegoAmounts,

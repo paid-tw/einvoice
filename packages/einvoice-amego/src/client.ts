@@ -188,8 +188,9 @@ export function mapAmegoErrorCode(rawCode: number | string): InvoiceErrorCode {
   // 統編 missing/invalid — credential-level
   if (code === 11 || code === 12) return InvoiceErrorCode.AUTH;
 
-  // No data / does not exist (invoice 3050125, allowance 4050134, 手機條碼 9000113)
-  if (code === 71 || code === 3050125 || code === 4050134 || code === 9000113)
+  // No data / does not exist (invoice 3050125, g0401 原發票 4040156, allowance
+  // 4050134, 手機條碼 9000113)
+  if (code === 71 || code === 3050125 || code === 4040156 || code === 4050134 || code === 9000113)
     return InvoiceErrorCode.NOT_FOUND;
 
   // Number track (字軌) exhausted
@@ -199,7 +200,9 @@ export function mapAmegoErrorCode(rawCode: number | string): InvoiceErrorCode {
   if (code === 3040171) return InvoiceErrorCode.CONFLICT;
   if (code === 3050141) return InvoiceErrorCode.CONFLICT; // 已存在折讓單
   if (code >= 3050121 && code <= 3050123) return InvoiceErrorCode.CONFLICT;
-  if (code >= 4040161 && code <= 4040162) return InvoiceErrorCode.CONFLICT;
+  // g0401 original-invoice / allowance-number state conflicts (開立中 / 已作廢 / 已註銷 / 已存在折讓)
+  if (code >= 4040152 && code <= 4040154) return InvoiceErrorCode.CONFLICT;
+  if (code >= 4040161 && code <= 4040163) return InvoiceErrorCode.CONFLICT;
 
   // Payload shape errors: "data 欄位資料應為陣列字串" (23 / 3050112 / 4050112) — caller bug
   if (code === 23 || code === 31 || code === 33 || code === 3050112 || code === 4050112)
@@ -211,6 +214,9 @@ export function mapAmegoErrorCode(rawCode: number | string): InvoiceErrorCode {
   // Empty data / malformed JSON / field & amount validation (30401xx, 30402xx…)
   if (code === 17 || code === 20) return InvoiceErrorCode.VALIDATION;
   if (code >= 3040100 && code < 3050000) return InvoiceErrorCode.VALIDATION;
+  // g0401 field/amount errors (4040112, 4040121–142, 4040151/155, 4040171/173) —
+  // the state conflicts and 原發票不存在 are handled above.
+  if (code >= 4040100 && code < 4050000) return InvoiceErrorCode.VALIDATION;
   if (code >= 9000000) return InvoiceErrorCode.VALIDATION; // barcode/carrier field errors
 
   return InvoiceErrorCode.PROVIDER;

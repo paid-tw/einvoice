@@ -38,6 +38,7 @@ import {
 import type { AmegoConfig } from "./config.js";
 import { ENDPOINTS } from "./endpoints.js";
 import {
+  assertValidAllowancePayload,
   assertValidCustomIssuePayload,
   assertValidIssuePayload,
   isValidUbn,
@@ -157,7 +158,7 @@ export class AmegoProvider implements InvoiceProvider {
         AllowanceDate: allowanceDate,
         AllowanceType: (opts.allowanceType as string) ?? "2",
         BuyerIdentifier: buyer.ubn ?? "0000000000",
-        BuyerName: buyer.name ?? "",
+        BuyerName: buyer.name ?? "消費者",
         BuyerEmailAddress: buyer.email,
         ProductItem: parsed.items.map((item) => {
           const tt = resolveItemTaxType(item, "TAXABLE");
@@ -177,6 +178,8 @@ export class AmegoProvider implements InvoiceProvider {
         ...(opts.extra as Record<string, unknown> | undefined),
       },
     ];
+
+    if (this.config.validatePayload !== false) assertValidAllowancePayload(data[0]);
 
     const res = await amegoRequest(this.config, ENDPOINTS.allowance, data);
     return {

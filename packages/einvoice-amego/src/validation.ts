@@ -245,6 +245,65 @@ export const amegoCustomIssuePayloadSchema = issueBaseObject
 export type AmegoIssuePayload = z.input<typeof amegoIssuePayloadSchema>;
 export type AmegoCustomIssuePayload = z.input<typeof amegoCustomIssuePayloadSchema>;
 
+// ---------------------------------------------------------------------------
+// g0401 (開立折讓) — allowance payload validation
+// Allowance fields may be sent as strings or numbers (the official example mixes
+// both), so numeric fields accept either.
+// ---------------------------------------------------------------------------
+
+const numericLike = z.union([z.number(), z.string().regex(/^-?\d+(\.\d+)?$/, "must be numeric")]);
+const decimal7Like = numericLike.refine((v) => maxDecimals(7)(Number(v)), "must have ≤7 decimal places");
+const integerLike = numericLike.refine((v) => Number.isInteger(Number(v)), "must be an integer");
+const ymdLike = z.union([
+  z.string().regex(/^\d{8}$/, "must be YYYYMMDD"),
+  z.number().int().refine((n) => String(n).length === 8, "must be YYYYMMDD"),
+]);
+const itemTaxType = z.union([
+  z.literal(1), z.literal(2), z.literal(3),
+  z.literal("1"), z.literal("2"), z.literal("3"),
+]);
+
+export const amegoAllowanceItemSchema = z
+  .object({
+    OriginalInvoiceNumber: z.string().min(1, "OriginalInvoiceNumber is required"),
+    OriginalInvoiceDate: ymdLike,
+    OriginalDescription: z.string().min(1, "OriginalDescription is required").max(256, "OriginalDescription must be ≤256 chars"),
+    Quantity: decimal7Like,
+    UnitPrice: decimal7Like, // 未稅
+    Amount: decimal7Like, // 未稅
+    Tax: integerLike, // 稅金 must be an integer (4040139)
+    TaxType: itemTaxType,
+    Unit: z.string().optional(),
+  })
+  .passthrough();
+
+/** One record for `/json/g0401` (開立折讓). All amounts are tax-EXCLUSIVE. */
+export const amegoAllowancePayloadSchema = z
+  .object({
+    AllowanceNumber: z.string().min(1, "AllowanceNumber is required").max(16, "AllowanceNumber must be ≤16 chars"),
+    AllowanceDate: ymdLike,
+    AllowanceType: z.union([z.literal(1), z.literal(2), z.literal("1"), z.literal("2")]),
+    BuyerIdentifier: z
+      .string()
+      .refine((v) => v === "0000000000" || isValidUbn(v), "BuyerIdentifier must be a valid 統一編號 or 0000000000"),
+    BuyerName: z
+      .string()
+      .min(1, "BuyerName is required")
+      .refine((v) => !["0", "00", "000", "0000"].includes(v), "BuyerName cannot be 0/00/000/0000"),
+    BuyerAddress: z.string().optional(),
+    BuyerTelephoneNumber: z.string().optional(),
+    BuyerEmailAddress: z.string().email("BuyerEmailAddress must be a valid email").optional().or(z.literal("")),
+    ProductItem: z
+      .array(amegoAllowanceItemSchema)
+      .min(1, "at least one ProductItem is required")
+      .max(9999, "at most 9999 ProductItems"),
+    TaxAmount: decimal7Like,
+    TotalAmount: decimal7Like, // 未稅 合計
+  })
+  .passthrough();
+
+export type AmegoAllowancePayload = z.input<typeof amegoAllowancePayloadSchema>;
+
 function assertValid(
   schema: { safeParse: (v: unknown) => z.SafeParseReturnType<unknown, unknown> },
   data: unknown,
@@ -268,6 +327,11 @@ function assertValid(
  */
 export function assertValidIssuePayload(data: unknown): void {
   assertValid(amegoIssuePayloadSchema, data);
+}
+
+/** Validate one g0401 allowance record. */
+export function assertValidAllowancePayload(data: unknown): void {
+  assertValid(amegoAllowancePayloadSchema, data);
 }
 
 /** Validate one f0401_custom record. */

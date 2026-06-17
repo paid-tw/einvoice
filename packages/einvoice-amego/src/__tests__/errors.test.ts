@@ -39,6 +39,13 @@ describe("mapAmegoErrorCode (from info_detail?mid=71)", () => {
     [4050134, "NOT_FOUND"], // 折讓單不存在
     ["4050134", "NOT_FOUND"], // string code (g0501 returns strings) — coerced
     ["4050112", "VALIDATION"], // string code
+    ["4040112", "VALIDATION"], // g0401 data 應為陣列 (string code)
+    ["4040121", "VALIDATION"], // AllowanceNumber 錯誤
+    ["4040139", "VALIDATION"], // Tax 必須為整數
+    [4040152, "CONFLICT"], // 原發票開立中
+    [4040156, "NOT_FOUND"], // 原發票不存在
+    [4040161, "CONFLICT"], // 已存在折讓開立
+    [4040171, "VALIDATION"], // 折讓金額大於原發票
     [71, "NOT_FOUND"], // 查無資料
     [3050125, "NOT_FOUND"], // 發票不存在
     [999999, "PROVIDER"], // unknown

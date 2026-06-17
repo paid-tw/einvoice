@@ -236,6 +236,21 @@ describe.skipIf(!live)("Amego live — server rejects invalid values", () => {
     expect(alwNew.rawCode).not.toBe("33");
   });
 
+  it("g0401 (open allowance) rejects bad fields with 4040xxx (string codes)", async () => {
+    const item = { OriginalInvoiceNumber: "AA26513024", OriginalInvoiceDate: 20260617, OriginalDescription: "商品", Quantity: 1, UnitPrice: "100", Amount: "100", Tax: 5, TaxType: 1 };
+    const rec = (o: Record<string, unknown> = {}) => ({ AllowanceNumber: `GA${Date.now()}`, AllowanceDate: "20260617", AllowanceType: "2", BuyerIdentifier: "0000000000", BuyerName: "消費者", ProductItem: [item], TaxAmount: "5", TotalAmount: "100", ...o });
+    // object instead of array
+    const arr = await provider.raw("/json/g0401", rec()).catch((e) => e);
+    expect(arr.rawCode).toBe("4040112");
+    // AllowanceType 3
+    const at = await provider.raw("/json/g0401", [rec({ AllowanceType: "3" })]).catch((e) => e);
+    expect(at.rawCode).toBe("4040123");
+    expect(at.code).toBe("VALIDATION");
+    // Tax not an integer
+    const tax = await provider.raw("/json/g0401", [rec({ ProductItem: [{ ...item, Tax: 5.5 }] })]).catch((e) => e);
+    expect(tax.rawCode).toBe("4040139");
+  });
+
   it("g0501 (void allowance) returns string codes: object → 4050112, nonexistent → 4050134 NOT_FOUND", async () => {
     const wrong = await provider.raw("/json/g0501", { CancelAllowanceNumber: "ZZNONEXIST0001" }).catch((e) => e);
     expect(wrong.rawCode).toBe("4050112");

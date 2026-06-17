@@ -1,9 +1,75 @@
 import { describe, expect, it } from "vitest";
 import {
+  amegoAllowancePayloadSchema,
   amegoCustomIssuePayloadSchema,
   amegoIssuePayloadSchema,
   isValidUbn,
 } from "./validation.js";
+
+describe("amegoAllowancePayloadSchema (g0401)", () => {
+  const validItem = (o: Record<string, unknown> = {}) => ({
+    OriginalInvoiceNumber: "AA26513024",
+    OriginalInvoiceDate: 20260617,
+    OriginalDescription: "商品",
+    Quantity: 1,
+    UnitPrice: "100",
+    Amount: "100",
+    Tax: 5,
+    TaxType: 1,
+    ...o,
+  });
+  const valid = (o: Record<string, unknown> = {}) => ({
+    AllowanceNumber: "ALW001",
+    AllowanceDate: "20260617",
+    AllowanceType: "2",
+    BuyerIdentifier: "0000000000",
+    BuyerName: "消費者",
+    ProductItem: [validItem()],
+    TaxAmount: "5",
+    TotalAmount: "100",
+    ...o,
+  });
+  const ok = (o: Record<string, unknown> = {}) => amegoAllowancePayloadSchema.safeParse(valid(o)).success;
+  const item = (o: Record<string, unknown>) => amegoAllowancePayloadSchema.safeParse(valid({ ProductItem: [validItem(o)] })).success;
+
+  it("accepts the official example shape (amounts as strings or numbers)", () => {
+    expect(ok()).toBe(true);
+    expect(ok({ AllowanceType: 1, TaxAmount: 5, TotalAmount: 100 })).toBe(true);
+  });
+  it("AllowanceNumber: required, ≤16 chars (4040121)", () => {
+    expect(ok({ AllowanceNumber: "" })).toBe(false);
+    expect(ok({ AllowanceNumber: "X".repeat(17) })).toBe(false);
+  });
+  it("AllowanceDate must be YYYYMMDD (4040122)", () => {
+    expect(ok({ AllowanceDate: "2026-06-17" })).toBe(false);
+    expect(ok({ AllowanceDate: 20260617 })).toBe(true);
+  });
+  it("AllowanceType must be 1 or 2 (4040123)", () => {
+    expect(ok({ AllowanceType: "3" })).toBe(false);
+    expect(ok({ AllowanceType: 1 })).toBe(true);
+  });
+  it("BuyerIdentifier: 0000000000 or valid 統編", () => {
+    expect(ok({ BuyerIdentifier: "12345678" })).toBe(false); // bad checksum
+    expect(ok({ BuyerIdentifier: "28080623" })).toBe(true);
+  });
+  it("BuyerName: required, not 0/00/000/0000 (4040127)", () => {
+    expect(ok({ BuyerName: "" })).toBe(false);
+    expect(ok({ BuyerName: "0000" })).toBe(false);
+  });
+  it("item OriginalDescription ≤256, required (4040134)", () => {
+    expect(item({ OriginalDescription: "" })).toBe(false);
+    expect(item({ OriginalDescription: "字".repeat(257) })).toBe(false);
+  });
+  it("item OriginalInvoiceDate must be YYYYMMDD (4040125)", () =>
+    expect(item({ OriginalInvoiceDate: "2026-06-17" })).toBe(false));
+  it("item Tax must be an integer (4040139)", () => {
+    expect(item({ Tax: 5.5 })).toBe(false);
+    expect(item({ Tax: "5" })).toBe(true);
+  });
+  it("item TaxType must be 1/2/3 (4040140)", () => expect(item({ TaxType: 5 })).toBe(false));
+  it("item UnitPrice/Amount ≤7 decimals", () => expect(item({ UnitPrice: 1.123456789 })).toBe(false));
+  it("requires at least one ProductItem", () => expect(ok({ ProductItem: [] })).toBe(false));
+});
 
 describe("isValidUbn (統一編號 checksum)", () => {
   it("accepts valid numbers (verified live)", () => {
