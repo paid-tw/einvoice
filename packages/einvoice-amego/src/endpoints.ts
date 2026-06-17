@@ -66,3 +66,18 @@ export const TRACK_SOURCE = {
   SYSTEM_IMPORT: 1, // 系統匯入
   MANUAL: 2, // 人工輸入
 } as const;
+
+/**
+ * 上傳至財政部的狀態 — used by invoice/allowance `status` and `query`
+ * (`invoice_status` / `allowance_status` / their nested `invoice_status`).
+ */
+export const UPLOAD_STATUS = {
+  PENDING: 1, // 待處理
+  UPLOADING: 2, // 上傳中
+  UPLOADED: 3, // 已上傳
+  PROCESSING: 31, // 處理中
+  AWAITING_CONFIRMATION: 32, // 處理完成／待確認
+  ERROR: 91, // 錯誤
+  COMPLETED: 99, // 完成
+} as const;
+export type UploadStatus = (typeof UPLOAD_STATUS)[keyof typeof UPLOAD_STATUS];

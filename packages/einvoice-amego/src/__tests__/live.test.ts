@@ -67,6 +67,12 @@ describe.skipIf(!live)("Amego live lifecycle", () => {
     expect(rows[0]).toHaveProperty("name");
   });
 
+  it("returns type NOT_FOUND (code 0) for an unknown allowance status", async () => {
+    const res = await provider.allowances.status(["ZZNONEXIST0001"]);
+    expect(res.code).toBe(0);
+    expect((res.data as Array<{ type: string }>)[0]?.type).toBe("NOT_FOUND");
+  });
+
   it("lists allowances, then queries the first one (allowance.list → allowance.query)", async () => {
     const list = await provider.allowances.list({ startDate: 20260601, endDate: 20260630, limit: 20 });
     expect(list.code).toBe(0);

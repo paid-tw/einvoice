@@ -8,11 +8,13 @@ import {
   TRACK_LAYER,
   TRACK_SOURCE,
   TRACK_STATUS,
+  UPLOAD_STATUS,
 } from "../endpoints.js";
 import { APP_KEY, BASE, parseBody, server, testProvider } from "./server.js";
 import {
   ALLOWANCE_LIST_OK,
   ALLOWANCE_QUERY_OK,
+  ALLOWANCE_STATUS_OK,
   FILE_URL_OK,
   LOTTERY_STATUS_OK,
   LOTTERY_TYPE_OK,
@@ -185,6 +187,22 @@ describe("Amego endpoint contracts (verified live shapes)", () => {
   it("raw() can call any endpoint directly", async () => {
     server.use(http.post(`${BASE}/json/anything`, () => HttpResponse.json({ code: 0, ok: true })));
     expect(await testProvider().raw("/json/anything", { foo: "bar" })).toMatchObject({ ok: true });
+  });
+
+  it("allowances.status sends the PascalCase array and parses the upload-status rows", async () => {
+    let data: unknown;
+    server.use(
+      http.post(`${BASE}${ENDPOINTS.allowanceStatus}`, async ({ request }) => {
+        data = parseBody(await request.text()).data;
+        return HttpResponse.json(ALLOWANCE_STATUS_OK);
+      }),
+    );
+    const res = await testProvider().allowances.status(["ALW1781650040"]);
+    expect(data).toEqual([{ AllowanceNumber: "ALW1781650040" }]);
+    const row = (res.data as Array<Record<string, unknown>>)[0]!;
+    expect(row.type).toBe("D0401");
+    expect(row.status).toBe(UPLOAD_STATUS.PENDING);
+    expect(row.total_amount).toBe(100); // 未稅
   });
 
   it("allowances.query sends { allowance_number } and parses nested data + wait[]", async () => {

@@ -7,8 +7,9 @@ export {
   TRACK_LAYER,
   TRACK_CATEGORY,
   TRACK_SOURCE,
+  UPLOAD_STATUS,
 } from "./endpoints.js";
-export type { TrackStatus } from "./endpoints.js";
+export type { TrackStatus, UploadStatus } from "./endpoints.js";
 export { sign, mapAmegoErrorCode, clearTimeSyncCache, fetchServerTime } from "./client.js";
 export type { AmegoResponse, AmegoTimeResponse } from "./client.js";
 export {
