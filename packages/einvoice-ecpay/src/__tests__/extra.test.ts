@@ -127,6 +127,38 @@ describe("查詢財政部配號結果 (GetGovInvoiceWordSetting)", () => {
   });
 });
 
+describe("設定字軌號碼狀態 (UpdateInvoiceWordStatus)", () => {
+  it("posts TrackID + the mapped InvoiceStatus code", async () => {
+    let data: Record<string, unknown> | undefined;
+    server.use(
+      http.post(url(ECPAY_ENDPOINTS.updateInvoiceWordStatus), async ({ request }) => {
+        data = parseRequest(await request.text()).data;
+        return HttpResponse.json(ecSuccess({}));
+      }),
+    );
+    await testProvider().setInvoiceWordStatus("1123456", "ENABLE");
+    expect(data).toMatchObject({ TrackID: "1123456", InvoiceStatus: 2 });
+
+    await testProvider().setInvoiceWordStatus("1123456", "DISABLE");
+    expect(data).toMatchObject({ InvoiceStatus: 0 });
+  });
+
+  it("maps an unknown TrackID (查無資料) to NOT_FOUND", async () => {
+    server.use(
+      http.post(url(ECPAY_ENDPOINTS.updateInvoiceWordStatus), () => HttpResponse.json(ecError(7, "查無資料"))),
+    );
+    await expect(testProvider().setInvoiceWordStatus("9999999", "ENABLE")).rejects.toMatchObject({
+      code: "NOT_FOUND",
+    });
+  });
+
+  it("rejects an empty TrackID locally", async () => {
+    await expect(testProvider().setInvoiceWordStatus("", "ENABLE")).rejects.toMatchObject({
+      code: "VALIDATION",
+    });
+  });
+});
+
 describe("raw() escape hatch", () => {
   it("posts an arbitrary Data payload and returns the decrypted result", async () => {
     let data: Record<string, unknown> | undefined;

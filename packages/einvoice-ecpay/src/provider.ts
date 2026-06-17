@@ -30,6 +30,10 @@ import type { EcpayConfig } from "./config.js";
 import { ENDPOINTS } from "./endpoints.js";
 import { assertValidIssuePayload } from "./validation.js";
 
+/** 字軌狀態: 停用 / 暫停 / 啟用. */
+export type EcpayWordStatus = "DISABLE" | "PAUSE" | "ENABLE";
+const WORD_STATUS_CODE: Record<EcpayWordStatus, number> = { DISABLE: 0, PAUSE: 1, ENABLE: 2 };
+
 /** One allocated invoice-number range (字軌) from 查詢財政部配號結果. */
 export interface EcpayWordSetting {
   /** 期別 1–6 (1=1-2月, 2=3-4月, …). */
@@ -281,6 +285,26 @@ export class EcpayProvider implements InvoiceProvider {
       end: String(w.InvoiceEnd ?? ""),
       count: Number(w.Number ?? 0),
     }));
+  }
+
+  /**
+   * 設定字軌號碼狀態 (UpdateInvoiceWordStatus): activate (or pause/disable) a
+   * track so invoices can be issued against it. Newly added 字軌 default to
+   * 已審核但未啟用, so this must be called once before issuing. `trackId` is the
+   * TrackID returned when the 字軌 was added.
+   */
+  async setInvoiceWordStatus(trackId: string, status: EcpayWordStatus): Promise<void> {
+    if (this.config.validatePayload !== false && !trackId) {
+      throw new InvoiceError("TrackID is required", {
+        provider: "ecpay",
+        code: InvoiceErrorCode.VALIDATION,
+        rawMessage: "TrackID is required",
+      });
+    }
+    await ecpayRequest(this.config, ENDPOINTS.updateInvoiceWordStatus, {
+      TrackID: trackId,
+      InvoiceStatus: WORD_STATUS_CODE[status],
+    });
   }
 
   // -------------------------------------------------------------------------

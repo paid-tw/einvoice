@@ -23,6 +23,7 @@ export const ENDPOINTS = {
   invoiceNotify: "/B2CInvoice/InvoiceNotify", // 發送通知
   invoicePrint: "/B2CInvoice/InvoicePrint", // 列印
   getGovInvoiceWordSetting: "/B2CInvoice/GetGovInvoiceWordSetting", // 查詢財政部配號結果
+  updateInvoiceWordStatus: "/B2CInvoice/UpdateInvoiceWordStatus", // 設定字軌號碼狀態
 } as const;
 
 export type EndpointKey = keyof typeof ENDPOINTS;

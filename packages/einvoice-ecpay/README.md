@@ -76,6 +76,9 @@ Declared as the `CARRIER_VALIDATION` capability. (ECPay's B2C API has no working
 // 查詢財政部配號結果 — the invoice-number ranges allocated for a 民國年.
 const ranges = await invoices.getGovInvoiceWordSetting("115");
 // → [{ term, invType, header, start, end, count }, …]; throws NOT_FOUND if unallocated.
+
+// 設定字軌號碼狀態 — a newly added 字軌 is inactive; enable it before issuing.
+await invoices.setInvoiceWordStatus(trackId, "ENABLE"); // or "PAUSE" / "DISABLE"
 ```
 
 ## Notes

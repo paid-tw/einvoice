@@ -92,4 +92,9 @@ describe.skipIf(!live)("ECPay live (stage) — 查詢財政部配號", LIVE_OPTS
     expect(ranges[0]?.header).toMatch(/^[A-Z]{2}$/);
     expect(ranges[0]?.start).toMatch(/^\d{8}$/);
   });
+
+  // Read-only: a bogus TrackID confirms the endpoint without mutating a real 字軌.
+  it("setInvoiceWordStatus rejects an unknown TrackID with NOT_FOUND", async () => {
+    await expect(p.setInvoiceWordStatus("9999999", "ENABLE")).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
 });
