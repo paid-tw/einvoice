@@ -13,7 +13,8 @@ export const ENDPOINTS = {
   voidWithReIssue: "/B2CInvoice/VoidWithReIssue", // 註銷重開
   allowance: "/B2CInvoice/Allowance", // 一般開立折讓(紙本, 隔日上傳, 立即可作廢)
   allowanceByCollegiate: "/B2CInvoice/AllowanceByCollegiate", // 線上折讓(買方 email 點連結確認)
-  allowanceInvalid: "/B2CInvoice/AllowanceInvalid", // 作廢折讓
+  allowanceInvalid: "/B2CInvoice/AllowanceInvalid", // 作廢折讓(已確認)
+  allowanceInvalidByCollegiate: "/B2CInvoice/AllowanceInvalidByCollegiate", // 取消線上折讓(買方確認前)
   getIssue: "/B2CInvoice/GetIssue", // 查詢開立
   getAllowance: "/B2CInvoice/GetAllowance", // 查詢折讓
   getInvalid: "/B2CInvoice/GetInvalid", // 查詢作廢

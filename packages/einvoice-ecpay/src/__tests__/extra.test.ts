@@ -393,6 +393,31 @@ describe("線上開立折讓 (allowanceOnline)", () => {
   it("requires a notifyMail locally", async () => {
     await expect(testProvider().allowanceOnline(input, { notifyMail: "" })).rejects.toMatchObject({ code: "VALIDATION" });
   });
+
+  it("cancelAllowanceOnline posts InvoiceNo+AllowanceNo+Reason; an agreed one (5070250) → CONFLICT", async () => {
+    let data: Record<string, unknown> | undefined;
+    server.use(
+      http.post(url(ECPAY_ENDPOINTS.allowanceInvalidByCollegiate), async ({ request }) => {
+        data = parseRequest(await request.text()).data;
+        return HttpResponse.json(ecSuccess({ IA_Invoice_No: "JU11083085" }));
+      }),
+    );
+    await testProvider().cancelAllowanceOnline({ invoiceNumber: "JU11083085", allowanceNumber: "A1", reason: "取消" });
+    expect(data).toMatchObject({ InvoiceNo: "JU11083085", AllowanceNo: "A1", Reason: "取消" });
+
+    server.use(
+      http.post(url(ECPAY_ENDPOINTS.allowanceInvalidByCollegiate), () =>
+        HttpResponse.json(ecError(5070250, "無法取消已經同意的線上折讓單")),
+      ),
+    );
+    await expect(
+      testProvider().cancelAllowanceOnline({ invoiceNumber: "JU1", allowanceNumber: "A1" }),
+    ).rejects.toMatchObject({ code: "CONFLICT", rawCode: "5070250" });
+
+    await expect(
+      testProvider().cancelAllowanceOnline({ invoiceNumber: "JU1", allowanceNumber: "A1", reason: "x".repeat(21) }),
+    ).rejects.toMatchObject({ code: "VALIDATION" });
+  });
 });
 
 describe("raw() escape hatch", () => {

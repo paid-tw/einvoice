@@ -68,6 +68,9 @@ describe.skipIf(!live)("ECPay live (stage) — issue → query → void", LIVE_O
     );
     expect(res.allowanceNumber).toMatch(/^\d+$/);
     expect(res.expiresAt.getTime()).toBeGreaterThan(res.createdAt.getTime());
+    // Cancel the pending online allowance (before buyer confirmation).
+    const c = await p.cancelAllowanceOnline({ invoiceNumber: oinv.invoiceNumber, allowanceNumber: res.allowanceNumber, reason: "測試取消" });
+    expect(c.raw.RtnCode).toBe(1);
   });
 
   it("issues an allowance then voids it (full 折讓 lifecycle, no buyer confirm)", async () => {

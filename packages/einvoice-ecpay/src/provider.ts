@@ -415,6 +415,30 @@ export class EcpayProvider implements InvoiceProvider {
     return { allowanceNumber: parsed.allowanceNumber, raw: result };
   }
 
+  /**
+   * 取消線上折讓 (AllowanceInvalidByCollegiate): cancel a still-pending online
+   * allowance (from {@link EcpayProvider.allowanceOnline}) before the buyer
+   * confirms it — the amount is returned to the invoice's available allowance.
+   * For a confirmed/paper allowance use {@link EcpayProvider.voidAllowance}.
+   */
+  async cancelAllowanceOnline(input: VoidAllowanceInput): Promise<VoidAllowanceResult> {
+    const parsed = voidAllowanceInputSchema.parse(input);
+    const reason = parsed.reason ?? "取消折讓";
+    if (this.config.validatePayload !== false && reason.length > 20) {
+      throw new InvoiceError("Reason must be ≤20 chars", {
+        provider: "ecpay",
+        code: InvoiceErrorCode.VALIDATION,
+        rawMessage: "取消原因 (Reason) must be ≤20 chars",
+      });
+    }
+    const result = await ecpayRequest(this.config, ENDPOINTS.allowanceInvalidByCollegiate, {
+      InvoiceNo: parsed.invoiceNumber,
+      AllowanceNo: parsed.allowanceNumber,
+      Reason: reason,
+    });
+    return { allowanceNumber: parsed.allowanceNumber, raw: result };
+  }
+
   async query(input: QueryInvoiceInput): Promise<QueryInvoiceResult> {
     const parsed = queryInvoiceInputSchema.parse(input);
     const opts = (parsed.providerOptions ?? {}) as Record<string, unknown>;

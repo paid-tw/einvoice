@@ -125,7 +125,9 @@ await invoices.setInvoiceWordStatus(trackId, "ENABLE"); // or "PAUSE" / "DISABLE
   to notify.
 - `allowanceOnline(input, { notifyMail, returnUrl?, … })` is the 線上折讓
   (AllowanceByCollegiate): ECPay emails the buyer a confirmation link (72h
-  `expiresAt`); the allowance is issued only when they click it.
+  `expiresAt`); the allowance is issued only when they click it. Cancel a
+  still-pending one with `cancelAllowanceOnline({ invoiceNumber, allowanceNumber })`;
+  void a confirmed/paper one with `voidAllowance`.
 - Live tests run with `ECPAY_LIVE=1` (defaulting to `ECPAY_SANDBOX`).
 
 ## License
