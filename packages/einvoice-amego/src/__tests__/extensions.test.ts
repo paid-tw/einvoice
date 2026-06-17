@@ -11,6 +11,7 @@ import {
 } from "../endpoints.js";
 import { APP_KEY, BASE, parseBody, server, testProvider } from "./server.js";
 import {
+  LOTTERY_STATUS_OK,
   LOTTERY_TYPE_OK,
   TIME_OK,
   TRACK_ALL_OK,
@@ -87,12 +88,6 @@ const CASES: Array<{
     path: ENDPOINTS.allowancePrint,
     invoke: (p) => p.allowances.print("ALW1", 7),
     expectData: { AllowanceNumber: "ALW1", PrinterType: 7, PrinterLang: 3 },
-  },
-  {
-    name: "lottery.status (Year/Period)",
-    path: ENDPOINTS.lotteryStatus,
-    invoke: (p) => p.lottery.status(2026, 2),
-    expectData: { Year: 2026, Period: 2 },
   },
   {
     name: "banQuery (ARRAY of {ban})",
@@ -181,6 +176,20 @@ describe("Amego endpoint contracts (verified live shapes)", () => {
   it("raw() can call any endpoint directly", async () => {
     server.use(http.post(`${BASE}/json/anything`, () => HttpResponse.json({ code: 0, ok: true })));
     expect(await testProvider().raw("/json/anything", { foo: "bar" })).toMatchObject({ ok: true });
+  });
+
+  it("lottery.status sends { Year, Period } and parses the winning-invoice rows", async () => {
+    let data: Record<string, unknown> | undefined;
+    server.use(
+      http.post(`${BASE}${ENDPOINTS.lotteryStatus}`, async ({ request }) => {
+        data = parseBody(await request.text()).data;
+        return HttpResponse.json(LOTTERY_STATUS_OK);
+      }),
+    );
+    const res = await testProvider().lottery.status(2022, 3);
+    expect(data).toEqual({ Year: 2022, Period: 3 });
+    const rows = res.data as Array<Record<string, unknown>>;
+    expect(rows[0]).toMatchObject({ invoice_number: "DF73530001", invoice_date: "20220819", type: "22" });
   });
 
   it("lottery.type sends an EMPTY data string (not '{}') and returns the prize types", async () => {

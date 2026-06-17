@@ -185,6 +185,21 @@ export const TRACK_STATUS_OK = {
   ],
 };
 
+/**
+ * lottery_status (winning invoices) response. The envelope `{code:0, data:[]}` is
+ * verified live (the sandbox merchant has no winners); the winning-row shape is
+ * from the official spec (`type` references the lottery_type definitions).
+ */
+export const LOTTERY_STATUS_OK = {
+  code: 0,
+  msg: "",
+  data: [
+    { invoice_date: "20220819", invoice_number: "DF73530001", type: "22" },
+    { invoice_date: "20220819", invoice_number: "DF73530002", type: "18" },
+  ],
+};
+export const LOTTERY_STATUS_EMPTY = { code: 0, msg: "", data: [] };
+
 /** Real lottery_type response (prize-type definitions). Takes no request data. */
 export const LOTTERY_TYPE_OK = {
   code: 0,

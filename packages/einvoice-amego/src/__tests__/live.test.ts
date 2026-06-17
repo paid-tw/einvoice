@@ -52,6 +52,12 @@ describe.skipIf(!live)("Amego live lifecycle", () => {
     expect(res).not.toHaveProperty("code");
   });
 
+  it("queries winning invoices (lottery.status — Year/Period)", async () => {
+    const res = await provider.lottery.status(2025, 4);
+    expect(res.code).toBe(0);
+    expect(Array.isArray(res.data)).toBe(true); // empty for the sandbox merchant
+  });
+
   it("reads prize-type definitions (lottery.type — empty data)", async () => {
     const res = await provider.lottery.type();
     expect(res.code).toBe(0);
