@@ -1,3 +1,4 @@
+import type { IssueInvoiceInput } from "@paid-tw/einvoice";
 import { http, HttpResponse } from "msw";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { assertValidCrossBorderIssue, EZPAY_CB_ENDPOINTS, resolveCurrency } from "../index.js";
@@ -7,7 +8,7 @@ beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
 
-const valid = () => ({
+const valid = (): IssueInvoiceInput => ({
   orderId: "ORDER_1",
   buyer: { name: "跨境測試", email: "b@x.com" },
   items: [{ description: "商品", quantity: 1, unitPrice: 105, amount: 105 }],
@@ -16,7 +17,7 @@ const valid = () => ({
   priceMode: "TAX_INCLUSIVE" as const,
 });
 
-const expectCode = (input: ReturnType<typeof valid>, code: string) => {
+const expectCode = (input: IssueInvoiceInput, code: string) => {
   expect(() => assertValidCrossBorderIssue(input)).toThrowError(expect.objectContaining({ code }));
 };
 
