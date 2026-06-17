@@ -134,7 +134,8 @@ async function doRequest(
     });
   }
 
-  if (json.code !== 0) {
+  // Some endpoints (e.g. g0501) return `code` as a STRING — normalize it.
+  if (Number(json.code) !== 0) {
     throw new InvoiceError(json.msg || "Amego returned an error", {
       provider: "amego",
       code: mapAmegoErrorCode(json.code),
@@ -177,14 +178,18 @@ export async function amegoRequest(
  * Map Amego error codes onto normalized {@link InvoiceErrorCode}s.
  * Source: https://invoice.amego.tw/info_detail?mid=71 + live sandbox.
  */
-export function mapAmegoErrorCode(code: number): InvoiceErrorCode {
+export function mapAmegoErrorCode(rawCode: number | string): InvoiceErrorCode {
+  // Some endpoints return `code` as a string — normalize to a number.
+  const code = Number(rawCode);
+  if (!Number.isFinite(code)) return InvoiceErrorCode.PROVIDER;
+
   // Auth / signature / time / IP
   if (code === 14 || code === 15 || code === 16) return InvoiceErrorCode.AUTH;
   // 統編 missing/invalid — credential-level
   if (code === 11 || code === 12) return InvoiceErrorCode.AUTH;
 
-  // No data / invoice does not exist / 手機條碼不存在
-  if (code === 71 || code === 3050125 || code === 9000113)
+  // No data / does not exist (invoice 3050125, allowance 4050134, 手機條碼 9000113)
+  if (code === 71 || code === 3050125 || code === 4050134 || code === 9000113)
     return InvoiceErrorCode.NOT_FOUND;
 
   // Number track (字軌) exhausted
@@ -196,8 +201,8 @@ export function mapAmegoErrorCode(code: number): InvoiceErrorCode {
   if (code >= 3050121 && code <= 3050123) return InvoiceErrorCode.CONFLICT;
   if (code >= 4040161 && code <= 4040162) return InvoiceErrorCode.CONFLICT;
 
-  // Payload shape errors: "data 欄位資料應為陣列字串" (23 / 3050112) — caller bug
-  if (code === 23 || code === 31 || code === 33 || code === 3050112)
+  // Payload shape errors: "data 欄位資料應為陣列字串" (23 / 3050112 / 4050112) — caller bug
+  if (code === 23 || code === 31 || code === 33 || code === 3050112 || code === 4050112)
     return InvoiceErrorCode.VALIDATION;
 
   // f0401_custom per-record field errors are returned as code 99 (verified live).

@@ -236,6 +236,15 @@ describe.skipIf(!live)("Amego live — server rejects invalid values", () => {
     expect(alwNew.rawCode).not.toBe("33");
   });
 
+  it("g0501 (void allowance) returns string codes: object → 4050112, nonexistent → 4050134 NOT_FOUND", async () => {
+    const wrong = await provider.raw("/json/g0501", { CancelAllowanceNumber: "ZZNONEXIST0001" }).catch((e) => e);
+    expect(wrong.rawCode).toBe("4050112");
+    expect(wrong.code).toBe("VALIDATION");
+    const missing = await provider.raw("/json/g0501", [{ CancelAllowanceNumber: "ZZNONEXIST0001" }]).catch((e) => e);
+    expect(missing.rawCode).toBe("4050134");
+    expect(missing.code).toBe("NOT_FOUND");
+  });
+
   it("rejects a bad 統編 checksum in ban_query (99)", async () => {
     const err = await provider.raw("/json/ban_query", [{ ban: "28080624" }]).catch((e) => e);
     expect(err.rawCode).toBe("99");

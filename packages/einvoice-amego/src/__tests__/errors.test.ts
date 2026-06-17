@@ -35,6 +35,10 @@ describe("mapAmegoErrorCode (from info_detail?mid=71)", () => {
     [99, "VALIDATION"], // f0401_custom per-record field error
     [9000112, "VALIDATION"], // 手機條碼格式錯誤
     [9000113, "NOT_FOUND"], // 手機條碼不存在
+    [4050112, "VALIDATION"], // g0501 data 應為陣列
+    [4050134, "NOT_FOUND"], // 折讓單不存在
+    ["4050134", "NOT_FOUND"], // string code (g0501 returns strings) — coerced
+    ["4050112", "VALIDATION"], // string code
     [71, "NOT_FOUND"], // 查無資料
     [3050125, "NOT_FOUND"], // 發票不存在
     [999999, "PROVIDER"], // unknown
