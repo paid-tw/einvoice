@@ -6,3 +6,6 @@ export {
   decryptPostData,
   makeCheckCode,
 } from "./crypto.js";
+export { ENDPOINTS as EZPAY_ENDPOINTS } from "./endpoints.js";
+export { ezpayRequest, mapEzpayError, ezpayTimestamp } from "./client.js";
+export type { EzpayResponse, EzpayResult } from "./client.js";
