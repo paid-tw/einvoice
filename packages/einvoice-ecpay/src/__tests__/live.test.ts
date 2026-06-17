@@ -77,8 +77,9 @@ describe.skipIf(!live)("ECPay live (stage) — 載具驗證", LIVE_OPTS, () => {
     expect(typeof (await p.validateMobileBarcode("/ABC1234"))).toBe("boolean");
   });
 
-  it("validateLoveCode resolves true for a registered code", async () => {
+  it("validateLoveCode resolves true for a registered code, with its organ name", async () => {
     expect(await p.validateLoveCode("168001")).toBe(true);
+    expect(await p.lookupLoveCodeOrganName("168001")).toBeTruthy();
   });
 
   it("lookupCompanyName resolves a real company; 查無 → undefined; bad checksum throws", async () => {

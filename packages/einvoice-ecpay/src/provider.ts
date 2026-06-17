@@ -318,6 +318,23 @@ export class EcpayProvider implements InvoiceProvider {
   }
 
   /**
+   * 愛心碼/捐贈碼驗證 + 組織名稱: resolve the receiving organisation's name for a
+   * donation code, or `undefined` when the code does not exist. The 3–7 digit
+   * format is checked first.
+   */
+  async lookupLoveCodeOrganName(loveCode: string): Promise<string | undefined> {
+    if (this.config.validatePayload !== false && !/^\d{3,7}$/.test(loveCode)) {
+      throw new InvoiceError(`Invalid love code format: ${loveCode}`, {
+        provider: "ecpay",
+        code: InvoiceErrorCode.VALIDATION,
+        rawMessage: "LoveCode must be 3–7 digits",
+      });
+    }
+    const result = await ecpayRequest(this.config, ENDPOINTS.checkLoveCode, { LoveCode: loveCode });
+    return result.IsExist === "Y" && result.OrganName ? String(result.OrganName) : undefined;
+  }
+
+  /**
    * 統一編號驗證 + 公司名稱 (GetCompanyNameByTaxID): resolve the company name for a
    * 統編, or `undefined` when the number is well-formed but not in any public
    * dataset (查無資料 / 財政部API異常 — these do NOT mean the 統編 is invalid, so

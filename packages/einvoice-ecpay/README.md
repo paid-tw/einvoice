@@ -55,6 +55,7 @@ const issued = await invoices.triggerIssue({ relateNumber }); // TriggerIssue �
 ```ts
 await invoices.validateMobileBarcode("/ABC1234"); // → boolean (CheckBarcode)
 await invoices.validateLoveCode("168001"); // → boolean (CheckLoveCode)
+await invoices.lookupLoveCodeOrganName("168001"); // → "財團法人…" | undefined (the charity name)
 ```
 
 Declared as the `CARRIER_VALIDATION` capability.

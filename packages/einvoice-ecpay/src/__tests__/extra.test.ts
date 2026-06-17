@@ -80,6 +80,24 @@ describe("carrier validation", () => {
     expect(await testProvider().validateLoveCode("123")).toBe(false);
   });
 
+  it("lookupLoveCodeOrganName returns the OrganName when it exists, else undefined", async () => {
+    server.use(
+      http.post(url(ECPAY_ENDPOINTS.checkLoveCode), () =>
+        HttpResponse.json(ecSuccess({ IsExist: "Y", OrganName: "財團法人ＯＭＧ關懷社會愛心基金會" })),
+      ),
+    );
+    expect(await testProvider().lookupLoveCodeOrganName("168001")).toBe("財團法人ＯＭＧ關懷社會愛心基金會");
+
+    server.use(
+      http.post(url(ECPAY_ENDPOINTS.checkLoveCode), () => HttpResponse.json(ecSuccess({ IsExist: "N" }))),
+    );
+    expect(await testProvider().lookupLoveCodeOrganName("000")).toBeUndefined();
+  });
+
+  it("lookupLoveCodeOrganName rejects a malformed code locally", async () => {
+    await expect(testProvider().lookupLoveCodeOrganName("12")).rejects.toMatchObject({ code: "VALIDATION" });
+  });
+
   it("rejects malformed input locally before any request", async () => {
     await expect(testProvider().validateMobileBarcode("BAD")).rejects.toMatchObject({ code: "VALIDATION" });
     await expect(testProvider().validateLoveCode("12")).rejects.toMatchObject({ code: "VALIDATION" });
