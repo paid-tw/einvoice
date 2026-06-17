@@ -56,9 +56,20 @@ describe("ezpayIssuePayloadSchema", () => {
     expect(ok({ CarrierType: "0", CarrierNum: "/ABC1234", LoveCode: "168", PrintFlag: "N" })).toBe(false);
   });
 
-  it("validates email + love code format", () => {
+  it("validates email format and caps BuyerEmail at 50 chars", () => {
     expect(ok({ BuyerEmail: "not-an-email" })).toBe(false);
     expect(ok({ LoveCode: "abc", PrintFlag: "N" })).toBe(false);
+    const longEmail = `${"a".repeat(45)}@x.com`; // 51 chars
+    expect(ok({ BuyerEmail: longEmail })).toBe(false);
+  });
+
+  it("mixed tax (TaxType=9) requires per-tax-type amounts and ItemTaxType", () => {
+    // missing both AmtSales/AmtZero/AmtFree and ItemTaxType
+    expect(ok({ TaxType: "9" })).toBe(false);
+    // has amounts but no ItemTaxType
+    expect(ok({ TaxType: "9", AmtSales: 100 })).toBe(false);
+    // complete
+    expect(ok({ TaxType: "9", AmtSales: 100, ItemTaxType: "1" })).toBe(true);
   });
 
   it("requires equal item segment counts", () => {

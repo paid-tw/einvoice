@@ -34,6 +34,19 @@ describe("mapEzpayError (ezPay §九 錯誤代碼)", () => {
     expect(mapEzpayError(code)).toBe(expected);
   });
 
+  // 手機條碼/愛心碼驗證 API error family (API100xx / CBC100xx).
+  it.each([
+    ["API10001", "VALIDATION"], // 缺少參數
+    ["API10002", "NOT_FOUND"], // 查詢失敗 (查無條碼/愛心碼)
+    ["API10004", "VALIDATION"], // 參數錯誤
+    ["CBC10001", "VALIDATION"], // 欄位資料空白
+    ["CBC10002", "VALIDATION"], // 欄位資料格式錯誤
+    ["CBC10003", "PROVIDER"], // 異常終止
+    ["CBC10004", "NETWORK"], // 財政部大平台網路連線異常
+  ])("maps carrier-validation %s → %s", (code, expected) => {
+    expect(mapEzpayError(code)).toBe(expected);
+  });
+
   // Audit: every code in the official §九 table is categorized intentionally.
   it("categorizes the full official error table (39 codes)", () => {
     const expected: Record<string, string> = {

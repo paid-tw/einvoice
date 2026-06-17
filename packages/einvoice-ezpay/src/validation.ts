@@ -21,7 +21,12 @@ export const ezpayIssuePayloadSchema = z
     BuyerName: z.string().min(1, "BuyerName is required").max(60, "BuyerName must be ≤60 chars"),
     BuyerUBN: z.string().regex(/^\d{8}$/, "BuyerUBN must be 8 digits").optional(),
     BuyerAddress: z.string().max(100, "BuyerAddress must be ≤100 chars").optional(),
-    BuyerEmail: z.string().email("BuyerEmail must be a valid email").optional().or(z.literal("")),
+    BuyerEmail: z
+      .string()
+      .email("BuyerEmail must be a valid email")
+      .max(50, "BuyerEmail must be ≤50 chars")
+      .optional()
+      .or(z.literal("")),
     CarrierType: z.enum(["0", "1", "2"]).optional(),
     CarrierNum: z.string().max(50).optional(),
     LoveCode: z.string().regex(/^\d{3,7}$/, "LoveCode must be 3–7 digits").optional(),
@@ -110,6 +115,24 @@ export const ezpayIssuePayloadSchema = z
         message: "CreateStatusTime is required for scheduled issue (Status=3)",
         path: ["CreateStatusTime"],
       });
+    }
+    // 混合稅率 (TaxType=9, B2C only): needs the per-tax-type sales amounts and
+    // a per-item tax type so the platform can split the invoice.
+    if (p.TaxType === "9") {
+      if (p.AmtSales === undefined && p.AmtZero === undefined && p.AmtFree === undefined) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Mixed tax (TaxType=9) requires at least one of AmtSales/AmtZero/AmtFree",
+          path: ["AmtSales"],
+        });
+      }
+      if (!p.ItemTaxType) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Mixed tax (TaxType=9) requires per-item ItemTaxType",
+          path: ["ItemTaxType"],
+        });
+      }
     }
   });
 

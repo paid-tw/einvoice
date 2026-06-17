@@ -125,8 +125,18 @@ export function mapEzpayError(code: string): InvoiceErrorCode {
     case "IAI10005":
     case "IAI10006":
       return InvoiceErrorCode.PROVIDER;
+    // 手機條碼/愛心碼驗證 API: 查詢失敗 (查無此條碼/愛心碼)
+    case "API10002":
+      return InvoiceErrorCode.NOT_FOUND;
+    // 手機條碼/愛心碼驗證 API: 財政部大平台異常終止
+    case "CBC10003":
+      return InvoiceErrorCode.PROVIDER;
+    // 手機條碼/愛心碼驗證 API: 財政部大平台網路連線異常
+    case "CBC10004":
+      return InvoiceErrorCode.NETWORK;
   }
-  // Field / data / amount validation families (KEY100xx, INV100xx, INV70001, IAI10001/4).
-  if (/^(KEY|INV|IAI|LIB)\d+$/.test(code)) return InvoiceErrorCode.VALIDATION;
+  // Field / data / amount validation families. KEY/INV/IAI/LIB cover invoice,
+  // allowance and void; API/CBC cover the 手機條碼/愛心碼驗證 API.
+  if (/^(KEY|INV|IAI|LIB|API|CBC)\d+$/.test(code)) return InvoiceErrorCode.VALIDATION;
   return InvoiceErrorCode.PROVIDER;
 }
