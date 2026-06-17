@@ -45,11 +45,14 @@ describe.skipIf(!live)("ECPay live (stage) — issue → query → void", LIVE_O
     invoiceDate = res.invoiceDate.toISOString().slice(0, 10);
   });
 
-  it("queries it by orderId (GetIssue) with items + amount", async () => {
-    const res = await p.query({ orderId });
-    expect(res.invoiceNumber).toBe(invoiceNumber);
-    expect(res.amount.totalAmount).toBe(100);
-    expect(res.items.length).toBeGreaterThan(0);
+  it("queries it by orderId (情境一) and by InvoiceNo+Date (情境二)", async () => {
+    const byOrder = await p.query({ orderId });
+    expect(byOrder.invoiceNumber).toBe(invoiceNumber);
+    expect(byOrder.amount.totalAmount).toBe(100);
+    expect(byOrder.items.length).toBeGreaterThan(0);
+    const byInvoice = await p.query({ invoiceNumber, providerOptions: { invoiceDate } });
+    expect(byInvoice.invoiceNumber).toBe(invoiceNumber);
+    expect(byInvoice.amount.totalAmount).toBe(100);
   });
 
   it("creates an online allowance (線上折讓) pending buyer confirmation, with a 72h expiry", async () => {
@@ -82,6 +85,8 @@ describe.skipIf(!live)("ECPay live (stage) — issue → query → void", LIVE_O
       providerOptions: { invoiceDate },
     });
     expect(al.allowanceNumber).toMatch(/^\d+$/);
+    // The invoice now reports ALLOWANCE (remaining < sales).
+    expect((await p.query({ invoiceNumber, providerOptions: { invoiceDate } })).status).toBe("ALLOWANCE");
     const va = await p.voidAllowance({ invoiceNumber, allowanceNumber: al.allowanceNumber, reason: "測試作廢" });
     expect(va.raw.RtnCode).toBe(1);
     // Voiding it again → 2000063 該折讓單已作廢過 → CONFLICT.

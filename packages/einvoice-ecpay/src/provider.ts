@@ -442,10 +442,15 @@ export class EcpayProvider implements InvoiceProvider {
   async query(input: QueryInvoiceInput): Promise<QueryInvoiceResult> {
     const parsed = queryInvoiceInputSchema.parse(input);
     const opts = (parsed.providerOptions ?? {}) as Record<string, unknown>;
-    // GetIssue is keyed by RelateNumber (the merchant order id).
-    const result = await ecpayRequest(this.config, ENDPOINTS.getIssue, {
-      RelateNumber: parsed.orderId ?? (opts.relateNumber as string) ?? "",
-    });
+    // GetIssue takes either RelateNumber (情境一) or InvoiceNo + InvoiceDate (情境二).
+    const data =
+      parsed.orderId || opts.relateNumber
+        ? { RelateNumber: parsed.orderId ?? (opts.relateNumber as string) }
+        : {
+            InvoiceNo: parsed.invoiceNumber,
+            InvoiceDate: (opts.invoiceDate as string) ?? taipeiDate(),
+          };
+    const result = await ecpayRequest(this.config, ENDPOINTS.getIssue, data);
     // GetIssue returns IIS_-prefixed fields; SalesAmount is the 含稅 total.
     const total = Number(result.IIS_Sales_Amount ?? 0);
     const tax = Number(result.IIS_Tax_Amount ?? 0);
@@ -461,6 +466,8 @@ export class EcpayProvider implements InvoiceProvider {
         name: stringOrUndef(result.IIS_Customer_Name),
         ubn: stringOrUndef(result.IIS_Identifier, "0000000000"),
         email: stringOrUndef(result.IIS_Customer_Email),
+        address: stringOrUndef(result.IIS_Customer_Addr),
+        phone: stringOrUndef(result.IIS_Customer_Phone),
       },
       items: items.map((it) => ({
         description: String(it.ItemName ?? ""),
@@ -755,5 +762,9 @@ function stringOrUndef(value: unknown, placeholder?: string): string | undefined
 function deriveStatus(result: Record<string, unknown>): InvoiceStatus {
   const invalid = result.IIS_Invalid_Status ?? result.InvalidStatus;
   if (invalid === "1" || invalid === 1) return InvoiceStatus.VOIDED;
+  // A remaining-allowance amount below the sales total means it's been credited.
+  const sales = Number(result.IIS_Sales_Amount ?? 0);
+  const remain = Number(result.IIS_Remain_Allowance_Amt ?? sales);
+  if (sales > 0 && remain < sales) return InvoiceStatus.ALLOWANCE;
   return InvoiceStatus.ISSUED;
 }

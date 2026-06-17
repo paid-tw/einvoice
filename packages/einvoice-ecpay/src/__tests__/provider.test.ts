@@ -235,13 +235,16 @@ describe("query (GetIssue)", () => {
     IIS_Random_Number: "3136",
     IIS_Identifier: "0000000000",
     IIS_Customer_Email: "b@x.com",
+    IIS_Customer_Addr: "台北市測試路1號",
+    IIS_Customer_Phone: "0900000000",
     IIS_Sales_Amount: 105,
     IIS_Tax_Amount: 5,
+    IIS_Remain_Allowance_Amt: 105,
     IIS_Invalid_Status: "0",
     Items: [{ ItemName: "商品一", ItemCount: 1, ItemPrice: 100, ItemAmount: 100, ItemWord: "式" }],
   };
 
-  it("queries by orderId (RelateNumber), parses IIS_ fields + Items + amount split", async () => {
+  it("queries by orderId (RelateNumber), parses IIS_ fields + Items + amount + buyer addr/phone", async () => {
     let data: Record<string, unknown> | undefined;
     server.use(
       http.post(url(ECPAY_ENDPOINTS.getIssue), async ({ request }) => {
@@ -250,12 +253,35 @@ describe("query (GetIssue)", () => {
       }),
     );
     const res = await testProvider().query({ orderId: "ORDER_1" });
-    expect(data).toMatchObject({ RelateNumber: "ORDER_1" });
+    expect(data).toEqual({ MerchantID: "2000132", RelateNumber: "ORDER_1" });
     expect(res.invoiceNumber).toBe("JU11082062");
     expect(res.amount).toEqual({ salesAmount: 100, taxAmount: 5, totalAmount: 105 });
+    expect(res.buyer).toMatchObject({ email: "b@x.com", address: "台北市測試路1號", phone: "0900000000" });
     expect(res.buyer.ubn).toBeUndefined(); // 0000000000 placeholder
-    expect(res.buyer.email).toBe("b@x.com");
     expect(res.items[0]?.description).toBe("商品一");
+  });
+
+  it("queries by invoiceNumber via InvoiceNo + InvoiceDate (情境二)", async () => {
+    let data: Record<string, unknown> | undefined;
+    server.use(
+      http.post(url(ECPAY_ENDPOINTS.getIssue), async ({ request }) => {
+        data = parseRequest(await request.text()).data;
+        return HttpResponse.json(ecSuccess(GET_OK));
+      }),
+    );
+    const res = await testProvider().query({ invoiceNumber: "JU11082062", providerOptions: { invoiceDate: "2026-06-17" } });
+    expect(data).toMatchObject({ InvoiceNo: "JU11082062", InvoiceDate: "2026-06-17" });
+    expect(res.invoiceNumber).toBe("JU11082062");
+  });
+
+  it("derives ALLOWANCE when the remaining allowance is below the sales total", async () => {
+    server.use(
+      http.post(url(ECPAY_ENDPOINTS.getIssue), () =>
+        HttpResponse.json(ecSuccess({ ...GET_OK, IIS_Remain_Allowance_Amt: 55 })),
+      ),
+    );
+    const res = await testProvider().query({ orderId: "ORDER_1" });
+    expect(res.status).toBe("ALLOWANCE");
   });
 
   it("derives VOIDED when IIS_Invalid_Status=1", async () => {
