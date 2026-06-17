@@ -2,7 +2,13 @@ import { http, HttpResponse } from "msw";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import type { IssueInvoiceInput } from "@paid-tw/einvoice";
 import { EZPAY_ENDPOINTS } from "../index.js";
-import { BASE, ezError, ezSuccess, MERCHANT, parsePostData, server, testProvider, withCheckCode } from "./server.js";
+import { decryptPostData } from "../crypto.js";
+import { BASE, ezError, ezSuccess, IV, KEY, MERCHANT, parsePostData, server, testProvider, withCheckCode } from "./server.js";
+
+/** Decrypt the PostData_ field of a built form into a params object. */
+function decodeForm(form: { MerchantID_: string; PostData_: string }) {
+  return Object.fromEntries(new URLSearchParams(decryptPostData(form.PostData_, KEY, IV)));
+}
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => server.resetHandlers());
@@ -442,6 +448,35 @@ describe("allowance / voidAllowance / query", () => {
     );
     const res = await testProvider().query({ invoiceNumber: "BB00000001", providerOptions: { randomNum: "1234" } });
     expect(res.buyer.ubn).toBeUndefined();
+  });
+});
+
+describe("buildPostData / buildQueryPostData (encrypt without sending)", () => {
+  it("buildPostData pairs MerchantID_ with an encrypted PostData_", () => {
+    const form = testProvider().buildPostData({ Foo: "bar", N: 1 });
+    expect(form.MerchantID_).toBe(MERCHANT);
+    expect(form.PostData_).toMatch(/^[0-9a-f]+$/); // lowercase hex
+    expect(decodeForm(form)).toMatchObject({ Foo: "bar", N: "1" });
+  });
+
+  it("buildQueryPostData builds a SearchType-0 search form with DisplayFlag", () => {
+    const form = testProvider().buildQueryPostData({
+      invoiceNumber: "BB00000001",
+      providerOptions: { randomNum: "4253", displayFlag: "1" },
+    });
+    const params = decodeForm(form);
+    expect(params).toMatchObject({
+      RespondType: "JSON",
+      Version: "1.3",
+      SearchType: "0",
+      InvoiceNumber: "BB00000001",
+      RandomNum: "4253",
+      DisplayFlag: "1",
+    });
+  });
+
+  it("buildQueryPostData still validates the lookup (SearchType-0 needs RandomNum)", () => {
+    expect(() => testProvider().buildQueryPostData({ invoiceNumber: "BB00000001" })).toThrow();
   });
 });
 

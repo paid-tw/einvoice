@@ -25,7 +25,7 @@ import {
 } from "@paid-tw/einvoice";
 import { type EzpayResponse, type EzpayResult, ezpayRequest, ezpayTimestamp } from "./client.js";
 import type { EzpayConfig } from "./config.js";
-import { makeCheckCode } from "./crypto.js";
+import { encryptPostData, makeCheckCode } from "./crypto.js";
 import { ENDPOINTS } from "./endpoints.js";
 import {
   assertValidAllowancePayload,
@@ -135,6 +135,31 @@ export class EzpayProvider implements InvoiceProvider {
   /** Escape hatch: call any ezPay endpoint with raw PostData_ params. */
   raw(path: string, postData: Record<string, string | number | undefined>): Promise<EzpayResult> {
     return ezpayRequest(this.config, path, postData);
+  }
+
+  /**
+   * Build the encrypted form fields (`MerchantID_` + `PostData_`) for an
+   * endpoint WITHOUT sending the request. Use this to POST from a browser form
+   * straight to ezPay — e.g. a DisplayFlag query whose result page is rendered
+   * by ezPay. POST these fields to `${baseUrl}${endpointPath}`.
+   */
+  buildPostData(postData: Record<string, string | number | undefined>): {
+    MerchantID_: string;
+    PostData_: string;
+  } {
+    return {
+      MerchantID_: this.config.merchantId,
+      PostData_: encryptPostData(postData, this.config.hashKey, this.config.hashIV),
+    };
+  }
+
+  /**
+   * Build the encrypted `invoice_search` form fields for a browser Form POST
+   * (the DisplayFlag flow). Pass `providerOptions.displayFlag: "1"` to have
+   * ezPay render the result page. POST the returned fields to the search endpoint.
+   */
+  buildQueryPostData(input: QueryInvoiceInput): { MerchantID_: string; PostData_: string } {
+    return this.buildPostData(this.buildSearchPostData(input));
   }
 
   // -------------------------------------------------------------------------
@@ -338,13 +363,16 @@ export class EzpayProvider implements InvoiceProvider {
     };
   }
 
-  async query(input: QueryInvoiceInput): Promise<QueryInvoiceResult> {
+  /** Build the validated `invoice_search` PostData_ from a unified query input. */
+  private buildSearchPostData(
+    input: QueryInvoiceInput,
+  ): Record<string, string | number | undefined> {
     const parsed = queryInvoiceInputSchema.parse(input);
     const opts = (parsed.providerOptions ?? {}) as Record<string, unknown>;
     // ezPay supports two lookups: by invoice number + random code (SearchType 0),
     // or by order number + total amount (SearchType 1).
     const byInvoice = Boolean(parsed.invoiceNumber);
-    const postData: Record<string, string | number | undefined> = byInvoice
+    const lookup: Record<string, string | number | undefined> = byInvoice
       ? {
           SearchType: "0",
           InvoiceNumber: parsed.invoiceNumber,
@@ -359,14 +387,22 @@ export class EzpayProvider implements InvoiceProvider {
           InvoiceNumber: opts.invoiceNumber as string | undefined,
           RandomNum: opts.randomNum as string | undefined,
         };
+    // DisplayFlag=1 hands the result page to ezPay (browser Form POST flow).
+    if (opts.displayFlag !== undefined) lookup.DisplayFlag = String(opts.displayFlag);
 
     const fullPostData = {
       RespondType: this.respondType(),
       Version: ENDPOINTS.search.version,
       TimeStamp: ezpayTimestamp(),
-      ...postData,
+      ...lookup,
     };
     this.validate(assertValidSearchPayload, fullPostData);
+    return fullPostData;
+  }
+
+  async query(input: QueryInvoiceInput): Promise<QueryInvoiceResult> {
+    const parsed = queryInvoiceInputSchema.parse(input);
+    const fullPostData = this.buildSearchPostData(input);
     const { result, raw } = await ezpayRequest(this.config, ENDPOINTS.search.path, fullPostData);
 
     return {

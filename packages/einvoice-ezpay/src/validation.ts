@@ -258,6 +258,7 @@ export const ezpaySearchPayloadSchema = z
     RandomNum: z.string().regex(/^\d{4}$/, "RandomNum must be 4 digits").optional(),
     MerchantOrderNo: z.string().max(20).optional().or(z.literal("")),
     TotalAmt: z.coerce.number().int().nonnegative().optional(),
+    DisplayFlag: z.enum(["", "1"]).optional(),
   })
   .passthrough()
   .superRefine((p, ctx) => {

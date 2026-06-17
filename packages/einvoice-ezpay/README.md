@@ -77,6 +77,24 @@ A held (`Status=3`) scheduled invoice can also be issued early with
 `triggerIssue`. A confirmed allowance uploads the next day and can no longer be
 cancelled — void an uploaded one with `voidAllowance` instead.
 
+## Browser Form POST (build without sending)
+
+For flows where the browser POSTs straight to ezPay — e.g. a query whose result
+page is rendered by ezPay (`DisplayFlag=1`) — build the encrypted form fields
+without performing the request:
+
+```ts
+// Generic: encrypt any params for a chosen endpoint.
+const { MerchantID_, PostData_ } = invoices.buildPostData({ /* ... */ });
+
+// Query-specific: pass providerOptions.displayFlag to hand the result page to ezPay.
+const fields = invoices.buildQueryPostData({
+  invoiceNumber: "BB00000001",
+  providerOptions: { randomNum: "4253", displayFlag: "1" },
+});
+// POST { MerchantID_, PostData_ } as a form to the matching endpoint URL.
+```
+
 ## Notes
 
 - ezPay query needs an extra key beyond the unified `invoiceNumber`/`orderId`:
