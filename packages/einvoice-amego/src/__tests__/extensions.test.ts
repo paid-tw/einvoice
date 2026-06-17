@@ -16,6 +16,7 @@ import {
   ALLOWANCE_QUERY_OK,
   ALLOWANCE_STATUS_OK,
   FILE_URL_OK,
+  INVOICE_LIST_OK,
   LOTTERY_STATUS_OK,
   LOTTERY_TYPE_OK,
   TIME_OK,
@@ -230,6 +231,25 @@ describe("Amego endpoint contracts (verified live shapes)", () => {
     expect(item.tax).toBe(5);
     // pending schedule (e.g. a queued void)
     expect((d.wait as Array<Record<string, unknown>>)[0]?.invoice_type).toBe("D0501");
+  });
+
+  it("invoice.list sends the numeric date range and parses pagination + full rows", async () => {
+    let data: Record<string, unknown> | undefined;
+    server.use(
+      http.post(`${BASE}${ENDPOINTS.invoiceList}`, async ({ request }) => {
+        data = parseBody(await request.text()).data;
+        return HttpResponse.json(INVOICE_LIST_OK);
+      }),
+    );
+    const res = await testProvider().invoice.list({ startDate: "2026-06-01", endDate: 20260630, dateSelect: 2 });
+    expect(data).toEqual({ date_select: 2, date_start: 20260601, date_end: 20260630, limit: 20, page: 1 });
+    expect(res.data_total).toBe(6041);
+    expect(res.page_total).toBe(303);
+    const row = (res.data as Array<Record<string, unknown>>)[0]!;
+    expect(row.invoice_type).toBe("C0401");
+    expect(row.invoice_status).toBe(UPLOAD_STATUS.COMPLETED);
+    expect(row.total_amount).toBe(69);
+    expect(row.order_id).toBe("202605260953542841");
   });
 
   it("allowances.list parses pagination + 未稅 rows with original-invoice items", async () => {

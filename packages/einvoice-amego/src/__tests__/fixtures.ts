@@ -141,12 +141,13 @@ export const ALLOWANCE_QUERY_OK = {
   },
 };
 
+/** Real invoice_list response (one full row), captured live. */
 export const INVOICE_LIST_OK = {
   code: 0,
   msg: "",
-  page_total: 299,
+  page_total: 303,
   page_now: 1,
-  data_total: 5968,
+  data_total: 6041,
   data: [
     {
       invoice_number: "AA26505593",
@@ -154,7 +155,30 @@ export const INVOICE_LIST_OK = {
       invoice_status: 99,
       invoice_date: 20260601,
       invoice_time: "09:50:59",
-      total_amount: 105,
+      buyer_identifier: "28080623",
+      buyer_name: "光貿科技股份有限公司",
+      buyer_zip: 404,
+      buyer_address: "進化北路238號14樓之5",
+      sales_amount: 66,
+      free_tax_sales_amount: 0,
+      zero_tax_sales_amount: 0,
+      tax_type: 1,
+      tax_rate: "0.05",
+      tax_amount: 3,
+      total_amount: 69,
+      print_mark: "Y",
+      random_number: "1711",
+      main_remark: "如需作廢發票，請於5號前通知~",
+      customs_clearance_mark: 0,
+      zero_tax_rate_reason: 0,
+      carrier_type: "",
+      carrier_id1: "",
+      carrier_id2: "",
+      npoban: "",
+      cancel_date: 0,
+      invoice_lottery: 0,
+      order_id: "202605260953542841",
+      create_date: 1779760433,
     },
   ],
 };
