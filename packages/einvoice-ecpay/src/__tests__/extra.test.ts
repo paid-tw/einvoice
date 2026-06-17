@@ -420,6 +420,40 @@ describe("線上開立折讓 (allowanceOnline)", () => {
   });
 });
 
+describe("查詢作廢發票明細 (getInvalid / GetInvalid)", () => {
+  it("posts RelateNumber+InvoiceNo+InvoiceDate, parses the void detail", async () => {
+    let data: Record<string, unknown> | undefined;
+    server.use(
+      http.post(url(ECPAY_ENDPOINTS.getInvalid), async ({ request }) => {
+        data = parseRequest(await request.text()).data;
+        return HttpResponse.json(
+          ecSuccess({
+            II_Invoice_No: "JU11083872",
+            II_Date: "2026-06-17 22:30:12",
+            II_Upload_Status: "0",
+            II_Upload_Date: "",
+            Reason: "測試作廢原因",
+            II_Seller_Identifier: "53538851",
+            II_Buyer_Identifier: "0000000000",
+          }),
+        );
+      }),
+    );
+    const res = await testProvider().getInvalid({ orderId: "ORDER_1", invoiceNumber: "JU11083872", invoiceDate: "2026-06-17" });
+    expect(data).toMatchObject({ RelateNumber: "ORDER_1", InvoiceNo: "JU11083872", InvoiceDate: "2026-06-17" });
+    expect(res).toMatchObject({ invoiceNumber: "JU11083872", reason: "測試作廢原因", uploaded: false, sellerUbn: "53538851" });
+    expect(res.buyerUbn).toBeUndefined(); // 0000000000
+    expect(res.uploadedAt).toBeUndefined();
+    expect(res.voidedAt.getFullYear()).toBe(2026);
+  });
+
+  it("rejects a missing field locally", async () => {
+    await expect(
+      testProvider().getInvalid({ orderId: "O1", invoiceNumber: "JU1", invoiceDate: "" }),
+    ).rejects.toMatchObject({ code: "VALIDATION" });
+  });
+});
+
 describe("查詢折讓明細 (getAllowanceList / GetAllowanceList)", () => {
   const ALLOW = {
     IA_Allow_No: "2026061722267537",

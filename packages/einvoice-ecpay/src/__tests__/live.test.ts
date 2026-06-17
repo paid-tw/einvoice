@@ -99,9 +99,12 @@ describe.skipIf(!live)("ECPay live (stage) — issue → query → void", LIVE_O
     ).rejects.toMatchObject({ code: "CONFLICT" });
   });
 
-  it("voids it (Invalid)", async () => {
+  it("voids it (Invalid), then reads the void detail (GetInvalid)", async () => {
     const res = await p.void({ invoiceNumber, reason: "整合測試作廢", providerOptions: { invoiceDate } });
     expect(res.status).toBe("VOIDED");
+    const detail = await p.getInvalid({ orderId, invoiceNumber, invoiceDate });
+    expect(detail.invoiceNumber).toBe(invoiceNumber);
+    expect(detail.reason).toBe("整合測試作廢");
   });
 });
 

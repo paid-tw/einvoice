@@ -124,6 +124,19 @@ export interface OnlineAllowanceResult {
   raw: EcpayResult;
 }
 
+/** Detail of a voided invoice from {@link EcpayProvider.getInvalid} (查詢作廢發票明細). */
+export interface InvalidDetail {
+  invoiceNumber: string; // II_Invoice_No
+  /** 作廢時間 (II_Date). */
+  voidedAt: Date;
+  reason: string; // Reason
+  uploaded: boolean; // II_Upload_Status
+  uploadedAt?: Date; // II_Upload_Date
+  sellerUbn?: string; // II_Seller_Identifier
+  buyerUbn?: string; // II_Buyer_Identifier
+  raw: Record<string, unknown>;
+}
+
 /** Lookup for {@link EcpayProvider.getAllowanceList} (查詢折讓明細). */
 export interface GetAllowanceListInput {
   /** 折讓編號 — SearchType 0. */
@@ -549,6 +562,40 @@ export class EcpayProvider implements InvoiceProvider {
         unit: stringOrUndef(it.ItemWord),
         remark: stringOrUndef(it.ItemRemark),
       })),
+      raw: result,
+    };
+  }
+
+  /**
+   * 查詢作廢發票明細 (GetInvalid): look up a voided invoice's detail (void time,
+   * reason, upload status, seller/buyer 統編). Keyed by RelateNumber + InvoiceNo
+   * + InvoiceDate (all required).
+   */
+  async getInvalid(input: {
+    orderId: string;
+    invoiceNumber: string;
+    invoiceDate: string;
+  }): Promise<InvalidDetail> {
+    if (this.config.validatePayload !== false && (!input.orderId || !input.invoiceNumber || !input.invoiceDate)) {
+      throw new InvoiceError("orderId, invoiceNumber and invoiceDate are all required", {
+        provider: "ecpay",
+        code: InvoiceErrorCode.VALIDATION,
+        rawMessage: "GetInvalid needs RelateNumber + InvoiceNo + InvoiceDate",
+      });
+    }
+    const result = await ecpayRequest(this.config, ENDPOINTS.getInvalid, {
+      RelateNumber: input.orderId,
+      InvoiceNo: input.invoiceNumber,
+      InvoiceDate: input.invoiceDate,
+    });
+    return {
+      invoiceNumber: String(result.II_Invoice_No ?? input.invoiceNumber),
+      voidedAt: parseEcpayDate(result.II_Date),
+      reason: String(result.Reason ?? ""),
+      uploaded: result.II_Upload_Status === "1" || result.II_Upload_Status === 1,
+      uploadedAt: result.II_Upload_Date ? parseEcpayDate(result.II_Upload_Date) : undefined,
+      sellerUbn: stringOrUndef(result.II_Seller_Identifier, "0000000000"),
+      buyerUbn: stringOrUndef(result.II_Buyer_Identifier, "0000000000"),
       raw: result,
     };
   }
