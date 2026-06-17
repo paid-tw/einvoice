@@ -1,11 +1,13 @@
 {
   "name": "@paid-tw/einvoice-ecpay",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "ECPay 綠界 (ecpay.com.tw) adapter for @paid-tw/einvoice — implements InvoiceProvider over the ECPay B2C e-invoice 2.0 API.",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -29,7 +31,13 @@
     "tsup": "^8.3.0",
     "typescript": "^5.6.0"
   },
-  "keywords": ["einvoice", "電子發票", "ecpay", "綠界", "taiwan"],
+  "keywords": [
+    "einvoice",
+    "電子發票",
+    "ecpay",
+    "綠界",
+    "taiwan"
+  ],
   "publishConfig": {
     "access": "public"
   }
