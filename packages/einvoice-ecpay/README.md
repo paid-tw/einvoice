@@ -70,6 +70,14 @@ Declared as the `CARRIER_VALIDATION` capability. (ECPay's B2C API has no working
 | `mode` | | `"TEST"` (default, stage) or `"PRODUCTION"` |
 | `validatePayload` | | validate the issue payload locally (default `true`) |
 
+## 字軌 / numbering
+
+```ts
+// 查詢財政部配號結果 — the invoice-number ranges allocated for a 民國年.
+const ranges = await invoices.getGovInvoiceWordSetting("115");
+// → [{ term, invType, header, start, end, count }, …]; throws NOT_FOUND if unallocated.
+```
+
 ## Notes
 
 - `void` and `allowance` need the invoice's date — pass it via

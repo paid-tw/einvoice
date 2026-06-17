@@ -30,6 +30,22 @@ import type { EcpayConfig } from "./config.js";
 import { ENDPOINTS } from "./endpoints.js";
 import { assertValidIssuePayload } from "./validation.js";
 
+/** One allocated invoice-number range (字軌) from 查詢財政部配號結果. */
+export interface EcpayWordSetting {
+  /** 期別 1–6 (1=1-2月, 2=3-4月, …). */
+  term: number;
+  /** 字軌類別: 07 一般稅額 / 08 特種稅額. */
+  invType: string;
+  /** 發票字軌, e.g. `"GI"`. */
+  header: string;
+  /** 起始 8-digit 發票號碼 (尾數 00/50). */
+  start: string;
+  /** 結束 8-digit 發票號碼 (尾數 49/99). */
+  end: string;
+  /** 申請本數 (1 本 = 50 numbers). */
+  count: number;
+}
+
 /** Unified carrier type → ECPay CarrierType (空=紙本/1=綠界/2=自然人/3=手機). */
 const CARRIER_TYPE: Record<Carrier["type"], string> = {
   MEMBER: "1",
@@ -235,6 +251,36 @@ export class EcpayProvider implements InvoiceProvider {
     }
     const result = await ecpayRequest(this.config, ENDPOINTS.checkLoveCode, { LoveCode: loveCode });
     return result.IsExist === "Y";
+  }
+
+  /**
+   * 查詢財政部配號結果 (GetGovInvoiceWordSetting): list the invoice number ranges
+   * (字軌) the tax authority has allocated to this merchant for a given 民國年
+   * (e.g. `"115"` — only last/current/next year). Throws NOT_FOUND (查無資料)
+   * when no allocation exists (often: not yet authorised to ECPay).
+   */
+  async getGovInvoiceWordSetting(invoiceYear: string): Promise<EcpayWordSetting[]> {
+    if (this.config.validatePayload !== false && !/^\d{3}$/.test(invoiceYear)) {
+      throw new InvoiceError(`Invalid InvoiceYear: ${invoiceYear}`, {
+        provider: "ecpay",
+        code: InvoiceErrorCode.VALIDATION,
+        rawMessage: "InvoiceYear must be a 3-digit 民國年 (e.g. 115)",
+      });
+    }
+    const result = await ecpayRequest(this.config, ENDPOINTS.getGovInvoiceWordSetting, {
+      InvoiceYear: invoiceYear,
+    });
+    const info = Array.isArray(result.InvoiceInfo)
+      ? (result.InvoiceInfo as Array<Record<string, unknown>>)
+      : [];
+    return info.map((w) => ({
+      term: Number(w.InvoiceTerm),
+      invType: String(w.InvType ?? ""),
+      header: String(w.InvoiceHeader ?? ""),
+      start: String(w.InvoiceStart ?? ""),
+      end: String(w.InvoiceEnd ?? ""),
+      count: Number(w.Number ?? 0),
+    }));
   }
 
   // -------------------------------------------------------------------------

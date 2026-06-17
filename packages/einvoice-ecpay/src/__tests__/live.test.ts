@@ -81,3 +81,15 @@ describe.skipIf(!live)("ECPay live (stage) — 載具驗證", LIVE_OPTS, () => {
     expect(await p.validateLoveCode("168001")).toBe(true);
   });
 });
+
+describe.skipIf(!live)("ECPay live (stage) — 查詢財政部配號", LIVE_OPTS, () => {
+  const p = provider();
+  const thisYear = String(new Date().getFullYear() - 1911); // 民國年
+
+  it("lists the allocated 字軌 ranges for the current 民國年", async () => {
+    const ranges = await p.getGovInvoiceWordSetting(thisYear);
+    expect(ranges.length).toBeGreaterThan(0);
+    expect(ranges[0]?.header).toMatch(/^[A-Z]{2}$/);
+    expect(ranges[0]?.start).toMatch(/^\d{8}$/);
+  });
+});

@@ -22,6 +22,7 @@ export const ENDPOINTS = {
   checkUnifiedBusinessNo: "/B2CInvoice/CheckUnifiedBussinesNo", // 統編驗證 (ECPay's spelling)
   invoiceNotify: "/B2CInvoice/InvoiceNotify", // 發送通知
   invoicePrint: "/B2CInvoice/InvoicePrint", // 列印
+  getGovInvoiceWordSetting: "/B2CInvoice/GetGovInvoiceWordSetting", // 查詢財政部配號結果
 } as const;
 
 export type EndpointKey = keyof typeof ENDPOINTS;

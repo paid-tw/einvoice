@@ -86,6 +86,47 @@ describe("carrier validation", () => {
   });
 });
 
+describe("查詢財政部配號結果 (GetGovInvoiceWordSetting)", () => {
+  it("posts InvoiceYear and maps InvoiceInfo to a clean shape", async () => {
+    let data: Record<string, unknown> | undefined;
+    server.use(
+      http.post(url(ECPAY_ENDPOINTS.getGovInvoiceWordSetting), async ({ request }) => {
+        data = parseRequest(await request.text()).data;
+        return HttpResponse.json(
+          ecSuccess({
+            InvoiceInfo: [
+              { InvoiceTerm: 1, InvType: "07", InvoiceHeader: "GI", InvoiceStart: "10000000", InvoiceEnd: "10000299", Number: 6 },
+            ],
+          }),
+        );
+      }),
+    );
+    const res = await testProvider().getGovInvoiceWordSetting("115");
+    expect(data).toMatchObject({ InvoiceYear: "115" });
+    expect(res).toEqual([
+      { term: 1, invType: "07", header: "GI", start: "10000000", end: "10000299", count: 6 },
+    ]);
+  });
+
+  it("returns an empty list when the response carries no InvoiceInfo", async () => {
+    server.use(
+      http.post(url(ECPAY_ENDPOINTS.getGovInvoiceWordSetting), () => HttpResponse.json(ecSuccess({}))),
+    );
+    expect(await testProvider().getGovInvoiceWordSetting("115")).toEqual([]);
+  });
+
+  it("throws NOT_FOUND when there's no allocation (查無資料)", async () => {
+    server.use(
+      http.post(url(ECPAY_ENDPOINTS.getGovInvoiceWordSetting), () => HttpResponse.json(ecError(7, "查無資料"))),
+    );
+    await expect(testProvider().getGovInvoiceWordSetting("116")).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("rejects a malformed InvoiceYear locally", async () => {
+    await expect(testProvider().getGovInvoiceWordSetting("2026")).rejects.toMatchObject({ code: "VALIDATION" });
+  });
+});
+
 describe("raw() escape hatch", () => {
   it("posts an arbitrary Data payload and returns the decrypted result", async () => {
     let data: Record<string, unknown> | undefined;
