@@ -49,3 +49,46 @@ describe.skipIf(!live)("ezPay live (test env)", () => {
     expect(res.status).toBe("VOIDED");
   });
 });
+
+describe.skipIf(!live)("ezPay live — allowance lifecycle", () => {
+  const provider = createEzpayProvider({
+    merchantId: process.env.EZPAY_MERCHANT_ID!,
+    hashKey: process.env.EZPAY_HASH_KEY!,
+    hashIV: process.env.EZPAY_HASH_IV!,
+    mode: "TEST",
+  });
+
+  const orderId = `AL${Date.now()}`;
+  let invoiceNumber: string;
+  let allowanceNumber: string;
+
+  it("issues a B2B invoice to credit", async () => {
+    const res = await provider.issue({
+      orderId,
+      buyer: { ubn: "28080623", name: "光貿科技股份有限公司" },
+      items: [{ description: "折讓測試商品", quantity: 1, unitPrice: 100, amount: 100 }],
+      amount: { salesAmount: 100, taxAmount: 5, totalAmount: 105 },
+      taxType: "TAXABLE",
+      priceMode: "TAX_EXCLUSIVE",
+    });
+    expect(res.invoiceNumber).toMatch(/^[A-Z]{2}\d{8}$/);
+    invoiceNumber = res.invoiceNumber;
+  });
+
+  it("opens an allowance (allowance_issue) and returns the AllowanceNo", async () => {
+    const res = await provider.allowance({
+      invoiceNumber,
+      allowanceId: orderId,
+      items: [{ description: "折讓測試商品", quantity: 1, unitPrice: 100, amount: 100 }],
+      amount: { salesAmount: 100, taxAmount: 5, totalAmount: 105 },
+      providerOptions: { merchantOrderNo: orderId },
+    });
+    expect(res.allowanceNumber).toMatch(/^[A-Z]/);
+    allowanceNumber = res.allowanceNumber;
+  });
+
+  it("voids the allowance (allowanceInvalid)", async () => {
+    const res = await provider.voidAllowance({ invoiceNumber, allowanceNumber, reason: "測試作廢折讓" });
+    expect(res.allowanceNumber).toBe(allowanceNumber);
+  });
+});
