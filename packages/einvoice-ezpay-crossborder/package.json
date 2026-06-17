@@ -1,0 +1,47 @@
+{
+  "name": "@paid-tw/einvoice-ezpay-crossborder",
+  "version": "0.0.0",
+  "description": "ezPay 境外電商 (cross-border e-commerce supplier) adapter for @paid-tw/einvoice — foreign-currency B2C e-invoices over the ezPay CES API.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@paid-tw/einvoice": "workspace:*",
+    "@paid-tw/einvoice-ezpay": "workspace:*",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "tsup": "^8.3.0",
+    "typescript": "^5.6.0"
+  },
+  "keywords": [
+    "einvoice",
+    "電子發票",
+    "ezpay",
+    "藍新",
+    "境外電商",
+    "cross-border",
+    "taiwan"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}
