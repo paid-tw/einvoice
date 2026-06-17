@@ -18,11 +18,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # pnpm 10 mints the OIDC token for trusted publishing and converts the
-      # `workspace:*` ranges to real versions at pack time.
+      # No `version:` here — pnpm/action-setup reads `packageManager` from
+      # package.json (specifying both errors). pnpm only installs/builds/packs.
       - uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       - uses: actions/setup-node@v4
         with:
@@ -33,8 +31,24 @@ jobs:
       - run: pnpm -r build
       - run: pnpm test
 
-      # No NODE_AUTH_TOKEN: with `id-token: write` and a Trusted Publisher
-      # configured for each package on npmjs.com, pnpm publishes tokenlessly
-      # and attaches build provenance. `--no-git-checks` because we publish
-      # from a detached tag checkout.
-      - run: pnpm -r publish --access public --provenance --no-git-checks
+      # npm >= 11.5.1 (on Node 24) does tokenless OIDC trusted publishing. We
+      # publish a `pnpm pack` tarball (which rewrites the `workspace:*` ranges to
+      # real versions) so npm handles auth + provenance and pnpm handles the
+      # workspace resolution. No NODE_AUTH_TOKEN: each package has a Trusted
+      # Publisher configured for this repo + workflow on npmjs.com.
+      - run: npm install -g npm@latest
+      - name: Publish changed packages (OIDC + provenance)
+        run: |
+          for dir in packages/*/; do
+            [ -f "${dir}package.json" ] || continue
+            node -e "process.exit(require('./${dir}package.json').private ? 1 : 0)" || continue
+            name=$(node -p "require('./${dir}package.json').name")
+            ver=$(node -p "require('./${dir}package.json').version")
+            if npm view "${name}@${ver}" version >/dev/null 2>&1; then
+              echo "::notice::${name}@${ver} already published — skipping"
+              continue
+            fi
+            echo "::group::publish ${name}@${ver}"
+            ( cd "$dir" && pnpm pack && npm publish ./*.tgz --access public --provenance )
+            echo "::endgroup::"
+          done
