@@ -2,7 +2,7 @@ import { http, HttpResponse } from "msw";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import type { IssueInvoiceInput } from "@paid-tw/einvoice";
 import { EZPAY_ENDPOINTS } from "../index.js";
-import { BASE, ezError, ezSuccess, MERCHANT, parsePostData, server, testProvider } from "./server.js";
+import { BASE, ezError, ezSuccess, MERCHANT, parsePostData, server, testProvider, withCheckCode } from "./server.js";
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => server.resetHandlers());
@@ -39,7 +39,7 @@ describe("issue (invoice_issue)", () => {
     server.use(
       http.post(url(EZPAY_ENDPOINTS.issue), async ({ request }) => {
         captured = parsePostData(await request.text());
-        return HttpResponse.json(ezSuccess(ISSUE_OK));
+        return HttpResponse.json(ezSuccess(withCheckCode(ISSUE_OK)));
       }),
     );
 
@@ -74,7 +74,7 @@ describe("issue (invoice_issue)", () => {
     server.use(
       http.post(url(EZPAY_ENDPOINTS.issue), async ({ request }) => {
         p = parsePostData(await request.text()).params;
-        return HttpResponse.json(ezSuccess(ISSUE_OK));
+        return HttpResponse.json(ezSuccess(withCheckCode(ISSUE_OK)));
       }),
     );
     await testProvider().issue(
@@ -90,7 +90,7 @@ describe("issue (invoice_issue)", () => {
     server.use(
       http.post(url(EZPAY_ENDPOINTS.issue), async ({ request }) => {
         p = parsePostData(await request.text()).params;
-        return HttpResponse.json(ezSuccess(ISSUE_OK));
+        return HttpResponse.json(ezSuccess(withCheckCode(ISSUE_OK)));
       }),
     );
     await testProvider().issue(
@@ -132,6 +132,49 @@ describe("issue (invoice_issue)", () => {
   });
 });
 
+describe("issue response CheckCode verification", () => {
+  it("accepts a response whose CheckCode matches the 5 result fields", async () => {
+    server.use(
+      http.post(url(EZPAY_ENDPOINTS.issue), () => HttpResponse.json(ezSuccess(withCheckCode(ISSUE_OK)))),
+    );
+    const res = await testProvider().issue(issueInput());
+    expect(res.invoiceNumber).toBe("DS12223139");
+  });
+
+  it("rejects a tampered CheckCode as a PROVIDER error", async () => {
+    server.use(
+      http.post(url(EZPAY_ENDPOINTS.issue), () =>
+        HttpResponse.json(ezSuccess({ ...ISSUE_OK, CheckCode: "DEADBEEF" })),
+      ),
+    );
+    const err = await testProvider().issue(issueInput()).catch((e) => e);
+    expect(err.code).toBe("PROVIDER");
+    expect(err.rawCode).toBe("CHECKCODE_MISMATCH");
+  });
+
+  it("detects payload tampering (mutated TotalAmt invalidates the CheckCode)", async () => {
+    // valid CheckCode for the original, but a swapped TotalAmt → mismatch.
+    server.use(
+      http.post(url(EZPAY_ENDPOINTS.issue), () =>
+        HttpResponse.json(ezSuccess({ ...withCheckCode(ISSUE_OK), TotalAmt: 999 })),
+      ),
+    );
+    await expect(testProvider().issue(issueInput())).rejects.toMatchObject({
+      rawCode: "CHECKCODE_MISMATCH",
+    });
+  });
+
+  it("verifyCheckCode:false skips verification", async () => {
+    server.use(
+      http.post(url(EZPAY_ENDPOINTS.issue), () =>
+        HttpResponse.json(ezSuccess({ ...ISSUE_OK, CheckCode: "WRONG" })),
+      ),
+    );
+    const res = await testProvider({ verifyCheckCode: false }).issue(issueInput());
+    expect(res.invoiceNumber).toBe("DS12223139");
+  });
+});
+
 describe("void (invoice_invalid)", () => {
   it("sends InvoiceNumber + InvalidReason and maps the result", async () => {
     let p: Record<string, string> | undefined;
@@ -165,15 +208,17 @@ describe("觸發開立 (issuePending → triggerIssue)", () => {
       http.post(url(EZPAY_ENDPOINTS.issue), async ({ request }) => {
         p = parsePostData(await request.text()).params;
         return HttpResponse.json(
-          ezSuccess({
-            MerchantID: MERCHANT,
-            InvoiceTransNo: "26061710261482406",
-            MerchantOrderNo: "ORDER_1",
-            InvoiceNumber: "", // held: not issued yet
-            TotalAmt: 105,
-            RandomNum: "8117",
-            CreateTime: "",
-          }),
+          ezSuccess(
+            withCheckCode({
+              MerchantID: MERCHANT,
+              InvoiceTransNo: "26061710261482406",
+              MerchantOrderNo: "ORDER_1",
+              InvoiceNumber: "", // held: not issued yet
+              TotalAmt: 105,
+              RandomNum: "8117",
+              CreateTime: "",
+            }),
+          ),
         );
       }),
     );
@@ -190,16 +235,17 @@ describe("觸發開立 (issuePending → triggerIssue)", () => {
       http.post(url(EZPAY_ENDPOINTS.touchIssue), async ({ request }) => {
         p = parsePostData(await request.text()).params;
         return HttpResponse.json(
-          ezSuccess({
-            MerchantID: MERCHANT,
-            InvoiceTransNo: "26061710261482406",
-            MerchantOrderNo: "ORDER_1",
-            TotalAmt: 105,
-            InvoiceNumber: "BB00000057",
-            RandomNum: "8117",
-            CreateTime: "2026-06-17 10:26:14",
-            CheckCode: "X",
-          }),
+          ezSuccess(
+            withCheckCode({
+              MerchantID: MERCHANT,
+              InvoiceTransNo: "26061710261482406",
+              MerchantOrderNo: "ORDER_1",
+              TotalAmt: 105,
+              InvoiceNumber: "BB00000057",
+              RandomNum: "8117",
+              CreateTime: "2026-06-17 10:26:14",
+            }),
+          ),
         );
       }),
     );

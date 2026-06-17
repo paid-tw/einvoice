@@ -4,6 +4,8 @@ import {
   Capability,
   type Carrier,
   deriveCategory,
+  InvoiceError,
+  InvoiceErrorCode,
   type InvoiceProvider,
   InvoiceStatus,
   type IssueInvoiceInput,
@@ -23,6 +25,7 @@ import {
 } from "@paid-tw/einvoice";
 import { type EzpayResponse, type EzpayResult, ezpayRequest, ezpayTimestamp } from "./client.js";
 import type { EzpayConfig } from "./config.js";
+import { makeCheckCode } from "./crypto.js";
 import { ENDPOINTS } from "./endpoints.js";
 import {
   assertValidAllowancePayload,
@@ -99,6 +102,36 @@ export class EzpayProvider implements InvoiceProvider {
     if (this.config.validatePayload !== false) assert(postData);
   }
 
+  /**
+   * Verify an issue-family response's `CheckCode` against the 5 result fields
+   * (per the ezPay 附件二 spec). Throws when it doesn't match the locally
+   * recomputed value — a sign the reply was tampered with or mis-routed.
+   */
+  private verifyIssueCheckCode(result: Record<string, unknown>): void {
+    if (this.config.verifyCheckCode === false) return;
+    const checkCode = result.CheckCode;
+    if (!checkCode) return; // some responses omit it; nothing to verify
+    const expected = makeCheckCode(
+      {
+        MerchantID: String(result.MerchantID ?? ""),
+        MerchantOrderNo: String(result.MerchantOrderNo ?? ""),
+        InvoiceTransNo: String(result.InvoiceTransNo ?? ""),
+        TotalAmt: String(result.TotalAmt ?? ""),
+        RandomNum: String(result.RandomNum ?? ""),
+      },
+      this.config.hashKey,
+      this.config.hashIV,
+    );
+    if (expected !== String(checkCode).toUpperCase()) {
+      throw new InvoiceError("ezPay response CheckCode mismatch — possible tampering", {
+        provider: "ezpay",
+        code: InvoiceErrorCode.PROVIDER,
+        rawCode: "CHECKCODE_MISMATCH",
+        raw: result,
+      });
+    }
+  }
+
   /** Escape hatch: call any ezPay endpoint with raw PostData_ params. */
   raw(path: string, postData: Record<string, string | number | undefined>): Promise<EzpayResult> {
     return ezpayRequest(this.config, path, postData);
@@ -153,6 +186,7 @@ export class EzpayProvider implements InvoiceProvider {
     const parsed = issueInvoiceInputSchema.parse(input);
     const postData = this.buildIssuePostData(parsed, "1"); // 即時開立
     const { result, raw } = await ezpayRequest(this.config, ENDPOINTS.issue.path, postData);
+    this.verifyIssueCheckCode(result);
     return {
       invoiceNumber: String(result.InvoiceNumber ?? ""),
       invoiceDate: parseEzpayDate(result.CreateTime),
@@ -173,6 +207,7 @@ export class EzpayProvider implements InvoiceProvider {
     const parsed = issueInvoiceInputSchema.parse(input);
     const postData = this.buildIssuePostData(parsed, "0"); // 等待觸發開立
     const { result, raw } = await ezpayRequest(this.config, ENDPOINTS.issue.path, postData);
+    this.verifyIssueCheckCode(result);
     return {
       invoiceTransNo: String(result.InvoiceTransNo ?? ""),
       orderId: String(result.MerchantOrderNo ?? parsed.orderId),
@@ -198,6 +233,7 @@ export class EzpayProvider implements InvoiceProvider {
     };
     this.validate(assertValidTouchIssuePayload, postData);
     const { result, raw } = await ezpayRequest(this.config, ENDPOINTS.touchIssue.path, postData);
+    this.verifyIssueCheckCode(result);
     return {
       invoiceNumber: String(result.InvoiceNumber ?? ""),
       invoiceDate: parseEzpayDate(result.CreateTime),

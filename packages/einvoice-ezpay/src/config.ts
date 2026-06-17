@@ -11,6 +11,11 @@ export interface EzpayConfig extends BaseProviderConfig {
   respondType?: "JSON" | "String";
   /** Validate the built issue payload locally before sending (default `true`). */
   validatePayload?: boolean;
+  /**
+   * Verify the `CheckCode` on issue-family responses (issue / issuePending /
+   * triggerIssue) to detect a tampered or mis-routed reply (default `true`).
+   */
+  verifyCheckCode?: boolean;
 }
 
 /**

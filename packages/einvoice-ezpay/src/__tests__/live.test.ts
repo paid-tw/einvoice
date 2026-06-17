@@ -24,7 +24,9 @@ describe.skipIf(!live)("ezPay live (test env)", () => {
   let randomCode: string;
   const orderId = `IT${Date.now()}`;
 
-  it("issues a real B2C invoice (AES encryption verified end-to-end)", async () => {
+  it("issues a real B2C invoice (AES + response CheckCode verified end-to-end)", async () => {
+    // verifyCheckCode defaults to true, so a successful issue here means the
+    // live response's CheckCode matched our locally recomputed value.
     const res = await provider.issue({
       orderId,
       buyer: {},

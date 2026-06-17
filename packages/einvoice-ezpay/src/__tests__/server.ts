@@ -1,6 +1,6 @@
 import { setupServer } from "msw/node";
 import { createEzpayProvider } from "../provider.js";
-import { decryptPostData } from "../crypto.js";
+import { decryptPostData, makeCheckCode } from "../crypto.js";
 
 export const BASE = "https://ezpay.test";
 export const MERCHANT = "TEST1234567890";
@@ -37,4 +37,22 @@ export function ezSuccess(result: Record<string, unknown>, message = "處理成�
 /** An error envelope (Status = error code). */
 export function ezError(code: string, message: string) {
   return { Status: code, Message: message };
+}
+
+/** Attach a valid issue-family CheckCode (over the 5 fields) using the test key/iv. */
+export function withCheckCode(result: Record<string, unknown>) {
+  return {
+    ...result,
+    CheckCode: makeCheckCode(
+      {
+        MerchantID: String(result.MerchantID ?? ""),
+        MerchantOrderNo: String(result.MerchantOrderNo ?? ""),
+        InvoiceTransNo: String(result.InvoiceTransNo ?? ""),
+        TotalAmt: String(result.TotalAmt ?? ""),
+        RandomNum: String(result.RandomNum ?? ""),
+      },
+      KEY,
+      IV,
+    ),
+  };
 }
