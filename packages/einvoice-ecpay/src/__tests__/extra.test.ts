@@ -127,6 +127,70 @@ describe("查詢財政部配號結果 (GetGovInvoiceWordSetting)", () => {
   });
 });
 
+describe("查詢字軌 (GetInvoiceWordSetting)", () => {
+  const TRACK = {
+    TrackID: "11902",
+    InvoiceYear: "115",
+    InvoiceTerm: 3,
+    InvType: "07",
+    InvoiceHeader: "JU",
+    InvoiceStart: "90000000",
+    InvoiceEnd: "90000049",
+    InvoiceNo: "90000012",
+    UseStatus: 2,
+    ProductServiceId: "A001",
+  };
+
+  it("defaults the filter (term/status all, category B2C) and maps the tracks", async () => {
+    let data: Record<string, unknown> | undefined;
+    server.use(
+      http.post(url(ECPAY_ENDPOINTS.getInvoiceWordSetting), async ({ request }) => {
+        data = parseRequest(await request.text()).data;
+        return HttpResponse.json(ecSuccess({ InvoiceInfo: [TRACK] }));
+      }),
+    );
+    const res = await testProvider().getInvoiceWordSetting({ invoiceYear: "115" });
+    expect(data).toMatchObject({ InvoiceYear: "115", InvoiceTerm: 0, UseStatus: 0, InvoiceCategory: 1 });
+    expect(res).toEqual([
+      {
+        trackId: "11902",
+        year: "115",
+        term: 3,
+        invType: "07",
+        header: "JU",
+        start: "90000000",
+        end: "90000049",
+        currentNumber: "90000012",
+        status: "IN_USE",
+        productServiceId: "A001",
+      },
+    ]);
+  });
+
+  it("maps the useStatus enum + term to the request codes", async () => {
+    let data: Record<string, unknown> | undefined;
+    server.use(
+      http.post(url(ECPAY_ENDPOINTS.getInvoiceWordSetting), async ({ request }) => {
+        data = parseRequest(await request.text()).data;
+        return HttpResponse.json(ecSuccess({ InvoiceInfo: [] }));
+      }),
+    );
+    await testProvider().getInvoiceWordSetting({ invoiceYear: "115", term: 3, useStatus: "PAUSED" });
+    expect(data).toMatchObject({ InvoiceTerm: 3, UseStatus: 4 });
+  });
+
+  it("returns an empty list when the response carries no InvoiceInfo", async () => {
+    server.use(http.post(url(ECPAY_ENDPOINTS.getInvoiceWordSetting), () => HttpResponse.json(ecSuccess({}))));
+    expect(await testProvider().getInvoiceWordSetting({ invoiceYear: "115" })).toEqual([]);
+  });
+
+  it("rejects a malformed InvoiceYear locally", async () => {
+    await expect(testProvider().getInvoiceWordSetting({ invoiceYear: "2026" })).rejects.toMatchObject({
+      code: "VALIDATION",
+    });
+  });
+});
+
 describe("設定字軌號碼狀態 (UpdateInvoiceWordStatus)", () => {
   it("posts TrackID + the mapped InvoiceStatus code", async () => {
     let data: Record<string, unknown> | undefined;

@@ -77,6 +77,10 @@ Declared as the `CARRIER_VALIDATION` capability. (ECPay's B2C API has no working
 const ranges = await invoices.getGovInvoiceWordSetting("115");
 // → [{ term, invType, header, start, end, count }, …]; throws NOT_FOUND if unallocated.
 
+// 查詢字軌 — this merchant's own 字軌 (TrackID, range, used number, status).
+const tracks = await invoices.getInvoiceWordSetting({ invoiceYear: "115", useStatus: "IN_USE" });
+// → [{ trackId, year, term, invType, header, start, end, currentNumber, status }, …]
+
 // 設定字軌號碼狀態 — a newly added 字軌 is inactive; enable it before issuing.
 await invoices.setInvoiceWordStatus(trackId, "ENABLE"); // or "PAUSE" / "DISABLE"
 ```

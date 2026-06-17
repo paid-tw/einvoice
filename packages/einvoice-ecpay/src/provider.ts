@@ -34,6 +34,66 @@ import { assertValidIssuePayload } from "./validation.js";
 export type EcpayWordStatus = "DISABLE" | "PAUSE" | "ENABLE";
 const WORD_STATUS_CODE: Record<EcpayWordStatus, number> = { DISABLE: 0, PAUSE: 1, ENABLE: 2 };
 
+/** A 字軌's use status (UseStatus 1–6). */
+export type EcpayWordTrackStatus =
+  | "INACTIVE" // 1 未啟用
+  | "IN_USE" // 2 使用中
+  | "DISABLED" // 3 已停用
+  | "PAUSED" // 4 暫停中
+  | "PENDING_REVIEW" // 5 待審核
+  | "REJECTED"; // 6 審核不通過
+const TRACK_STATUS: Record<number, EcpayWordTrackStatus> = {
+  1: "INACTIVE",
+  2: "IN_USE",
+  3: "DISABLED",
+  4: "PAUSED",
+  5: "PENDING_REVIEW",
+  6: "REJECTED",
+};
+const TRACK_STATUS_CODE: Record<EcpayWordTrackStatus, number> = {
+  INACTIVE: 1,
+  IN_USE: 2,
+  DISABLED: 3,
+  PAUSED: 4,
+  PENDING_REVIEW: 5,
+  REJECTED: 6,
+};
+
+/** A merchant 字軌 from 查詢字軌 (GetInvoiceWordSetting). */
+export interface EcpayWordTrack {
+  /** 字軌號碼ID (use with {@link EcpayProvider.setInvoiceWordStatus}). */
+  trackId: string;
+  /** 發票年度 (民國年). */
+  year: string;
+  /** 期別 1–6. */
+  term: number;
+  /** 07 一般稅額 / 08 特種稅額. */
+  invType: string;
+  /** 字軌名稱, e.g. `"JU"`. */
+  header: string;
+  /** 起始 / 結束 8-digit 發票號碼. */
+  start: string;
+  end: string;
+  /** 目前已使用號碼 (可空). */
+  currentNumber: string;
+  status: EcpayWordTrackStatus;
+  /** 產品服務別代號 (多組字軌時). */
+  productServiceId?: string;
+}
+
+/** Filter for 查詢字軌 (GetInvoiceWordSetting). */
+export interface GetWordSettingInput {
+  /** 發票年度 (民國年, e.g. "115"). */
+  invoiceYear: string;
+  /** 期別 1–6; omit for all. */
+  term?: number;
+  /** Use status; omit for all. */
+  useStatus?: EcpayWordTrackStatus;
+  invType?: "07" | "08";
+  invoiceHeader?: string;
+  productServiceId?: string;
+}
+
 /** One allocated invoice-number range (字軌) from 查詢財政部配號結果. */
 export interface EcpayWordSetting {
   /** 期別 1–6 (1=1-2月, 2=3-4月, …). */
@@ -284,6 +344,45 @@ export class EcpayProvider implements InvoiceProvider {
       start: String(w.InvoiceStart ?? ""),
       end: String(w.InvoiceEnd ?? ""),
       count: Number(w.Number ?? 0),
+    }));
+  }
+
+  /**
+   * 查詢字軌 (GetInvoiceWordSetting): list this merchant's own 字軌 (TrackID, the
+   * allocated number range, the currently-used number, and use status) for a
+   * 民國年, optionally filtered by 期別 / status / 字軌類別.
+   */
+  async getInvoiceWordSetting(input: GetWordSettingInput): Promise<EcpayWordTrack[]> {
+    if (this.config.validatePayload !== false && !/^\d{3}$/.test(input.invoiceYear)) {
+      throw new InvoiceError(`Invalid InvoiceYear: ${input.invoiceYear}`, {
+        provider: "ecpay",
+        code: InvoiceErrorCode.VALIDATION,
+        rawMessage: "InvoiceYear must be a 3-digit 民國年 (e.g. 115)",
+      });
+    }
+    const result = await ecpayRequest(this.config, ENDPOINTS.getInvoiceWordSetting, {
+      InvoiceYear: input.invoiceYear,
+      InvoiceTerm: input.term ?? 0, // 0 = all
+      UseStatus: input.useStatus ? TRACK_STATUS_CODE[input.useStatus] : 0, // 0 = all
+      InvoiceCategory: 1, // B2C (fixed)
+      InvType: input.invType,
+      InvoiceHeader: input.invoiceHeader,
+      ProductServiceId: input.productServiceId,
+    });
+    const info = Array.isArray(result.InvoiceInfo)
+      ? (result.InvoiceInfo as Array<Record<string, unknown>>)
+      : [];
+    return info.map((w) => ({
+      trackId: String(w.TrackID ?? ""),
+      year: String(w.InvoiceYear ?? ""),
+      term: Number(w.InvoiceTerm),
+      invType: String(w.InvType ?? ""),
+      header: String(w.InvoiceHeader ?? ""),
+      start: String(w.InvoiceStart ?? ""),
+      end: String(w.InvoiceEnd ?? ""),
+      currentNumber: String(w.InvoiceNo ?? ""),
+      status: TRACK_STATUS[Number(w.UseStatus)] ?? "INACTIVE",
+      productServiceId: stringOrUndef(w.ProductServiceId),
     }));
   }
 

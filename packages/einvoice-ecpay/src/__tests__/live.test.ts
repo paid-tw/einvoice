@@ -93,6 +93,13 @@ describe.skipIf(!live)("ECPay live (stage) — 查詢財政部配號", LIVE_OPTS
     expect(ranges[0]?.start).toMatch(/^\d{8}$/);
   });
 
+  it("lists this merchant's own 字軌 with a use status", async () => {
+    const tracks = await p.getInvoiceWordSetting({ invoiceYear: thisYear });
+    expect(tracks.length).toBeGreaterThan(0);
+    expect(tracks[0]?.trackId).toMatch(/^\d+$/);
+    expect(tracks[0]?.status).toMatch(/^(INACTIVE|IN_USE|DISABLED|PAUSED|PENDING_REVIEW|REJECTED)$/);
+  });
+
   // Read-only: a bogus TrackID confirms the endpoint without mutating a real 字軌.
   it("setInvoiceWordStatus rejects an unknown TrackID with NOT_FOUND", async () => {
     await expect(p.setInvoiceWordStatus("9999999", "ENABLE")).rejects.toMatchObject({ code: "NOT_FOUND" });
