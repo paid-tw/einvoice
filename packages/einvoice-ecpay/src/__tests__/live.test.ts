@@ -1,0 +1,83 @@
+import { describe, expect, it } from "vitest";
+import { ECPAY_SANDBOX } from "../config.js";
+import { createEcpayProvider } from "../provider.js";
+
+/**
+ * Live test against the ECPay B2C stage environment. Skipped unless ECPAY_LIVE=1.
+ * Credentials default to the public {@link ECPAY_SANDBOX}, so `ECPAY_LIVE=1` alone
+ * is enough; override with ECPAY_MERCHANT_ID / ECPAY_HASH_KEY / ECPAY_HASH_IV.
+ *
+ *   ECPAY_LIVE=1 pnpm --filter @paid-tw/einvoice-ecpay exec vitest run live
+ */
+const live = process.env.ECPAY_LIVE === "1";
+const LIVE_OPTS = { retry: 2 } as const;
+
+function provider() {
+  return createEcpayProvider({
+    merchantId: process.env.ECPAY_MERCHANT_ID ?? ECPAY_SANDBOX.merchantId,
+    hashKey: process.env.ECPAY_HASH_KEY ?? ECPAY_SANDBOX.hashKey,
+    hashIV: process.env.ECPAY_HASH_IV ?? ECPAY_SANDBOX.hashIV,
+    mode: "TEST",
+  });
+}
+
+const carrierIssue = (orderId: string) => ({
+  orderId,
+  buyer: { email: "test@example.com" },
+  items: [{ description: "整合測試商品", quantity: 2, unitPrice: 50, amount: 100 }],
+  amount: { salesAmount: 100, taxAmount: 0, totalAmount: 100 },
+  taxType: "TAXABLE" as const,
+  priceMode: "TAX_INCLUSIVE" as const,
+  carrier: { type: "MEMBER" as const },
+});
+
+describe.skipIf(!live)("ECPay live (stage) — issue → query → void", LIVE_OPTS, () => {
+  const p = provider();
+  const orderId = `IT${Date.now()}`;
+  let invoiceNumber: string;
+  let invoiceDate: string;
+
+  it("issues a B2C carrier invoice (AES + envelope verified end-to-end)", async () => {
+    const res = await p.issue(carrierIssue(orderId));
+    expect(res.invoiceNumber).toMatch(/^[A-Z]{2}\d{8}$/);
+    expect(res.randomCode).toMatch(/^\d{4}$/);
+    invoiceNumber = res.invoiceNumber;
+    invoiceDate = res.invoiceDate.toISOString().slice(0, 10);
+  });
+
+  it("queries it by orderId (GetIssue) with items + amount", async () => {
+    const res = await p.query({ orderId });
+    expect(res.invoiceNumber).toBe(invoiceNumber);
+    expect(res.amount.totalAmount).toBe(100);
+    expect(res.items.length).toBeGreaterThan(0);
+  });
+
+  it("voids it (Invalid)", async () => {
+    const res = await p.void({ invoiceNumber, reason: "整合測試作廢", providerOptions: { invoiceDate } });
+    expect(res.status).toBe("VOIDED");
+  });
+});
+
+describe.skipIf(!live)("ECPay live (stage) — 延遲/觸發開立", LIVE_OPTS, () => {
+  const p = provider();
+  const orderId = `TP${Date.now()}`;
+
+  it("issuePending → triggerIssue assigns a real number", async () => {
+    const pend = await p.issuePending(carrierIssue(orderId));
+    expect(pend.relateNumber).toBe(orderId);
+    const issued = await p.triggerIssue({ relateNumber: orderId });
+    expect(issued.invoiceNumber).toMatch(/^[A-Z]{2}\d{8}$/);
+  });
+});
+
+describe.skipIf(!live)("ECPay live (stage) — 載具驗證", LIVE_OPTS, () => {
+  const p = provider();
+
+  it("validateMobileBarcode resolves a boolean", async () => {
+    expect(typeof (await p.validateMobileBarcode("/ABC1234"))).toBe("boolean");
+  });
+
+  it("validateLoveCode resolves true for a registered code", async () => {
+    expect(await p.validateLoveCode("168001")).toBe(true);
+  });
+});
