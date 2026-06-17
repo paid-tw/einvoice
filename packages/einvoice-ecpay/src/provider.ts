@@ -110,6 +110,18 @@ export interface EcpayWordSetting {
   count: number;
 }
 
+/** Outcome of {@link EcpayProvider.triggerIssue} (觸發開立). */
+export interface TriggerIssueResult {
+  /** `true` when issued immediately (4000004); `false` when it will auto-issue after the delay (4000003). */
+  issued: boolean;
+  /** The assigned 發票號碼 — present only when `issued` is true. */
+  invoiceNumber?: string;
+  invoiceDate?: Date;
+  randomCode?: string;
+  relateNumber: string;
+  raw: EcpayResult;
+}
+
 /** Options for {@link EcpayProvider.issuePending} (延遲開立). */
 export interface IssuePendingOptions {
   /** `"SCHEDULE"` (預約, auto-issues after delayDay) or `"TRIGGER"` (待觸發, default). */
@@ -226,26 +238,33 @@ export class EcpayProvider implements InvoiceProvider {
   }
 
   /**
-   * 觸發開立 (TriggerIssue): issue a held invoice now, then look up the assigned
-   * number (the trigger reply itself carries no InvoiceNo). Success replies use
-   * RtnCode 4000003/4000004.
+   * 觸發開立 (TriggerIssue): trigger a previously staged (DelayFlag=2) invoice,
+   * keyed by its `Tsr` (= the relateNumber). The request takes only Tsr + PayType.
+   * Two outcomes (live-verified):
+   * - `DelayDay=0` → RtnCode 4000004: issued now; `issued: true` + the looked-up
+   *   invoice number (the trigger reply itself carries none).
+   * - `DelayDay>0` → RtnCode 4000003: it will auto-issue after the delay;
+   *   `issued: false`, no number yet — query by `relateNumber` later.
    */
-  async triggerIssue(opts: { relateNumber: string; payAct?: string }): Promise<IssueInvoiceResult> {
-    await ecpayRequest(
+  async triggerIssue(opts: { relateNumber: string }): Promise<TriggerIssueResult> {
+    const res = await ecpayRequest(
       this.config,
       ENDPOINTS.triggerIssue,
-      { Tsr: opts.relateNumber, PayType: "2", PayAct: opts.payAct ?? "ECPAY" },
+      { Tsr: opts.relateNumber, PayType: "2" },
       { successCodes: [4000003, 4000004] },
     );
+    if (Number(res.RtnCode) !== 4000004) {
+      // 4000003: triggered but issues after the configured delay — not yet available.
+      return { issued: false, relateNumber: opts.relateNumber, raw: res };
+    }
     const q = await this.query({ orderId: opts.relateNumber });
     return {
+      issued: true,
       invoiceNumber: q.invoiceNumber,
       invoiceDate: q.invoiceDate,
       randomCode: q.randomCode,
-      orderId: opts.relateNumber,
-      totalAmount: q.amount.totalAmount,
-      status: q.status,
-      raw: q.raw,
+      relateNumber: opts.relateNumber,
+      raw: res,
     };
   }
 

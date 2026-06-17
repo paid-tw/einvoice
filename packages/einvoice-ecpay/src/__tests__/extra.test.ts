@@ -71,7 +71,7 @@ describe("延遲/觸發開立 two-phase", () => {
     await expect(testProvider().editDelayIssue(issueInput, { tsr: "NOPE" })).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 
-  it("triggerIssue accepts the 4000004 success code, then queries for the number", async () => {
+  it("triggerIssue (4000004, DelayDay=0) issues now, sends only Tsr+PayType, queries the number", async () => {
     let triggered: Record<string, unknown> | undefined;
     server.use(
       http.post(url(ECPAY_ENDPOINTS.triggerIssue), async ({ request }) => {
@@ -92,9 +92,20 @@ describe("延遲/觸發開立 two-phase", () => {
       ),
     );
     const res = await testProvider().triggerIssue({ relateNumber: "ORDER_1" });
-    expect(triggered).toMatchObject({ Tsr: "ORDER_1" });
+    expect(triggered).toEqual({ MerchantID: "2000132", Tsr: "ORDER_1", PayType: "2" }); // no PayAct
+    expect(res.issued).toBe(true);
     expect(res.invoiceNumber).toBe("JU11082064");
-    expect(res.status).toBe("ISSUED");
+  });
+
+  it("triggerIssue (4000003, DelayDay>0) reports issued=false with no number (no query)", async () => {
+    server.use(
+      http.post(url(ECPAY_ENDPOINTS.triggerIssue), () => HttpResponse.json(ecError(4000003, "延後開立成功"))),
+      // GetIssue is NOT registered — if triggerIssue queried, the test would error.
+    );
+    const res = await testProvider().triggerIssue({ relateNumber: "ORDER_1" });
+    expect(res.issued).toBe(false);
+    expect(res.invoiceNumber).toBeUndefined();
+    expect(res.raw.RtnCode).toBe(4000003);
   });
 });
 

@@ -48,7 +48,9 @@ const invoices = createEcpayProvider({ ...ECPAY_SANDBOX, mode: "TEST" }); // 特
 ```ts
 // TRIGGER (待觸發, default): issues only when you trigger it.
 const { relateNumber } = await invoices.issuePending({ /* IssueInvoiceInput */ });
-const issued = await invoices.triggerIssue({ relateNumber }); // → real invoice number
+const res = await invoices.triggerIssue({ relateNumber });
+// res.issued: true (DelayDay=0 → 4000004, res.invoiceNumber set) |
+//             false (DelayDay>0 → 4000003, auto-issues later — query by relateNumber after)
 
 // SCHEDULE (預約): auto-issues after N days (1–15), no trigger needed.
 await invoices.issuePending({ /* … */ }, { mode: "SCHEDULE", delayDay: 3 });

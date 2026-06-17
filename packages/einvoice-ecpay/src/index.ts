@@ -12,6 +12,7 @@ export type {
   EcpayWordTrackStatus,
   GetWordSettingInput,
   IssuePendingOptions,
+  TriggerIssueResult,
 } from "./provider.js";
 export { ecpayIssuePayloadSchema, assertValidIssuePayload } from "./validation.js";
 export type { EcpayIssuePayload } from "./validation.js";
