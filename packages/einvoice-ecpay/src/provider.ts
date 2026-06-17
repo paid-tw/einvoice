@@ -124,6 +124,40 @@ export interface OnlineAllowanceResult {
   raw: EcpayResult;
 }
 
+/** Lookup for {@link EcpayProvider.getAllowanceList} (查詢折讓明細). */
+export interface GetAllowanceListInput {
+  /** 折讓編號 — SearchType 0. */
+  allowanceNumber?: string;
+  /** 發票號碼 — SearchType 1/2 (needs `date`). */
+  invoiceNumber?: string;
+  /** yyyy-MM-dd — the invoice's issue date (dateType ISSUE) or allowance date (ALLOWANCE). */
+  date?: string;
+  /** `"ISSUE"` (SearchType 1, default) or `"ALLOWANCE"` (SearchType 2). */
+  dateType?: "ISSUE" | "ALLOWANCE";
+}
+
+/** One row from {@link EcpayProvider.getAllowanceList}. */
+export interface AllowanceDetail {
+  allowanceNumber: string; // IA_Allow_No
+  invoiceNumber: string; // IA_Invoice_No
+  allowanceDate: Date; // IA_Date
+  invoiceIssueDate: Date; // IA_Invoice_Issue_Date
+  voided: boolean; // IA_Invalid_Status
+  uploaded: boolean; // IA_Upload_Status
+  taxType: string; // IA_Tax_Type
+  /** 不含稅進貨額 (IA_Total_Amount). */
+  amount: number;
+  taxAmount: number; // IA_Tax_Amount
+  /** 含稅折讓總額 (IA_Total_Tax_Amount). */
+  totalAmount: number;
+  ubn?: string; // IA_Identifier
+  customerName?: string; // IIS_Customer_Name
+  notifyMail?: string; // IA_Send_Mail
+  notifyPhone?: string; // IA_Send_Phone
+  items: InvoiceItem[];
+  raw: Record<string, unknown>;
+}
+
 /** Filter for {@link EcpayProvider.listInvoices} (查詢多筆發票). */
 export interface ListInvoicesInput {
   /** 查詢起始日期 yyyy-MM-dd (by issue date). */
@@ -517,6 +551,60 @@ export class EcpayProvider implements InvoiceProvider {
       })),
       raw: result,
     };
+  }
+
+  /**
+   * 查詢折讓明細 (GetAllowanceList): look up allowances by 折讓編號 (SearchType 0)
+   * or 發票號碼 + 日期 (SearchType 1 = issue date, 2 = allowance date). Excludes
+   * online allowances the buyer hasn't confirmed yet.
+   */
+  async getAllowanceList(input: GetAllowanceListInput): Promise<AllowanceDetail[]> {
+    let data: Record<string, unknown>;
+    if (input.allowanceNumber) {
+      data = { SearchType: "0", AllowanceNo: input.allowanceNumber };
+    } else if (input.invoiceNumber && input.date) {
+      data = {
+        SearchType: input.dateType === "ALLOWANCE" ? "2" : "1",
+        InvoiceNo: input.invoiceNumber,
+        Date: input.date,
+      };
+    } else if (this.config.validatePayload !== false) {
+      throw new InvoiceError("Provide allowanceNumber, or invoiceNumber + date", {
+        provider: "ecpay",
+        code: InvoiceErrorCode.VALIDATION,
+        rawMessage: "GetAllowanceList needs SearchType 0 (allowanceNumber) or 1/2 (invoiceNumber + date)",
+      });
+    } else {
+      data = { SearchType: "0", AllowanceNo: "" };
+    }
+    const result = await ecpayRequest(this.config, ENDPOINTS.getAllowanceList, data);
+    const rows = Array.isArray(result.AllowanceInfo)
+      ? (result.AllowanceInfo as Array<Record<string, unknown>>)
+      : [];
+    return rows.map((a) => ({
+      allowanceNumber: String(a.IA_Allow_No ?? ""),
+      invoiceNumber: String(a.IA_Invoice_No ?? ""),
+      allowanceDate: parseEcpayDate(a.IA_Date),
+      invoiceIssueDate: parseEcpayDate(a.IA_Invoice_Issue_Date),
+      voided: a.IA_Invalid_Status === "1" || a.IA_Invalid_Status === 1,
+      uploaded: a.IA_Upload_Status === "1" || a.IA_Upload_Status === 1,
+      taxType: String(a.IA_Tax_Type ?? ""),
+      amount: Number(a.IA_Total_Amount ?? 0),
+      taxAmount: Number(a.IA_Tax_Amount ?? 0),
+      totalAmount: Number(a.IA_Total_Tax_Amount ?? 0),
+      ubn: stringOrUndef(a.IA_Identifier, "0000000000"),
+      customerName: stringOrUndef(a.IIS_Customer_Name),
+      notifyMail: stringOrUndef(a.IA_Send_Mail),
+      notifyPhone: stringOrUndef(a.IA_Send_Phone),
+      items: (Array.isArray(a.Items) ? (a.Items as Array<Record<string, unknown>>) : []).map((it) => ({
+        description: String(it.ItemName ?? ""),
+        quantity: Number(it.ItemCount ?? 0),
+        unitPrice: Number(it.ItemPrice ?? 0),
+        amount: Number(it.ItemAmount ?? 0),
+        unit: stringOrUndef(it.ItemWord),
+      })),
+      raw: a,
+    }));
   }
 
   /**

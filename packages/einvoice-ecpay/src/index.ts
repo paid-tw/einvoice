@@ -12,6 +12,8 @@ export type {
   EcpayWordTrackStatus,
   GetWordSettingInput,
   IssuePendingOptions,
+  GetAllowanceListInput,
+  AllowanceDetail,
   ListInvoicesInput,
   InvoiceListItem,
   InvoiceListPage,

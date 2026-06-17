@@ -420,6 +420,82 @@ describe("線上開立折讓 (allowanceOnline)", () => {
   });
 });
 
+describe("查詢折讓明細 (getAllowanceList / GetAllowanceList)", () => {
+  const ALLOW = {
+    IA_Allow_No: "2026061722267537",
+    IA_Invoice_No: "JU11083866",
+    IA_Date: "2026-06-17 22:25:37",
+    IA_Invoice_Issue_Date: "2026-06-17 22:25:36",
+    IA_Identifier: "0000000000",
+    IA_Invalid_Status: "0",
+    IA_Upload_Status: "0",
+    IA_Tax_Type: "1",
+    IA_Tax_Amount: 5,
+    IA_Total_Amount: 100,
+    IA_Total_Tax_Amount: 105,
+    IA_Send_Mail: "",
+    IIS_Customer_Name: "",
+    Items: [{ ItemSeq: 1, ItemName: "商品", ItemCount: 1, ItemWord: "式", ItemPrice: 105, ItemTaxType: "1", ItemRateAmt: 5, ItemAmount: 105 }],
+  };
+
+  it("SearchType 0: by AllowanceNo, parses the detail + amount split", async () => {
+    let data: Record<string, unknown> | undefined;
+    server.use(
+      http.post(url(ECPAY_ENDPOINTS.getAllowanceList), async ({ request }) => {
+        data = parseRequest(await request.text()).data;
+        return HttpResponse.json(ecSuccess({ AllowanceInfo: [ALLOW] }));
+      }),
+    );
+    const res = await testProvider().getAllowanceList({ allowanceNumber: "2026061722267537" });
+    expect(data).toMatchObject({ SearchType: "0", AllowanceNo: "2026061722267537" });
+    expect(res[0]).toMatchObject({
+      allowanceNumber: "2026061722267537",
+      invoiceNumber: "JU11083866",
+      amount: 100,
+      taxAmount: 5,
+      totalAmount: 105,
+      voided: false,
+      uploaded: false,
+    });
+    expect(res[0]?.items[0]?.description).toBe("商品");
+  });
+
+  it("SearchType 1/2: by InvoiceNo + date (ISSUE→1, ALLOWANCE→2)", async () => {
+    let data: Record<string, unknown> | undefined;
+    server.use(
+      http.post(url(ECPAY_ENDPOINTS.getAllowanceList), async ({ request }) => {
+        data = parseRequest(await request.text()).data;
+        return HttpResponse.json(ecSuccess({ AllowanceInfo: [] }));
+      }),
+    );
+    await testProvider().getAllowanceList({ invoiceNumber: "JU1", date: "2026-06-17" });
+    expect(data).toMatchObject({ SearchType: "1", InvoiceNo: "JU1", Date: "2026-06-17" });
+    await testProvider().getAllowanceList({ invoiceNumber: "JU1", date: "2026-06-17", dateType: "ALLOWANCE" });
+    expect(data).toMatchObject({ SearchType: "2" });
+  });
+
+  it("rejects when neither an allowance number nor invoice+date is given", async () => {
+    await expect(testProvider().getAllowanceList({})).rejects.toMatchObject({ code: "VALIDATION" });
+  });
+
+  it("returns an empty list when there's no AllowanceInfo", async () => {
+    server.use(http.post(url(ECPAY_ENDPOINTS.getAllowanceList), () => HttpResponse.json(ecSuccess({}))));
+    expect(await testProvider().getAllowanceList({ allowanceNumber: "X" })).toEqual([]);
+  });
+
+  it("with validatePayload:false, an empty input falls through to a bare SearchType 0", async () => {
+    let data: Record<string, unknown> | undefined;
+    server.use(
+      http.post(url(ECPAY_ENDPOINTS.getAllowanceList), async ({ request }) => {
+        data = parseRequest(await request.text()).data;
+        return HttpResponse.json(ecSuccess({ AllowanceInfo: [] }));
+      }),
+    );
+    await testProvider({ validatePayload: false }).getAllowanceList({});
+    expect(data).toMatchObject({ SearchType: "0", AllowanceNo: "" });
+  });
+});
+
 describe("查詢多筆發票 (listInvoices / GetIssueList)", () => {
   const ROW = {
     IIS_Number: "JU11083134",
