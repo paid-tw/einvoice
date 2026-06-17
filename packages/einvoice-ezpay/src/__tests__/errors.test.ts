@@ -33,4 +33,27 @@ describe("mapEzpayError (ezPay §九 錯誤代碼)", () => {
   ])("maps %s → %s", (code, expected) => {
     expect(mapEzpayError(code)).toBe(expected);
   });
+
+  // Audit: every code in the official §九 table is categorized intentionally.
+  it("categorizes the full official error table (39 codes)", () => {
+    const expected: Record<string, string> = {
+      KEY10002: "AUTH", KEY10004: "VALIDATION", KEY10006: "AUTH", KEY10007: "AUTH",
+      KEY10010: "VALIDATION", KEY10011: "VALIDATION", KEY10012: "VALIDATION",
+      KEY10013: "VALIDATION", KEY10014: "NETWORK", KEY10015: "VALIDATION",
+      INV10003: "VALIDATION", INV10004: "VALIDATION", INV10006: "VALIDATION",
+      INV10012: "VALIDATION", INV10013: "VALIDATION", INV10014: "VALIDATION",
+      INV10015: "VALIDATION", INV10016: "VALIDATION", INV10017: "VALIDATION",
+      INV10019: "VALIDATION", INV10020: "PROVIDER", INV10021: "PROVIDER",
+      INV20006: "NOT_FOUND", INV70001: "VALIDATION", INV70002: "CONFLICT",
+      INV90005: "AUTH", INV90006: "NUMBER_EXHAUSTED", NOR10001: "NETWORK",
+      LIB10003: "CONFLICT", LIB10005: "CONFLICT", LIB10007: "CONFLICT",
+      LIB10008: "CONFLICT", LIB10009: "CONFLICT", IAI10001: "VALIDATION",
+      IAI10002: "NOT_FOUND", IAI10003: "PROVIDER", IAI10004: "VALIDATION",
+      IAI10005: "PROVIDER", IAI10006: "PROVIDER",
+    };
+    for (const [code, cat] of Object.entries(expected)) {
+      expect(mapEzpayError(code)).toBe(cat);
+    }
+    expect(Object.keys(expected)).toHaveLength(39);
+  });
 });

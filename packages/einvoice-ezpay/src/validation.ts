@@ -36,7 +36,19 @@ export const ezpayIssuePayloadSchema = z
     ItemUnit: z.string().min(1, "ItemUnit is required"),
     ItemPrice: z.string().min(1, "ItemPrice is required"),
     ItemAmt: z.string().min(1, "ItemAmt is required"),
+    ItemTaxType: z.string().optional(), // pipe-joined 1/2/3 for mixed (TaxType=9)
     Comment: z.string().max(200, "Comment must be ≤200 chars").optional(),
+    // 開立方式 / 預約 / 通關 / 超商 Kiosk / 混合稅率 銷售額 — documented optional fields.
+    Status: z.enum(["0", "1", "3"]).optional(),
+    CreateStatusTime: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, "CreateStatusTime must be YYYY-MM-DD")
+      .optional(),
+    CustomsClearance: z.enum(["1", "2"]).optional(),
+    KioskPrintFlag: z.literal("1").optional(),
+    AmtSales: nonNegInt.optional(),
+    AmtZero: nonNegInt.optional(),
+    AmtFree: nonNegInt.optional(),
   })
   .passthrough()
   .superRefine((p, ctx) => {
@@ -81,6 +93,22 @@ export const ezpayIssuePayloadSchema = z
         code: z.ZodIssueCode.custom,
         message: "Item fields (ItemName/Count/Unit/Price/Amt) must have equal segment counts",
         path: ["ItemName"],
+      });
+    }
+    // 零稅率 (TaxType=2) requires the customs-clearance mark.
+    if (p.TaxType === "2" && !p.CustomsClearance) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "CustomsClearance is required for zero-rated invoices (TaxType=2)",
+        path: ["CustomsClearance"],
+      });
+    }
+    // 預約自動開立 (Status=3) requires the scheduled date.
+    if (p.Status === "3" && !p.CreateStatusTime) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "CreateStatusTime is required for scheduled issue (Status=3)",
+        path: ["CreateStatusTime"],
       });
     }
   });

@@ -65,4 +65,22 @@ describe("ezpayIssuePayloadSchema", () => {
     expect(ok({ ItemName: "a|b", ItemCount: "1", ItemUnit: "個", ItemPrice: "1|1", ItemAmt: "1|1" })).toBe(false);
     expect(ok({ ItemName: "a|b", ItemCount: "1|1", ItemUnit: "個|個", ItemPrice: "1|1", ItemAmt: "1|1", Amt: 2, TaxAmt: 0, TotalAmt: 2 })).toBe(true);
   });
+
+  it("zero-rated (TaxType=2) requires CustomsClearance 1/2", () => {
+    expect(ok({ TaxType: "2", TaxAmt: 0, TotalAmt: 100 })).toBe(false);
+    expect(ok({ TaxType: "2", TaxAmt: 0, TotalAmt: 100, CustomsClearance: "1" })).toBe(true);
+    expect(ok({ TaxType: "2", TaxAmt: 0, TotalAmt: 100, CustomsClearance: "3" })).toBe(false);
+  });
+
+  it("scheduled issue (Status=3) requires CreateStatusTime (YYYY-MM-DD)", () => {
+    expect(ok({ Status: "3" })).toBe(false);
+    expect(ok({ Status: "3", CreateStatusTime: "2026/06/16" })).toBe(false);
+    expect(ok({ Status: "3", CreateStatusTime: "2026-06-16" })).toBe(true);
+  });
+
+  it("Status must be 0/1/3; KioskPrintFlag only '1'", () => {
+    expect(ok({ Status: "2" })).toBe(false);
+    expect(ok({ KioskPrintFlag: "0" })).toBe(false);
+    expect(ok({ KioskPrintFlag: "1" })).toBe(true);
+  });
 });
