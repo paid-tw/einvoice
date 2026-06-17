@@ -199,6 +199,19 @@ describe.skipIf(!live)("Amego live — server rejects invalid values", () => {
     expect(err.code).toBe("VALIDATION");
   });
 
+  it("print endpoints: PascalCase is a field error, snake_case reaches print logic", async () => {
+    // invoice_print: old PascalCase → 31 (type 查詢類型不存在); corrected → not a field error
+    const invOld = await provider.raw("/json/invoice_print", { InvoiceNumber: "AA26513024", PrinterType: 2 }).catch((e) => e);
+    expect(invOld.rawCode).toBe("31");
+    const invNew = await provider.raw("/json/invoice_print", { type: "invoice", invoice_number: "AA26513024", printer_type: 2 }).catch((e) => e);
+    expect(invNew.rawCode).not.toBe("31");
+    // allowance_print: old PascalCase → 33 (allowance_number 不可為空); corrected → not that
+    const alwOld = await provider.raw("/json/allowance_print", { AllowanceNumber: "ALW1781650040", PrinterType: 2 }).catch((e) => e);
+    expect(alwOld.rawCode).toBe("33");
+    const alwNew = await provider.raw("/json/allowance_print", { allowance_number: "ALW1781650040", printer_type: 2 }).catch((e) => e);
+    expect(alwNew.rawCode).not.toBe("33");
+  });
+
   it("rejects a bad 統編 checksum in ban_query (99)", async () => {
     const err = await provider.raw("/json/ban_query", [{ ban: "28080624" }]).catch((e) => e);
     expect(err.rawCode).toBe("99");

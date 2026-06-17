@@ -48,10 +48,16 @@ const CASES: Array<{
     expectData: { date_select: 1, date_start: 20260601, date_end: 20260630, limit: 20, page: 2 },
   },
   {
-    name: "invoice.print (PascalCase)",
+    name: "invoice.print (type + snake_case)",
     path: ENDPOINTS.invoicePrint,
     invoke: (p) => p.invoice.print("AA1", 7),
-    expectData: { InvoiceNumber: "AA1", PrinterType: 7, PrinterLang: 3 },
+    expectData: { type: "invoice", invoice_number: "AA1", printer_type: 7 },
+  },
+  {
+    name: "invoice.print with printer_lang",
+    path: ENDPOINTS.invoicePrint,
+    invoke: (p) => p.invoice.print("AA1", 7, 3),
+    expectData: { type: "invoice", invoice_number: "AA1", printer_type: 7, printer_lang: 3 },
   },
   {
     name: "invoice.file (snake_case + type)",
@@ -84,10 +90,10 @@ const CASES: Array<{
     expectData: { allowance_number: "ALW1", download_style: 0 },
   },
   {
-    name: "allowances.print (PascalCase)",
+    name: "allowances.print (snake_case)",
     path: ENDPOINTS.allowancePrint,
     invoke: (p) => p.allowances.print("ALW1", 7),
-    expectData: { AllowanceNumber: "ALW1", PrinterType: 7, PrinterLang: 3 },
+    expectData: { allowance_number: "ALW1", printer_type: 7 },
   },
   {
     name: "banQuery (ARRAY of {ban})",

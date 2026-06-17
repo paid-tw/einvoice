@@ -278,12 +278,16 @@ export class AmegoProvider implements InvoiceProvider {
         limit: opts.limit ?? 20,
         page: opts.page ?? 1,
       }),
-    /** 發票列印 — PascalCase + printer fields. */
-    print: (invoiceNumber: string, printerType: number, lang: 1 | 2 | 3 = 3) =>
+    /**
+     * 發票列印 — snake_case + `type` discriminator (verified live; PascalCase
+     * gives "type 查詢類型不存在"). Returns `data.base64_data` for PrinterType ≥ 2.
+     */
+    print: (invoiceNumber: string, printerType: number, lang?: 1 | 2 | 3) =>
       this.raw(ENDPOINTS.invoicePrint, {
-        InvoiceNumber: invoiceNumber,
-        PrinterType: printerType,
-        PrinterLang: lang,
+        type: "invoice",
+        invoice_number: invoiceNumber,
+        printer_type: printerType,
+        ...(lang !== undefined ? { printer_lang: lang } : {}),
       }),
     /** 發票檔案 — returns `data.file_url`. */
     file: (invoiceNumber: string, downloadStyle: 0 | 1 | 2 | 3 = 0) =>
@@ -326,11 +330,15 @@ export class AmegoProvider implements InvoiceProvider {
         limit: opts.limit ?? 20,
         page: opts.page ?? 1,
       }),
-    print: (allowanceNumber: string, printerType: number, lang: 1 | 2 | 3 = 3) =>
+    /**
+     * 折讓列印 — snake_case (verified live; PascalCase gives "allowance_number
+     * 不可為空"). Returns `data.base64_data` for printer_type ≥ 2.
+     */
+    print: (allowanceNumber: string, printerType: number, lang?: 1 | 2 | 3) =>
       this.raw(ENDPOINTS.allowancePrint, {
-        AllowanceNumber: allowanceNumber,
-        PrinterType: printerType,
-        PrinterLang: lang,
+        allowance_number: allowanceNumber,
+        printer_type: printerType,
+        ...(lang !== undefined ? { printer_lang: lang } : {}),
       }),
     file: (allowanceNumber: string, downloadStyle: 0 | 1 | 2 | 3 = 0) =>
       this.raw(ENDPOINTS.allowanceFile, {
