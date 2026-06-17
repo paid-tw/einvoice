@@ -1,5 +1,20 @@
 # @paid-tw/einvoice-ezpay
 
+## 0.3.0
+
+### Minor Changes
+
+- ee30cb1: Add a `FOREIGN_CURRENCY` capability for the `currency` + `exchangeRate`
+  annotation. Amego declares it and maps the fields; ECPay and ezPay don't
+  support a foreign-currency field, so they now reject a non-TWD `currency` with
+  an `UNSUPPORTED` error instead of silently dropping it. The statutory amounts
+  are still integer TWD. The top-level README gains a capability matrix.
+
+### Patch Changes
+
+- Updated dependencies [ee30cb1]
+  - @paid-tw/einvoice@0.3.0
+
 ## 0.2.0
 
 ### Minor Changes

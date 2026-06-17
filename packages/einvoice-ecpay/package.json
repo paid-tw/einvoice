@@ -1,6 +1,6 @@
 {
   "name": "@paid-tw/einvoice-ecpay",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "ECPay 綠界 (ecpay.com.tw) adapter for @paid-tw/einvoice — implements InvoiceProvider over the ECPay B2C e-invoice 2.0 API.",
   "license": "MIT",
   "type": "module",

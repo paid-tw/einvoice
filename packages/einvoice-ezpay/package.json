@@ -1,6 +1,6 @@
 {
   "name": "@paid-tw/einvoice-ezpay",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "ezPay (ezpay.com.tw) adapter for @paid-tw/einvoice — implements InvoiceProvider over the ezPay e-invoice API.",
   "license": "MIT",
   "type": "module",
