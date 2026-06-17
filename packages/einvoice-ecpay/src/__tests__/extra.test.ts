@@ -624,6 +624,61 @@ describe("查詢多筆發票 (listInvoices / GetIssueList)", () => {
   });
 });
 
+describe("getPrintUrl (InvoicePrint / 發票列印)", () => {
+  it("posts the minimal payload and returns the InvoiceHtml URL", async () => {
+    let data: Record<string, unknown> | undefined;
+    server.use(
+      http.post(url(ECPAY_ENDPOINTS.invoicePrint), async ({ request }) => {
+        data = parseRequest(await request.text()).data;
+        return HttpResponse.json(ecSuccess({ RtnCode: 1, RtnMsg: "成功", InvoiceHtml: "https://print.example/aa" }));
+      }),
+    );
+    const u = await testProvider().getPrintUrl({ invoiceNumber: "JU11084038", invoiceDate: "2026-06-17" });
+    expect(u).toBe("https://print.example/aa");
+    expect(data).toMatchObject({ InvoiceNo: "JU11084038", InvoiceDate: "2026-06-17" });
+    expect(data?.PrintStyle).toBeUndefined();
+    expect(data?.IsShowingDetail).toBeUndefined();
+    expect(data?.IsReprintInvoice).toBeUndefined();
+  });
+
+  it("maps style / showDetail / reprint and defaults the date to today", async () => {
+    let data: Record<string, unknown> | undefined;
+    server.use(
+      http.post(url(ECPAY_ENDPOINTS.invoicePrint), async ({ request }) => {
+        data = parseRequest(await request.text()).data;
+        return HttpResponse.json(ecSuccess({ RtnCode: 1, RtnMsg: "成功", InvoiceHtml: "https://print.example/bb" }));
+      }),
+    );
+    await testProvider().getPrintUrl({ invoiceNumber: "JU1", style: "DOUBLE", showDetail: false, reprint: true });
+    expect(data).toMatchObject({ PrintStyle: 2, IsShowingDetail: 2, IsReprintInvoice: "Y" });
+    expect(data?.InvoiceDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it("maps showDetail:true and a B2B style", async () => {
+    let data: Record<string, unknown> | undefined;
+    server.use(
+      http.post(url(ECPAY_ENDPOINTS.invoicePrint), async ({ request }) => {
+        data = parseRequest(await request.text()).data;
+        return HttpResponse.json(ecSuccess({ RtnCode: 1, RtnMsg: "成功", InvoiceHtml: "https://print.example/cc" }));
+      }),
+    );
+    await testProvider().getPrintUrl({ invoiceNumber: "JU1", invoiceDate: "2026/06/17", style: "B2B_A4", showDetail: true });
+    expect(data).toMatchObject({ PrintStyle: 4, IsShowingDetail: 1 });
+  });
+
+  it("returns an empty string when ECPay omits InvoiceHtml", async () => {
+    server.use(http.post(url(ECPAY_ENDPOINTS.invoicePrint), () => HttpResponse.json(ecSuccess({ RtnCode: 1, RtnMsg: "成功" }))));
+    expect(await testProvider().getPrintUrl({ invoiceNumber: "JU1", invoiceDate: "2026-06-17" })).toBe("");
+  });
+
+  it("maps a carrier/donation or unknown invoice (查無資料) to NOT_FOUND", async () => {
+    server.use(http.post(url(ECPAY_ENDPOINTS.invoicePrint), () => HttpResponse.json(ecError(100, "查無資料"))));
+    await expect(
+      testProvider().getPrintUrl({ invoiceNumber: "JU00000000", invoiceDate: "2026-06-17" }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+});
+
 describe("sendNotification (InvoiceNotify / 發送發票通知)", () => {
   it("maps tag/method/recipient and posts the notification payload", async () => {
     let data: Record<string, unknown> | undefined;

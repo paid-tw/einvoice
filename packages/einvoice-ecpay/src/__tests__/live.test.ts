@@ -153,6 +153,31 @@ describe.skipIf(!live)("ECPay live (stage) — Issue field-rule audit", LIVE_OPT
   });
 });
 
+describe.skipIf(!live)("ECPay live (stage) — 發票列印", LIVE_OPTS, () => {
+  const p = provider();
+
+  it("returns a print URL for a paper invoice; a carrier invoice → NOT_FOUND", async () => {
+    // Paper (Print=1) invoice — needs an address + email/phone.
+    const paper = await p.issue({
+      orderId: `PR${Date.now()}`,
+      buyer: { name: "紙本", address: "台北市信義區", email: "test@example.com" },
+      items: [{ description: "商品", quantity: 1, unitPrice: 100, amount: 100 }],
+      amount: { salesAmount: 100, taxAmount: 0, totalAmount: 100 },
+      taxType: "TAXABLE",
+      priceMode: "TAX_INCLUSIVE",
+    });
+    const date = paper.invoiceDate.toISOString().slice(0, 10);
+    const u = await p.getPrintUrl({ invoiceNumber: paper.invoiceNumber, invoiceDate: date, style: "DOUBLE", reprint: true });
+    expect(u).toMatch(/^https:\/\//);
+
+    // A carrier invoice has Print=0 and cannot be printed → 查無資料 (NOT_FOUND).
+    const carrier = await p.issue(carrierIssue(`PRC${Date.now()}`));
+    await expect(
+      p.getPrintUrl({ invoiceNumber: carrier.invoiceNumber, invoiceDate: carrier.invoiceDate.toISOString().slice(0, 10) }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+});
+
 describe.skipIf(!live)("ECPay live (stage) — 延遲/觸發開立", LIVE_OPTS, () => {
   const p = provider();
   const orderId = `TP${Date.now()}`;

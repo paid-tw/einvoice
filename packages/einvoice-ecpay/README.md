@@ -108,6 +108,23 @@ const tracks = await invoices.getInvoiceWordSetting({ invoiceYear: "115", useSta
 await invoices.setInvoiceWordStatus(trackId, "ENABLE"); // or "PAUSE" / "DISABLE"
 ```
 
+## Printing (發票列印)
+
+```ts
+// Get a print URL (valid for 1 hour). Defaults to single-sided, today's date.
+const url = await invoices.getPrintUrl({
+  invoiceNumber: "JU11084038",
+  invoiceDate: "2026-06-17", // optional; defaults to today (Asia/Taipei)
+  style: "DOUBLE",   // SINGLE | DOUBLE | THERMAL | B2B_A4 | B2B_A5
+  showDetail: true,  // B2B / 統編 invoices always show detail
+  reprint: true,     // stamp as 補印 (ignored for B2B styles)
+});
+```
+
+Only paper-printable invoices work: a carrier/donation invoice (`Print=0`) or an
+unknown number returns 查無資料 → `NOT_FOUND`. The `B2B_A4` / `B2B_A5` styles
+require an invoice carrying a 統編.
+
 ## Notifications (發送發票通知)
 
 ```ts

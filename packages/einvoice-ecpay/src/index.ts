@@ -15,6 +15,8 @@ export type {
   GetAllowanceListInput,
   NotifyTag,
   SendNotifyInput,
+  PrintStyle,
+  PrintInvoiceInput,
   AllowanceDetail,
   InvalidDetail,
   InvalidAllowanceDetail,

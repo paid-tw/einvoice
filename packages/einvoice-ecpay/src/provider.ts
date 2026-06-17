@@ -158,6 +158,29 @@ export interface SendNotifyInput {
   phone?: string;
 }
 
+/** Print layout (→ ECPay `PrintStyle`). B2B styles require an invoice with a 統編. */
+export type PrintStyle = "SINGLE" | "DOUBLE" | "THERMAL" | "B2B_A4" | "B2B_A5";
+const PRINT_STYLE: Record<PrintStyle, number> = {
+  SINGLE: 1,
+  DOUBLE: 2,
+  THERMAL: 3,
+  B2B_A4: 4,
+  B2B_A5: 5,
+};
+
+/** Input for {@link EcpayProvider.getPrintUrl} (發票列印). */
+export interface PrintInvoiceInput {
+  invoiceNumber: string;
+  /** `yyyy-MM-dd` (or `yyyy/MM/dd`). Defaults to today (Asia/Taipei). */
+  invoiceDate?: string;
+  /** Layout; defaults to `SINGLE`. */
+  style?: PrintStyle;
+  /** Show the line-item detail. B2B / 統編 invoices always show it. */
+  showDetail?: boolean;
+  /** Stamp the print as 補印 (電子發票證明聯補印). Ignored for B2B styles. */
+  reprint?: boolean;
+}
+
 /** Detail of a voided invoice from {@link EcpayProvider.getInvalid} (查詢作廢發票明細). */
 export interface InvalidDetail {
   invoiceNumber: string; // II_Invoice_No
@@ -614,6 +637,23 @@ export class EcpayProvider implements InvoiceProvider {
       })),
       raw: result,
     };
+  }
+
+  /**
+   * 發票列印 (InvoicePrint): get a print URL (`InvoiceHtml`) for an invoice,
+   * valid for 1 hour. Only paper-printable invoices work — a carrier/donation
+   * invoice (or an unknown number) returns 查無資料 (NOT_FOUND). B2B styles
+   * (`B2B_A4` / `B2B_A5`) require an invoice carrying a 統編.
+   */
+  async getPrintUrl(input: PrintInvoiceInput): Promise<string> {
+    const result = await ecpayRequest(this.config, ENDPOINTS.invoicePrint, {
+      InvoiceNo: input.invoiceNumber,
+      InvoiceDate: input.invoiceDate ?? taipeiDate(),
+      ...(input.style ? { PrintStyle: PRINT_STYLE[input.style] } : {}),
+      ...(input.showDetail !== undefined ? { IsShowingDetail: input.showDetail ? 1 : 2 } : {}),
+      ...(input.reprint ? { IsReprintInvoice: "Y" } : {}),
+    });
+    return String(result.InvoiceHtml ?? "");
   }
 
   /**
