@@ -63,6 +63,7 @@ export class AmegoProvider implements InvoiceProvider {
     Capability.B2B,
     Capability.MIXED_TAX,
     Capability.QUERY_BY_ORDER_ID,
+    Capability.CARRIER_VALIDATION,
   ]);
 
   constructor(private readonly config: AmegoConfig) {}
@@ -490,6 +491,33 @@ export class AmegoProvider implements InvoiceProvider {
       });
     }
     return this.raw(ENDPOINTS.barcode, { barCode });
+  }
+
+  /**
+   * 手機條碼驗證 — resolves `true` when a mobile barcode is registered at the tax
+   * authority, `false` when it is well-formed but unregistered. A malformed
+   * barcode throws a VALIDATION error. Mirrors the ezPay adapter's method so the
+   * two providers are interchangeable ({@link Capability.CARRIER_VALIDATION}).
+   */
+  async validateMobileBarcode(barCode: string): Promise<boolean> {
+    try {
+      await this.barcodeQuery(barCode);
+      return true;
+    } catch (err) {
+      if (err instanceof InvoiceError && err.code === InvoiceErrorCode.NOT_FOUND) return false;
+      throw err;
+    }
+  }
+
+  /**
+   * 統一編號驗證 — resolves `true` when a company is registered for the 統編,
+   * `false` when the number is valid-format but has no company. A bad checksum
+   * throws a VALIDATION error. (Amego-specific; ezPay has no equivalent.)
+   */
+  async validateBan(ban: string): Promise<boolean> {
+    const res = await this.banQuery(ban);
+    const rows = res.data as Array<{ name?: string }> | undefined;
+    return Boolean(rows?.[0]?.name);
   }
 
   /** 伺服器時間 — a plain GET (no signing); returns the full time breakdown. */

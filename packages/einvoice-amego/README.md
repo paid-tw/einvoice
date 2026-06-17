@@ -47,6 +47,17 @@ createAmegoProvider({
 });
 ```
 
+### Carrier / 統編 validation
+
+```ts
+await invoices.validateMobileBarcode("/TRM+O+P"); // → boolean (registered?)
+await invoices.validateBan("28080623");           // → boolean (company exists?)
+```
+
+`validateMobileBarcode` mirrors the ezPay adapter (`CARRIER_VALIDATION`
+capability) so the two providers are interchangeable; `barcodeQuery()` /
+`banQuery()` remain for the full raw responses.
+
 ## Config
 
 | Option | Required | Description |

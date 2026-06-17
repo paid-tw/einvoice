@@ -332,4 +332,42 @@ describe("query (invoice_query) — type discriminator + nested data", () => {
     const res = await testProvider().query({ invoiceNumber: "AA26513024" });
     expect(res.status).toBe("ALLOWANCE");
   });
+
+  it("treats a B2C placeholder 統編 as none and maps every per-item tax type", async () => {
+    server.use(
+      http.post(`${BASE}/json/invoice_query`, () =>
+        HttpResponse.json({
+          code: 0,
+          data: {
+            ...INVOICE_QUERY_OK.data,
+            buyer_identifier: "0000000000", // B2C placeholder → ubn undefined
+            product_item: [
+              { description: "應稅", quantity: 1, unit_price: 100, amount: 100, tax_type: 1, unit: "個", remark: "r" },
+              { description: "零稅率", quantity: 1, unit_price: 100, amount: 100, tax_type: 2 },
+              { description: "免稅", quantity: 1, unit_price: 100, amount: 100, tax_type: 3 },
+              { description: "未知", quantity: 1, unit_price: 100, amount: 100, tax_type: 9 },
+            ],
+          },
+        }),
+      ),
+    );
+    const res = await testProvider().query({ invoiceNumber: "AA26513024" });
+    expect(res.buyer.ubn).toBeUndefined();
+    expect(res.items.map((i) => i.taxType)).toEqual(["TAXABLE", "ZERO_RATED", "TAX_FREE", undefined]);
+    expect(res.items[0]?.unit).toBe("個");
+    expect(res.items[0]?.remark).toBe("r");
+  });
+
+  it("returns empty items when the response carries no product_item", async () => {
+    server.use(
+      http.post(`${BASE}/json/invoice_query`, () =>
+        HttpResponse.json({
+          code: 0,
+          data: { invoice_number: "AA26513024", invoice_date: 20260617, total_amount: 105 },
+        }),
+      ),
+    );
+    const res = await testProvider().query({ invoiceNumber: "AA26513024" });
+    expect(res.items).toEqual([]);
+  });
 });

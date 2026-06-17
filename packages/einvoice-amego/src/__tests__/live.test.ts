@@ -10,7 +10,9 @@ import { createAmegoProvider } from "../provider.js";
  *   AMEGO_APP_KEY=... \
  *   pnpm --filter @paid-tw/einvoice-amego exec vitest run live
  */
-const live = process.env.AMEGO_LIVE === "1";
+// Requires credentials too, so a stray AMEGO_LIVE=1 without an app key skips
+// rather than failing against the real sandbox with empty auth.
+const live = process.env.AMEGO_LIVE === "1" && Boolean(process.env.AMEGO_APP_KEY);
 
 describe.skipIf(!live)("Amego live lifecycle", () => {
   const provider = createAmegoProvider({
@@ -305,6 +307,14 @@ describe.skipIf(!live)("Amego live — server rejects invalid values", () => {
     const res = await provider.banQuery("10458575");
     expect(res.code).toBe(0);
     expect((res.data as Array<{ name: string }>)[0]?.name).toBe("");
+  });
+
+  it("validateMobileBarcode → false for a well-formed but unregistered barcode", async () => {
+    expect(await provider.validateMobileBarcode("/AAAAAAA")).toBe(false);
+  });
+
+  it("validateBan → false for a valid 統編 with no registered company", async () => {
+    expect(await provider.validateBan("10458575")).toBe(false);
   });
 
   it("rejects a zero-rated invoice missing the customs mark (3040179)", async () => {

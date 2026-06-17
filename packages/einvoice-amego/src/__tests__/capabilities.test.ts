@@ -17,10 +17,11 @@ describe("Amego capabilities", () => {
     }
   });
 
-  it("supports B2B, mixed tax and order-id lookup", () => {
+  it("supports B2B, mixed tax, order-id lookup and carrier validation", () => {
     expect(supports(provider, Capability.B2B)).toBe(true);
     expect(supports(provider, Capability.MIXED_TAX)).toBe(true);
     expect(supports(provider, Capability.QUERY_BY_ORDER_ID)).toBe(true);
+    expect(supports(provider, Capability.CARRIER_VALIDATION)).toBe(true);
   });
 
   it("does not support scheduled issue", () => {

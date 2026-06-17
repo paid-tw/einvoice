@@ -198,6 +198,58 @@ describe("Amego endpoint contracts (verified live shapes)", () => {
     });
   });
 
+  describe("validateMobileBarcode (boolean wrapper)", () => {
+    it("returns true for a registered barcode (code 0)", async () => {
+      server.use(http.post(`${BASE}${ENDPOINTS.barcode}`, () => HttpResponse.json({ code: 0, msg: "" })));
+      expect(await testProvider().validateMobileBarcode("/TRM+O+P")).toBe(true);
+    });
+
+    it("returns false for a well-formed but unregistered barcode (9000113)", async () => {
+      server.use(
+        http.post(`${BASE}${ENDPOINTS.barcode}`, () =>
+          HttpResponse.json({ code: 9000113, msg: "查無此手機條碼" }),
+        ),
+      );
+      expect(await testProvider().validateMobileBarcode("/AAAAAAA")).toBe(false);
+    });
+
+    it("rethrows a non-NOT_FOUND error and throws VALIDATION on malformed input", async () => {
+      server.use(
+        http.post(`${BASE}${ENDPOINTS.barcode}`, () => HttpResponse.json({ code: 99, msg: "系統錯誤" })),
+      );
+      await expect(testProvider().validateMobileBarcode("/TRM+O+P")).rejects.toMatchObject({
+        provider: "amego",
+      });
+      await expect(testProvider().validateMobileBarcode("ABC")).rejects.toMatchObject({
+        code: "VALIDATION",
+      });
+    });
+  });
+
+  describe("validateBan (boolean wrapper)", () => {
+    it("returns true when a company is registered for the 統編", async () => {
+      server.use(
+        http.post(`${BASE}${ENDPOINTS.banQuery}`, () =>
+          HttpResponse.json({ code: 0, msg: "", data: [{ ban: "28080623", name: "光貿科技股份有限公司" }] }),
+        ),
+      );
+      expect(await testProvider().validateBan("28080623")).toBe(true);
+    });
+
+    it("returns false when the 統編 is valid-format but has no company (empty name)", async () => {
+      server.use(
+        http.post(`${BASE}${ENDPOINTS.banQuery}`, () =>
+          HttpResponse.json({ code: 0, msg: "", data: [{ ban: "10458575", name: "" }] }),
+        ),
+      );
+      expect(await testProvider().validateBan("10458575")).toBe(false);
+    });
+
+    it("throws VALIDATION on a bad checksum (no network call)", async () => {
+      await expect(testProvider().validateBan("28080624")).rejects.toMatchObject({ code: "VALIDATION" });
+    });
+  });
+
   it("raw() can call any endpoint directly", async () => {
     server.use(http.post(`${BASE}/json/anything`, () => HttpResponse.json({ code: 0, ok: true })));
     expect(await testProvider().raw("/json/anything", { foo: "bar" })).toMatchObject({ ok: true });

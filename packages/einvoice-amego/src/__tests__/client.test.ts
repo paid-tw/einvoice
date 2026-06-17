@@ -52,6 +52,37 @@ describe("retry (network only, opt-in)", () => {
   });
 });
 
+describe("transport errors", () => {
+  it("wraps a non-JSON POST response as a PROVIDER error", async () => {
+    server.use(
+      http.post(`${BASE}/json/f0501`, () => new HttpResponse("<html/>", { status: 502 })),
+    );
+    const err = await createAmegoProvider(cfg)
+      .void({ invoiceNumber: "AA1", reason: "x" })
+      .catch((e) => e);
+    expect(err.code).toBe("PROVIDER");
+    expect(err.rawCode).toBe("502");
+  });
+
+  it("wraps a time() GET network failure as a NETWORK error", async () => {
+    server.use(http.get(`${BASE}/json/time`, () => HttpResponse.error()));
+    const err = await createAmegoProvider(cfg).time().catch((e) => e);
+    expect(err.code).toBe("NETWORK");
+    expect(err.provider).toBe("amego");
+  });
+
+  it("falls back to local time when syncTime is on but the time GET fails", async () => {
+    server.use(
+      http.get(`${BASE}/json/time`, () => HttpResponse.error()),
+      http.post(`${BASE}/json/f0501`, () => HttpResponse.json({ code: 0 })),
+    );
+    // Should still succeed (request proceeds with local time, no throw).
+    await expect(
+      createAmegoProvider({ ...cfg, syncTime: true }).void({ invoiceNumber: "AA1", reason: "x" }),
+    ).resolves.toMatchObject({ status: "VOIDED" });
+  });
+});
+
 describe("time sync (opt-in)", () => {
   it("applies the server clock offset to the signed timestamp", async () => {
     let sentTime: string | undefined;
