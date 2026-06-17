@@ -57,6 +57,43 @@ export const INVOICE_STATUS_OK = {
 /** g0401 success returns no allowance number — the supplied one is the id. */
 export const ALLOWANCE_OK = { code: 0, msg: "" };
 
+/** Real allowance_list response (one row) — amounts are 未稅 + separate tax. */
+export const ALLOWANCE_LIST_OK = {
+  code: 0,
+  msg: "",
+  page_total: 16,
+  page_now: 1,
+  data_total: 302,
+  data: [
+    {
+      allowance_number: "AA26507438_001",
+      invoice_type: "D0401",
+      invoice_status: 99,
+      allowance_date: 20260601,
+      allowance_type: 2,
+      buyer_identifier: "0000000000",
+      buyer_name: "客戶",
+      tax_amount: 41,
+      total_amount: 819, // 未稅
+      cancel_date: 0,
+      create_date: 1780293784,
+      product_item: [
+        {
+          original_invoice_date: 20260601,
+          original_invoice_number: "AA26507438",
+          tax_type: 1,
+          description: "怪獸OK!益生菌",
+          unit_price: 819,
+          quantity: 1,
+          unit: "",
+          amount: 819,
+          tax: 41,
+        },
+      ],
+    },
+  ],
+};
+
 export const ALLOWANCE_STATUS_OK = {
   code: 0,
   msg: "",

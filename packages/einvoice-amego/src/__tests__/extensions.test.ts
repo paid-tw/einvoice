@@ -11,6 +11,7 @@ import {
 } from "../endpoints.js";
 import { APP_KEY, BASE, parseBody, server, testProvider } from "./server.js";
 import {
+  ALLOWANCE_LIST_OK,
   FILE_URL_OK,
   LOTTERY_STATUS_OK,
   LOTTERY_TYPE_OK,
@@ -183,6 +184,27 @@ describe("Amego endpoint contracts (verified live shapes)", () => {
   it("raw() can call any endpoint directly", async () => {
     server.use(http.post(`${BASE}/json/anything`, () => HttpResponse.json({ code: 0, ok: true })));
     expect(await testProvider().raw("/json/anything", { foo: "bar" })).toMatchObject({ ok: true });
+  });
+
+  it("allowances.list parses pagination + 未稅 rows with original-invoice items", async () => {
+    let data: Record<string, unknown> | undefined;
+    server.use(
+      http.post(`${BASE}${ENDPOINTS.allowanceList}`, async ({ request }) => {
+        data = parseBody(await request.text()).data;
+        return HttpResponse.json(ALLOWANCE_LIST_OK);
+      }),
+    );
+    const res = await testProvider().allowances.list({ startDate: "2026-06-01", endDate: 20260630 });
+    expect(data).toEqual({ date_select: 1, date_start: 20260601, date_end: 20260630, limit: 20, page: 1 });
+    expect(res.data_total).toBe(302);
+    expect(res.page_total).toBe(16);
+    const row = (res.data as Array<Record<string, unknown>>)[0]!;
+    expect(row.allowance_number).toBe("AA26507438_001");
+    expect(row.invoice_type).toBe("D0401");
+    expect(row.total_amount).toBe(819); // 未稅
+    const item = (row.product_item as Array<Record<string, unknown>>)[0]!;
+    expect(item.original_invoice_number).toBe("AA26507438");
+    expect(item.tax).toBe(41);
   });
 
   it("invoice.file / allowances.file return data.file_url (PDF link)", async () => {

@@ -67,6 +67,13 @@ describe.skipIf(!live)("Amego live lifecycle", () => {
     expect(rows[0]).toHaveProperty("name");
   });
 
+  it("lists allowances with real date filters (allowance.list)", async () => {
+    const res = await provider.allowances.list({ startDate: 20260601, endDate: 20260630, limit: 20 });
+    expect(res.code).toBe(0);
+    expect(Number(res.data_total)).toBeGreaterThanOrEqual(0);
+    expect(Array.isArray(res.data)).toBe(true);
+  });
+
   it("reads the full track tree (track_all, nested layers)", async () => {
     const res = await provider.track.all({ year: 2026, period: 2 });
     expect(res.code).toBe(0);
