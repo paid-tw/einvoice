@@ -3,6 +3,13 @@
   "version": "0.3.0",
   "description": "ezPay (ezpay.com.tw) adapter for @paid-tw/einvoice — implements InvoiceProvider over the ezPay e-invoice API.",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/paid-tw/einvoice.git",
+    "directory": "packages/einvoice-ezpay"
+  },
+  "homepage": "https://github.com/paid-tw/einvoice/tree/main/packages/einvoice-ezpay#readme",
+  "bugs": "https://github.com/paid-tw/einvoice/issues",
   "type": "module",
   "sideEffects": false,
   "files": [

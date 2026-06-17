@@ -3,6 +3,13 @@
   "version": "0.3.0",
   "description": "Provider-agnostic core for Taiwan e-invoice: unified types, InvoiceProvider interface, validation schemas, and a MockProvider.",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/paid-tw/einvoice.git",
+    "directory": "packages/einvoice"
+  },
+  "homepage": "https://github.com/paid-tw/einvoice/tree/main/packages/einvoice#readme",
+  "bugs": "https://github.com/paid-tw/einvoice/issues",
   "type": "module",
   "sideEffects": false,
   "files": [
