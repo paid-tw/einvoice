@@ -15,7 +15,7 @@ those once and lets each provider be a thin adapter.
 | [`@paid-tw/einvoice`](./packages/einvoice) | core | Unified types, `InvoiceProvider` interface, Zod validation, `MockProvider` |
 | [`@paid-tw/einvoice-amego`](./packages/einvoice-amego) | adapter | Amego (amego.tw) — MD5-signed |
 | [`@paid-tw/einvoice-ezpay`](./packages/einvoice-ezpay) | adapter | ezPay 藍新 (ezpay.com.tw) — AES-encrypted |
-| `@paid-tw/einvoice-ecpay` | adapter | ECPay 綠界 *(planned)* |
+| [`@paid-tw/einvoice-ecpay`](./packages/einvoice-ecpay) | adapter | ECPay 綠界 (ecpay.com.tw) — B2C 2.0, AES-encrypted |
 
 Install only the providers you use — adapters are separate packages, so an app
 that only uses Amego never pulls in another provider's dependencies.
