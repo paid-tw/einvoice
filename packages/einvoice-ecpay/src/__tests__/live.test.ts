@@ -83,7 +83,7 @@ describe.skipIf(!live)("ECPay live (stage) — issue → query → void", LIVE_O
     expect(res.expiresAt.getTime()).toBeGreaterThan(res.createdAt.getTime());
     // Cancel the pending online allowance (before buyer confirmation).
     const c = await p.cancelAllowanceOnline({ invoiceNumber: oinv.invoiceNumber, allowanceNumber: res.allowanceNumber, reason: "測試取消" });
-    expect(c.raw.RtnCode).toBe(1);
+    expect((c.raw as { RtnCode: number }).RtnCode).toBe(1);
   });
 
   it("issues an allowance then voids it (full 折讓 lifecycle, no buyer confirm)", async () => {
@@ -102,7 +102,7 @@ describe.skipIf(!live)("ECPay live (stage) — issue → query → void", LIVE_O
     expect(details[0]?.invoiceNumber).toBe(invoiceNumber);
     expect(details[0]?.totalAmount).toBe(100);
     const va = await p.voidAllowance({ invoiceNumber, allowanceNumber: al.allowanceNumber, reason: "測試作廢" });
-    expect(va.raw.RtnCode).toBe(1);
+    expect((va.raw as { RtnCode: number }).RtnCode).toBe(1);
     // The voided allowance is queryable (GetAllowanceInvalid).
     const inval = await p.getAllowanceInvalid({ invoiceNumber, allowanceNumber: al.allowanceNumber });
     expect(inval.reason).toBe("測試作廢");
@@ -170,7 +170,7 @@ describe.skipIf(!live)("ECPay live (stage) — 註銷重開", LIVE_OPTS, () => {
         second: "2-digit",
         hour12: false,
       })
-        .format(orig.invoiceDate)
+        .format(d)
         .replace("T", " ");
     const res = await p.voidWithReissue({
       invoiceNumber: orig.invoiceNumber,

@@ -1,0 +1,40 @@
+name: Publish
+
+# Tag a release with a plain `vX.Y.Z` tag (after `pnpm changeset version` +
+# commit) and push it; this publishes every workspace package whose version
+# isn't already on the registry.
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  id-token: write # Required for npm OIDC trusted publishing
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # pnpm 10 mints the OIDC token for trusted publishing and converts the
+      # `workspace:*` ranges to real versions at pack time.
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r build
+      - run: pnpm test
+
+      # No NODE_AUTH_TOKEN: with `id-token: write` and a Trusted Publisher
+      # configured for each package on npmjs.com, pnpm publishes tokenlessly
+      # and attaches build provenance. `--no-git-checks` because we publish
+      # from a detached tag checkout.
+      - run: pnpm -r publish --access public --provenance --no-git-checks
