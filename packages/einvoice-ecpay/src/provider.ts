@@ -297,15 +297,28 @@ export class EcpayProvider implements InvoiceProvider {
     await ecpayRequest(this.config, ENDPOINTS.cancelDelayIssue, { Tsr: tsr });
   }
 
+  /**
+   * 作廢發票 (Invalid). Needs the invoice's open date — pass it via
+   * `providerOptions.invoiceDate` (defaults to today, Asia/Taipei). An invoice
+   * with an un-voided allowance can't be voided (5070450 → CONFLICT); void the
+   * allowance(s) first.
+   */
   async void(input: VoidInvoiceInput): Promise<VoidInvoiceResult> {
     const parsed = voidInvoiceInputSchema.parse(input);
     const opts = (parsed.providerOptions ?? {}) as Record<string, unknown>;
-    await ecpayRequest(this.config, ENDPOINTS.invalid, {
+    if (this.config.validatePayload !== false && parsed.reason.length > 20) {
+      throw new InvoiceError("Reason must be ≤20 chars", {
+        provider: "ecpay",
+        code: InvoiceErrorCode.VALIDATION,
+        rawMessage: "作廢原因 (Reason) must be ≤20 chars",
+      });
+    }
+    const result = await ecpayRequest(this.config, ENDPOINTS.invalid, {
       InvoiceNo: parsed.invoiceNumber,
       InvoiceDate: (opts.invoiceDate as string) ?? taipeiDate(parsed.date),
       Reason: parsed.reason,
     });
-    return { invoiceNumber: parsed.invoiceNumber, status: InvoiceStatus.VOIDED, raw: undefined };
+    return { invoiceNumber: parsed.invoiceNumber, status: InvoiceStatus.VOIDED, raw: result };
   }
 
   /**

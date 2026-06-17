@@ -130,6 +130,24 @@ describe("void / allowance / voidAllowance", () => {
     });
     expect(data).toMatchObject({ InvoiceNo: "JU11082062", InvoiceDate: "2026-06-17", Reason: "客戶取消" });
     expect(res.status).toBe("VOIDED");
+    expect((res.raw as { RtnCode: number }).RtnCode).toBe(1); // response captured, not discarded
+  });
+
+  it("maps a void blocked by an active allowance (5070450) to CONFLICT", async () => {
+    server.use(
+      http.post(url(ECPAY_ENDPOINTS.invalid), () =>
+        HttpResponse.json(ecError(5070450, "B2C作廢發票 該發票已被折讓過，無法直接作廢發票")),
+      ),
+    );
+    const err = await testProvider().void({ invoiceNumber: "JU1", reason: "x" }).catch((e) => e);
+    expect(err.code).toBe("CONFLICT");
+    expect(err.rawCode).toBe("5070450");
+  });
+
+  it("rejects an over-long Reason (>20 chars) locally", async () => {
+    await expect(
+      testProvider().void({ invoiceNumber: "JU1", reason: "x".repeat(21) }),
+    ).rejects.toMatchObject({ code: "VALIDATION" });
   });
 
   it("void defaults InvoiceDate to today (Asia/Taipei) when not provided", async () => {
