@@ -158,6 +158,126 @@ describe("void (invoice_invalid)", () => {
   });
 });
 
+describe("觸發開立 (issuePending → triggerIssue)", () => {
+  it("issuePending posts Status=0 and returns the InvoiceTransNo", async () => {
+    let p: Record<string, string> | undefined;
+    server.use(
+      http.post(url(EZPAY_ENDPOINTS.issue), async ({ request }) => {
+        p = parsePostData(await request.text()).params;
+        return HttpResponse.json(
+          ezSuccess({
+            MerchantID: MERCHANT,
+            InvoiceTransNo: "26061710261482406",
+            MerchantOrderNo: "ORDER_1",
+            InvoiceNumber: "", // held: not issued yet
+            TotalAmt: 105,
+            RandomNum: "8117",
+            CreateTime: "",
+          }),
+        );
+      }),
+    );
+    const res = await testProvider().issuePending(issueInput());
+    expect(p).toMatchObject({ Version: "1.5", Status: "0", MerchantOrderNo: "ORDER_1" });
+    expect(res.invoiceTransNo).toBe("26061710261482406");
+    expect(res.orderId).toBe("ORDER_1");
+    expect(res.totalAmount).toBe(105);
+  });
+
+  it("triggerIssue posts InvoiceTransNo to invoice_touch_issue and returns the InvoiceNumber", async () => {
+    let p: Record<string, string> | undefined;
+    server.use(
+      http.post(url(EZPAY_ENDPOINTS.touchIssue), async ({ request }) => {
+        p = parsePostData(await request.text()).params;
+        return HttpResponse.json(
+          ezSuccess({
+            MerchantID: MERCHANT,
+            InvoiceTransNo: "26061710261482406",
+            MerchantOrderNo: "ORDER_1",
+            TotalAmt: 105,
+            InvoiceNumber: "BB00000057",
+            RandomNum: "8117",
+            CreateTime: "2026-06-17 10:26:14",
+            CheckCode: "X",
+          }),
+        );
+      }),
+    );
+    const res = await testProvider().triggerIssue({
+      invoiceTransNo: "26061710261482406",
+      orderId: "ORDER_1",
+      totalAmount: 105,
+    });
+    expect(p).toMatchObject({
+      Version: "1.0",
+      InvoiceTransNo: "26061710261482406",
+      MerchantOrderNo: "ORDER_1",
+      TotalAmt: "105",
+    });
+    expect(res.invoiceNumber).toBe("BB00000057");
+    expect(res.randomCode).toBe("8117");
+    expect(res.status).toBe("ISSUED");
+  });
+
+  it("maps a touch-issue error to the normalized code", async () => {
+    server.use(
+      http.post(url(EZPAY_ENDPOINTS.touchIssue), () =>
+        HttpResponse.json(ezError("INV20006", "查無發票資料")),
+      ),
+    );
+    const err = await testProvider()
+      .triggerIssue({ invoiceTransNo: "X", orderId: "ORDER_1", totalAmount: 105 })
+      .catch((e) => e);
+    expect(err.code).toBe("NOT_FOUND");
+    expect(err.rawCode).toBe("INV20006");
+  });
+});
+
+describe("觸發折讓 (triggerAllowance)", () => {
+  it("CONFIRM posts AllowanceStatus=C to allowance_touch_issue", async () => {
+    let p: Record<string, string> | undefined;
+    server.use(
+      http.post(url(EZPAY_ENDPOINTS.allowanceTouch), async ({ request }) => {
+        p = parsePostData(await request.text()).params;
+        return HttpResponse.json(ezSuccess({ MerchantID: MERCHANT, AllowanceNo: "A26061710261630" }));
+      }),
+    );
+    const res = await testProvider().triggerAllowance({
+      allowanceNumber: "A26061710261630",
+      orderId: "ORDER_1",
+      totalAmount: 105,
+      action: "CONFIRM",
+      invoiceNumber: "BB00000058",
+    });
+    expect(p).toMatchObject({
+      Version: "1.0",
+      AllowanceStatus: "C",
+      AllowanceNo: "A26061710261630",
+      MerchantOrderNo: "ORDER_1",
+      TotalAmt: "105",
+    });
+    expect(res.allowanceNumber).toBe("A26061710261630");
+    expect(res.invoiceNumber).toBe("BB00000058");
+  });
+
+  it("CANCEL posts AllowanceStatus=D", async () => {
+    let p: Record<string, string> | undefined;
+    server.use(
+      http.post(url(EZPAY_ENDPOINTS.allowanceTouch), async ({ request }) => {
+        p = parsePostData(await request.text()).params;
+        return HttpResponse.json(ezSuccess({ MerchantID: MERCHANT, AllowanceNo: "A1" }));
+      }),
+    );
+    await testProvider().triggerAllowance({
+      allowanceNumber: "A1",
+      orderId: "ORDER_1",
+      totalAmount: 105,
+      action: "CANCEL",
+    });
+    expect(p?.AllowanceStatus).toBe("D");
+  });
+});
+
 describe("allowance / voidAllowance / query", () => {
   it("allowance posts InvoiceNo + per-line tax and returns the AllowanceNo", async () => {
     let p: Record<string, string> | undefined;

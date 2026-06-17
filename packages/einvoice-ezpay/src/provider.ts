@@ -21,7 +21,7 @@ import {
   voidAllowanceInputSchema,
   voidInvoiceInputSchema,
 } from "@paid-tw/einvoice";
-import { type EzpayResult, ezpayRequest, ezpayTimestamp } from "./client.js";
+import { type EzpayResponse, type EzpayResult, ezpayRequest, ezpayTimestamp } from "./client.js";
 import type { EzpayConfig } from "./config.js";
 import { ENDPOINTS } from "./endpoints.js";
 import { assertValidIssuePayload } from "./validation.js";
@@ -32,6 +32,39 @@ const CARRIER_TYPE: Record<Carrier["type"], string> = {
   CITIZEN_CERTIFICATE: "1",
   MEMBER: "2",
 };
+
+/** A held invoice awaiting a {@link EzpayProvider.triggerIssue} call. */
+export interface EzpayPendingInvoice {
+  /** ezPay 電子發票開立序號 — pass this to {@link EzpayProvider.triggerIssue}. */
+  invoiceTransNo: string;
+  orderId: string;
+  totalAmount: number;
+  raw: EzpayResponse;
+}
+
+/** Input for {@link EzpayProvider.triggerIssue} (觸發開立發票). */
+export interface TriggerIssueInput {
+  invoiceTransNo: string;
+  orderId: string;
+  totalAmount: number;
+  /** ezPay 簡單付交易序號, when金流 is also handled by ezPay. */
+  transNum?: string;
+  providerOptions?: Record<string, string | number | undefined>;
+}
+
+/** Input for {@link EzpayProvider.triggerAllowance} (觸發確認/取消折讓). */
+export interface TriggerAllowanceInput {
+  allowanceNumber: string;
+  /** MerchantOrderNo of the invoice the allowance was opened against. */
+  orderId: string;
+  /** 折讓總金額. */
+  totalAmount: number;
+  /** `CONFIRM` (確認折讓) uploads next day; `CANCEL` (取消折讓) discards it. */
+  action: "CONFIRM" | "CANCEL";
+  /** Carried through to the result for convenience. */
+  invoiceNumber?: string;
+  providerOptions?: Record<string, string | number | undefined>;
+}
 
 export class EzpayProvider implements InvoiceProvider {
   readonly name = "ezpay";
@@ -62,8 +95,11 @@ export class EzpayProvider implements InvoiceProvider {
   // Unified InvoiceProvider
   // -------------------------------------------------------------------------
 
-  async issue(input: IssueInvoiceInput): Promise<IssueInvoiceResult> {
-    const parsed = issueInvoiceInputSchema.parse(input);
+  /** Build the `invoice_issue` PostData_ for a given Status (1 即時 / 0 觸發 / 3 預約). */
+  private buildIssuePostData(
+    parsed: IssueInvoiceInput,
+    status: string,
+  ): Record<string, string | number | undefined> {
     const category = parsed.category ?? deriveCategory(parsed.buyer);
     const hasCarrierOrDonation = Boolean(parsed.carrier || parsed.donation);
 
@@ -72,7 +108,7 @@ export class EzpayProvider implements InvoiceProvider {
       Version: ENDPOINTS.issue.version,
       TimeStamp: ezpayTimestamp(),
       MerchantOrderNo: parsed.orderId,
-      Status: "1", // 即時開立
+      Status: status,
       Category: category,
       BuyerName: parsed.buyer.name ?? (category === "B2B" ? "" : "消費者"),
       BuyerUBN: category === "B2B" ? parsed.buyer.ubn : undefined,
@@ -97,7 +133,12 @@ export class EzpayProvider implements InvoiceProvider {
     } as Record<string, string | number | undefined>;
 
     if (this.config.validatePayload !== false) assertValidIssuePayload(postData);
+    return postData;
+  }
 
+  async issue(input: IssueInvoiceInput): Promise<IssueInvoiceResult> {
+    const parsed = issueInvoiceInputSchema.parse(input);
+    const postData = this.buildIssuePostData(parsed, "1"); // 即時開立
     const { result, raw } = await ezpayRequest(this.config, ENDPOINTS.issue.path, postData);
     return {
       invoiceNumber: String(result.InvoiceNumber ?? ""),
@@ -105,6 +146,49 @@ export class EzpayProvider implements InvoiceProvider {
       randomCode: String(result.RandomNum ?? ""),
       orderId: parsed.orderId,
       totalAmount: parsed.amount.totalAmount,
+      status: InvoiceStatus.ISSUED,
+      raw,
+    };
+  }
+
+  /**
+   * ezPay 觸發開立: create a held invoice (`Status=0`). It is only stored on the
+   * platform — call {@link EzpayProvider.triggerIssue} with the returned
+   * `invoiceTransNo` to actually issue it.
+   */
+  async issuePending(input: IssueInvoiceInput): Promise<EzpayPendingInvoice> {
+    const parsed = issueInvoiceInputSchema.parse(input);
+    const postData = this.buildIssuePostData(parsed, "0"); // 等待觸發開立
+    const { result, raw } = await ezpayRequest(this.config, ENDPOINTS.issue.path, postData);
+    return {
+      invoiceTransNo: String(result.InvoiceTransNo ?? ""),
+      orderId: String(result.MerchantOrderNo ?? parsed.orderId),
+      totalAmount: Number(result.TotalAmt ?? parsed.amount.totalAmount),
+      raw,
+    };
+  }
+
+  /**
+   * ezPay 觸發開立發票: issue a previously held invoice (created via
+   * {@link EzpayProvider.issuePending} or a `Status=3` scheduled one) now.
+   */
+  async triggerIssue(opts: TriggerIssueInput): Promise<IssueInvoiceResult> {
+    const { result, raw } = await ezpayRequest(this.config, ENDPOINTS.touchIssue.path, {
+      RespondType: this.respondType(),
+      Version: ENDPOINTS.touchIssue.version,
+      TimeStamp: ezpayTimestamp(),
+      InvoiceTransNo: opts.invoiceTransNo,
+      MerchantOrderNo: opts.orderId,
+      TotalAmt: opts.totalAmount,
+      TransNum: opts.transNum,
+      ...(opts.providerOptions ?? {}),
+    });
+    return {
+      invoiceNumber: String(result.InvoiceNumber ?? ""),
+      invoiceDate: parseEzpayDate(result.CreateTime),
+      randomCode: String(result.RandomNum ?? ""),
+      orderId: String(result.MerchantOrderNo ?? opts.orderId),
+      totalAmount: Number(result.TotalAmt ?? opts.totalAmount),
       status: InvoiceStatus.ISSUED,
       raw,
     };
@@ -167,6 +251,32 @@ export class EzpayProvider implements InvoiceProvider {
       ...(parsed.providerOptions ?? {}),
     });
     return { allowanceNumber: parsed.allowanceNumber, raw };
+  }
+
+  /**
+   * ezPay 觸發確認/取消折讓: confirm (`CONFIRM`) or cancel (`CANCEL`) a held
+   * allowance created with `Status=0`. A confirmed allowance is uploaded the
+   * next day; once confirmed it can no longer be cancelled (use
+   * {@link EzpayProvider.voidAllowance} to void an uploaded one instead).
+   */
+  async triggerAllowance(opts: TriggerAllowanceInput): Promise<AllowanceResult> {
+    const { result, raw } = await ezpayRequest(this.config, ENDPOINTS.allowanceTouch.path, {
+      RespondType: this.respondType(),
+      Version: ENDPOINTS.allowanceTouch.version,
+      TimeStamp: ezpayTimestamp(),
+      AllowanceStatus: opts.action === "CANCEL" ? "D" : "C",
+      AllowanceNo: opts.allowanceNumber,
+      MerchantOrderNo: opts.orderId,
+      TotalAmt: opts.totalAmount,
+      ...(opts.providerOptions ?? {}),
+    });
+    return {
+      allowanceNumber: String(result.AllowanceNo ?? opts.allowanceNumber),
+      invoiceNumber: opts.invoiceNumber ?? "",
+      allowanceDate: new Date(),
+      totalAmount: opts.totalAmount,
+      raw,
+    };
   }
 
   async query(input: QueryInvoiceInput): Promise<QueryInvoiceResult> {

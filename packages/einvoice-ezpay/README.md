@@ -47,13 +47,45 @@ move.
 | `respondType` | | `"JSON"` (default) or `"String"` |
 | `validatePayload` | | validate the issue payload locally (default `true`) |
 
+## 觸發開立 / 觸發折讓 (two-phase, ezPay-specific)
+
+Beyond immediate issue, ezPay supports holding an invoice/allowance and
+triggering it later. These don't map onto the unified interface, so they are
+extra methods on `EzpayProvider`:
+
+```ts
+// Hold an invoice (Status=0) — stored on the platform, not yet issued.
+const pending = await invoices.issuePending({ /* IssueInvoiceInput */ });
+
+// Trigger it → real invoice number.
+const issued = await invoices.triggerIssue({
+  invoiceTransNo: pending.invoiceTransNo,
+  orderId: pending.orderId,
+  totalAmount: pending.totalAmount,
+});
+
+// Confirm / cancel a held allowance (opened with providerOptions: { status: "0" }).
+await invoices.triggerAllowance({
+  allowanceNumber,
+  orderId,
+  totalAmount,
+  action: "CONFIRM", // or "CANCEL"
+});
+```
+
+A held (`Status=3`) scheduled invoice can also be issued early with
+`triggerIssue`. A confirmed allowance uploads the next day and can no longer be
+cancelled — void an uploaded one with `voidAllowance` instead.
+
 ## Notes
 
 - ezPay query needs an extra key beyond the unified `invoiceNumber`/`orderId`:
   pass `providerOptions: { randomNum }` (SearchType 0) or `{ totalAmt }`
   (SearchType 1).
-- A live lifecycle test (issue → query → void) runs against the test environment
-  with `EZPAY_LIVE=1` and the credentials in env.
+- Live lifecycle tests run against the test environment with `EZPAY_LIVE=1` and
+  the credentials in env: immediate (issue → query → void), allowance
+  (issue → allowance → void), 觸發開立 (issuePending → triggerIssue → void),
+  and 觸發折讓 (held allowance → cancel).
 
 ## License
 
