@@ -61,6 +61,29 @@ describe("mapAmegoErrorCode (from info_detail?mid=71)", () => {
     expect(mapAmegoErrorCode(code)).toBe(expected);
   });
 
+  // Audit: the 通用/系統 error codes (10–23).
+  it("categorizes the common/system error codes", () => {
+    const expected: Record<number, string> = {
+      10: "PROVIDER", // 系統停機維護中
+      11: "AUTH", // 統編不可為空
+      12: "AUTH", // 統編錯誤
+      13: "AUTH", // status 未啟用
+      14: "AUTH", // IP 錯誤
+      15: "AUTH", // Time 錯誤
+      16: "AUTH", // 簽名驗證錯誤
+      17: "VALIDATION", // 資料不可為空
+      18: "PROVIDER", // 無法建立資料庫連線
+      19: "AUTH", // 公司停權
+      20: "VALIDATION", // data 非 JSON
+      21: "PROVIDER", // 人數過多
+      22: "AUTH", // 尚未申請 API 串接
+      23: "VALIDATION", // data 應為陣列字串
+    };
+    for (const [code, cat] of Object.entries(expected)) {
+      expect(mapAmegoErrorCode(Number(code))).toBe(cat);
+    }
+  });
+
   // Audit: every documented f0401 (開立發票) error code is categorized, never
   // left as a bare PROVIDER fallthrough except the system print-format error.
   it("categorizes the full f0401 error-code family", () => {

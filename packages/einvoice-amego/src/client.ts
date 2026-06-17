@@ -183,10 +183,12 @@ export function mapAmegoErrorCode(rawCode: number | string): InvoiceErrorCode {
   const code = Number(rawCode);
   if (!Number.isFinite(code)) return InvoiceErrorCode.PROVIDER;
 
-  // Auth / signature / time / IP
-  if (code === 14 || code === 15 || code === 16) return InvoiceErrorCode.AUTH;
-  // 統編 missing/invalid — credential-level
-  if (code === 11 || code === 12) return InvoiceErrorCode.AUTH;
+  // Account / auth / signature (通用錯誤): 11 統編空, 12 統編錯, 13 status未啟用,
+  // 14 IP錯, 15 Time錯, 16 簽名錯, 19 公司停權, 22 尚未申請 API 串接.
+  if ([11, 12, 13, 14, 15, 16, 19, 22].includes(code)) return InvoiceErrorCode.AUTH;
+
+  // Transient provider-side (通用錯誤): 10 維護中, 18 無法建立資料庫連線, 21 人數過多.
+  if (code === 10 || code === 18 || code === 21) return InvoiceErrorCode.PROVIDER;
 
   // No data / does not exist (invoice 3050125, g0401 原發票 4040156, allowance
   // 4050134, 手機條碼 9000113)
