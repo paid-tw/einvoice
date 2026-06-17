@@ -24,6 +24,7 @@ those once and lets each provider be a thin adapter.
 | [`@paid-tw/einvoice-ezpay`](./packages/einvoice-ezpay) | adapter | ezPay 藍新 (ezpay.com.tw) — AES-encrypted |
 | [`@paid-tw/einvoice-ecpay`](./packages/einvoice-ecpay) | adapter | ECPay 綠界 (ecpay.com.tw) — B2C 2.0, AES-encrypted |
 | [`@paid-tw/einvoice-ezpay-crossborder`](./packages/einvoice-ezpay-crossborder) | adapter | ezPay 境外電商 — cross-border B2C, foreign-currency-native |
+| [`@paid-tw/einvoice-ezreceipt`](./packages/einvoice-ezreceipt) | adapter | ezReceipt 易發票 (COIMOTION) — order-centric REST, token auth |
 
 Install only the providers you use — adapters are separate packages, so an app
 that only uses Amego never pulls in another provider's dependencies.
@@ -88,19 +89,19 @@ assertSupports(invoices, Capability.SCHEDULED_ISSUE);
 Each adapter declares a `capabilities` set; feature-detect at runtime with
 `supports(provider, cap)` / `assertSupports(provider, cap)`.
 
-| Capability | Amego | ECPay | ezPay | ezPay X-border |
-| --- | :---: | :---: | :---: | :---: |
-| `ISSUE` — 開立 | ✅ | ✅ | ✅ | ✅ |
-| `VOID` — 作廢 | ✅ | ✅ | ✅ | ✅ |
-| `ALLOWANCE` — 折讓 | ✅ | ✅ | ✅ | ✅ |
-| `VOID_ALLOWANCE` — 折讓作廢 | ✅ | ✅ | ✅ | ✅ |
-| `QUERY` — 查詢 | ✅ | ✅ | ✅ | ✅ |
-| `B2B` — 統一編號 buyer | ✅ | ✅ | ✅ | — |
-| `MIXED_TAX` — mixed tax-rate invoice | ✅ | ✅ | ✅ | — |
-| `QUERY_BY_ORDER_ID` — look up by order id | ✅ | ✅ | ✅ | ✅ |
-| `SCHEDULED_ISSUE` — schedule future issuance | — | ✅ | ✅ | ✅ |
-| `CARRIER_VALIDATION` — 手機條碼 / 愛心碼 | ✅ | ✅ | ✅ | — |
-| `FOREIGN_CURRENCY` — `currency` + `exchangeRate` annotation | ✅ | — | — | ✅ |
+| Capability | Amego | ECPay | ezPay | ezPay X-border | ezReceipt |
+| --- | :---: | :---: | :---: | :---: | :---: |
+| `ISSUE` — 開立 | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `VOID` — 作廢 | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `ALLOWANCE` — 折讓 | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `VOID_ALLOWANCE` — 折讓作廢 | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `QUERY` — 查詢 | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `B2B` — 統一編號 buyer | ✅ | ✅ | ✅ | — | ✅ |
+| `MIXED_TAX` — mixed tax-rate invoice | ✅ | ✅ | ✅ | — | ✅ |
+| `QUERY_BY_ORDER_ID` — look up by order id | ✅ | ✅ | ✅ | ✅ | — |
+| `SCHEDULED_ISSUE` — schedule future issuance | — | ✅ | ✅ | ✅ | — |
+| `CARRIER_VALIDATION` — 手機條碼 / 愛心碼 | ✅ | ✅ | ✅ | — | — |
+| `FOREIGN_CURRENCY` — `currency` + `exchangeRate` annotation | ✅ | — | — | ✅ | — |
 
 A provider that lacks `FOREIGN_CURRENCY` rejects a non-TWD `currency` with an
 `UNSUPPORTED` error rather than silently dropping the annotation.
