@@ -122,8 +122,10 @@ await invoices.setInvoiceWordStatus(trackId, "ENABLE"); // or "PAUSE" / "DISABLE
   折讓單號 immediately and is voidable right away (綠界 uploads to the MOF next
   day). It defaults to no buyer notification; pass
   `providerOptions: { allowanceNotify: "E"|"S"|"A", notifyMail, notifyPhone, reason }`
-  to notify. (協議折讓 `AllowanceByCollegiate` / 線上折讓 are also in
-  `ECPAY_ENDPOINTS` for the buyer-confirmation flows.)
+  to notify.
+- `allowanceOnline(input, { notifyMail, returnUrl?, … })` is the 線上折讓
+  (AllowanceByCollegiate): ECPay emails the buyer a confirmation link (72h
+  `expiresAt`); the allowance is issued only when they click it.
 - Live tests run with `ECPAY_LIVE=1` (defaulting to `ECPAY_SANDBOX`).
 
 ## License

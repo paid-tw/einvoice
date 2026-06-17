@@ -355,6 +355,46 @@ describe("統一編號驗證 (GetCompanyNameByTaxID)", () => {
   });
 });
 
+describe("線上開立折讓 (allowanceOnline)", () => {
+  const input = {
+    invoiceNumber: "JU11083085",
+    allowanceId: "ORDER_1",
+    items: [{ description: "商品", quantity: 1, unitPrice: 100, amount: 100 }],
+    amount: { salesAmount: 100, taxAmount: 0, totalAmount: 100 },
+    providerOptions: { invoiceDate: "2026-06-17" },
+  };
+
+  it("posts AllowanceByCollegiate with AllowanceNotify=E + ReturnURL, returns the pending number + expiry", async () => {
+    let data: Record<string, unknown> | undefined;
+    server.use(
+      http.post(url(ECPAY_ENDPOINTS.allowanceByCollegiate), async ({ request }) => {
+        data = parseRequest(await request.text()).data;
+        return HttpResponse.json(
+          ecSuccess({
+            IA_Allow_No: "2606172158112842",
+            IA_Invoice_No: "JU11083085",
+            IA_TempDate: "2026-06-17 21:58:02",
+            IA_TempExpireDate: "2026-06-20 21:58:02",
+            IA_Remain_Allowance_Amt: 0,
+          }),
+        );
+      }),
+    );
+    const res = await testProvider().allowanceOnline(input, {
+      notifyMail: "b@x.com",
+      returnUrl: "https://x.test/r",
+      customerName: "測試",
+    });
+    expect(data).toMatchObject({ AllowanceNotify: "E", NotifyMail: "b@x.com", ReturnURL: "https://x.test/r" });
+    expect(res.allowanceNumber).toBe("2606172158112842");
+    expect(res.expiresAt.getTime()).toBeGreaterThan(res.createdAt.getTime());
+  });
+
+  it("requires a notifyMail locally", async () => {
+    await expect(testProvider().allowanceOnline(input, { notifyMail: "" })).rejects.toMatchObject({ code: "VALIDATION" });
+  });
+});
+
 describe("raw() escape hatch", () => {
   it("posts an arbitrary Data payload and returns the decrypted result", async () => {
     let data: Record<string, unknown> | undefined;

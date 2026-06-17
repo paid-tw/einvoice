@@ -52,6 +52,24 @@ describe.skipIf(!live)("ECPay live (stage) — issue → query → void", LIVE_O
     expect(res.items.length).toBeGreaterThan(0);
   });
 
+  it("creates an online allowance (線上折讓) pending buyer confirmation, with a 72h expiry", async () => {
+    // Its own invoice — a pending online allowance would consume the shared one's budget.
+    const oid = `${orderId}O`;
+    const oinv = await p.issue(carrierIssue(oid));
+    const res = await p.allowanceOnline(
+      {
+        invoiceNumber: oinv.invoiceNumber,
+        allowanceId: oid,
+        items: [{ description: "整合測試商品", quantity: 2, unitPrice: 50, amount: 100 }],
+        amount: { salesAmount: 100, taxAmount: 0, totalAmount: 100 },
+        providerOptions: { invoiceDate: oinv.invoiceDate.toISOString().slice(0, 10) },
+      },
+      { notifyMail: "test@example.com", customerName: "測試" },
+    );
+    expect(res.allowanceNumber).toMatch(/^\d+$/);
+    expect(res.expiresAt.getTime()).toBeGreaterThan(res.createdAt.getTime());
+  });
+
   it("issues an allowance then voids it (full 折讓 lifecycle, no buyer confirm)", async () => {
     const al = await p.allowance({
       invoiceNumber,

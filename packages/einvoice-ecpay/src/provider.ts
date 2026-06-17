@@ -110,6 +110,20 @@ export interface EcpayWordSetting {
   count: number;
 }
 
+/** Result of {@link EcpayProvider.allowanceOnline} (線上折讓, pending buyer confirmation). */
+export interface OnlineAllowanceResult {
+  /** 折讓單號 — pending until the buyer confirms via the email link. */
+  allowanceNumber: string;
+  invoiceNumber: string;
+  /** When the online allowance was created (IA_TempDate). */
+  createdAt: Date;
+  /** The buyer must confirm before this (72h, IA_TempExpireDate). */
+  expiresAt: Date;
+  /** 折讓剩餘金額. */
+  remainingAmount: number;
+  raw: EcpayResult;
+}
+
 /** Outcome of {@link EcpayProvider.triggerIssue} (觸發開立). */
 export interface TriggerIssueResult {
   /** `true` when issued immediately (4000004); `false` when it will auto-issue after the delay (4000003). */
@@ -320,6 +334,47 @@ export class EcpayProvider implements InvoiceProvider {
       invoiceNumber: parsed.invoiceNumber,
       allowanceDate: parseEcpayDate(result.IA_Date),
       totalAmount: parsed.amount.totalAmount,
+      raw: result,
+    };
+  }
+
+  /**
+   * 線上開立折讓 (AllowanceByCollegiate): create an allowance the buyer confirms
+   * online — ECPay emails them a link they must click (72h, `expiresAt`) before
+   * the allowance is actually issued. Returns the pending 折讓單號 + expiry (the
+   * buyer can be reminded/cancelled until then). Needs a `notifyMail`; an
+   * optional `returnUrl` receives the server-to-server confirmation.
+   */
+  async allowanceOnline(
+    input: AllowanceInput,
+    options: { notifyMail: string; returnUrl?: string; customerName?: string; reason?: string },
+  ): Promise<OnlineAllowanceResult> {
+    const parsed = allowanceInputSchema.parse(input);
+    const opts = (parsed.providerOptions ?? {}) as Record<string, unknown>;
+    if (this.config.validatePayload !== false && !options.notifyMail) {
+      throw new InvoiceError("notifyMail is required for an online allowance", {
+        provider: "ecpay",
+        code: InvoiceErrorCode.VALIDATION,
+        rawMessage: "AllowanceNotify is fixed to E (email); notifyMail is required",
+      });
+    }
+    const result = await ecpayRequest(this.config, ENDPOINTS.allowanceByCollegiate, {
+      InvoiceNo: parsed.invoiceNumber,
+      InvoiceDate: (opts.invoiceDate as string) ?? taipeiDate(parsed.date),
+      AllowanceNotify: "E", // fixed to email
+      CustomerName: options.customerName,
+      NotifyMail: options.notifyMail,
+      AllowanceAmount: parsed.amount.totalAmount,
+      Reason: options.reason,
+      Items: toEcpayItems(parsed.items, parsed.providerOptions),
+      ReturnURL: options.returnUrl,
+    });
+    return {
+      allowanceNumber: String(result.IA_Allow_No ?? ""),
+      invoiceNumber: String(result.IA_Invoice_No ?? parsed.invoiceNumber),
+      createdAt: parseEcpayDate(result.IA_TempDate),
+      expiresAt: parseEcpayDate(result.IA_TempExpireDate),
+      remainingAmount: Number(result.IA_Remain_Allowance_Amt ?? 0),
       raw: result,
     };
   }
