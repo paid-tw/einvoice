@@ -193,8 +193,11 @@ export function mapAmegoErrorCode(rawCode: number | string): InvoiceErrorCode {
   if (code === 71 || code === 3050125 || code === 4040156 || code === 4050134 || code === 9000113)
     return InvoiceErrorCode.NOT_FOUND;
 
-  // Number track (字軌) exhausted
-  if (code === 3040111) return InvoiceErrorCode.NUMBER_EXHAUSTED;
+  // Number track (字軌) exhausted / no next invoice number available
+  if (code === 3040111 || code === 3040191) return InvoiceErrorCode.NUMBER_EXHAUSTED;
+
+  // System-side print-format generation failure (not caller input)
+  if (code === 3040192) return InvoiceErrorCode.PROVIDER;
 
   // Duplicate OrderId / invoice state conflict / already has an allowance
   if (code === 3040171) return InvoiceErrorCode.CONFLICT;

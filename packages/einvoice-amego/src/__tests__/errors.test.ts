@@ -60,7 +60,27 @@ describe("mapAmegoErrorCode (from info_detail?mid=71)", () => {
   ])("maps %i → %s", (code, expected) => {
     expect(mapAmegoErrorCode(code)).toBe(expected);
   });
+
+  // Audit: every documented f0401 (開立發票) error code is categorized, never
+  // left as a bare PROVIDER fallthrough except the system print-format error.
+  it("categorizes the full f0401 error-code family", () => {
+    const f0401 = [
+      3040111, 3040112, ...range(3040121, 3040163), 3040171,
+      ...range(3040172, 3040184), 3040191, 3040192, 3040193,
+    ];
+    expect(mapAmegoErrorCode(3040111)).toBe("NUMBER_EXHAUSTED");
+    expect(mapAmegoErrorCode(3040191)).toBe("NUMBER_EXHAUSTED"); // 無法取得下一張發票
+    expect(mapAmegoErrorCode(3040171)).toBe("CONFLICT"); // OrderId 重複
+    expect(mapAmegoErrorCode(3040192)).toBe("PROVIDER"); // 列印格式錯誤 (system)
+    // every other code is a caller-facing VALIDATION error
+    const validation = f0401.filter((c) => ![3040111, 3040191, 3040171, 3040192].includes(c));
+    for (const c of validation) expect(mapAmegoErrorCode(c)).toBe("VALIDATION");
+  });
 });
+
+function range(start: number, end: number): number[] {
+  return Array.from({ length: end - start + 1 }, (_, i) => start + i);
+}
 
 describe("error propagation", () => {
   it("throws an InvoiceError carrying the raw Amego code and message", async () => {
