@@ -1,0 +1,68 @@
+import { describe, expect, it } from "vitest";
+import { ezpayIssuePayloadSchema } from "./validation.js";
+
+function valid(o: Record<string, unknown> = {}) {
+  return {
+    MerchantOrderNo: "ORDER_1",
+    Category: "B2C",
+    BuyerName: "消費者",
+    PrintFlag: "Y",
+    TaxType: "1",
+    TaxRate: 5,
+    Amt: 100,
+    TaxAmt: 5,
+    TotalAmt: 105,
+    ItemName: "商品一",
+    ItemCount: "1",
+    ItemUnit: "個",
+    ItemPrice: "105",
+    ItemAmt: "105",
+    ...o,
+  };
+}
+const ok = (o: Record<string, unknown> = {}) => ezpayIssuePayloadSchema.safeParse(valid(o)).success;
+
+describe("ezpayIssuePayloadSchema", () => {
+  it("accepts a valid B2C payload", () => expect(ok()).toBe(true));
+
+  it("MerchantOrderNo: required, ≤20, [A-Za-z0-9_] only", () => {
+    expect(ok({ MerchantOrderNo: "bad order!" })).toBe(false);
+    expect(ok({ MerchantOrderNo: "x".repeat(21) })).toBe(false);
+    expect(ok({ MerchantOrderNo: "" })).toBe(false);
+  });
+
+  it("TaxType must be 1/2/3/9; PrintFlag Y/N; CarrierType 0/1/2", () => {
+    expect(ok({ TaxType: "5" })).toBe(false);
+    expect(ok({ PrintFlag: "X" })).toBe(false);
+    expect(ok({ CarrierType: "9" })).toBe(false);
+  });
+
+  it("enforces TotalAmt = Amt + TaxAmt", () => {
+    expect(ok({ Amt: 100, TaxAmt: 5, TotalAmt: 110 })).toBe(false);
+  });
+
+  it("B2B requires BuyerUBN (8 digits)", () => {
+    expect(ok({ Category: "B2B" })).toBe(false);
+    expect(ok({ Category: "B2B", BuyerUBN: "123" })).toBe(false);
+    expect(ok({ Category: "B2B", BuyerUBN: "28080623", BuyerName: "光貿" })).toBe(true);
+  });
+
+  it("ezPay carrier (CarrierType=2) requires BuyerEmail", () => {
+    expect(ok({ CarrierType: "2", CarrierNum: "member@x.com", PrintFlag: "N" })).toBe(false);
+    expect(ok({ CarrierType: "2", CarrierNum: "member@x.com", BuyerEmail: "b@x.com", PrintFlag: "N" })).toBe(true);
+  });
+
+  it("rejects carrier + donation together", () => {
+    expect(ok({ CarrierType: "0", CarrierNum: "/ABC1234", LoveCode: "168", PrintFlag: "N" })).toBe(false);
+  });
+
+  it("validates email + love code format", () => {
+    expect(ok({ BuyerEmail: "not-an-email" })).toBe(false);
+    expect(ok({ LoveCode: "abc", PrintFlag: "N" })).toBe(false);
+  });
+
+  it("requires equal item segment counts", () => {
+    expect(ok({ ItemName: "a|b", ItemCount: "1", ItemUnit: "個", ItemPrice: "1|1", ItemAmt: "1|1" })).toBe(false);
+    expect(ok({ ItemName: "a|b", ItemCount: "1|1", ItemUnit: "個|個", ItemPrice: "1|1", ItemAmt: "1|1", Amt: 2, TaxAmt: 0, TotalAmt: 2 })).toBe(true);
+  });
+});

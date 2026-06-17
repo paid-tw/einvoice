@@ -9,6 +9,8 @@ export interface EzpayConfig extends BaseProviderConfig {
   hashIV: string;
   /** Response format. Default `"JSON"`. */
   respondType?: "JSON" | "String";
+  /** Validate the built issue payload locally before sending (default `true`). */
+  validatePayload?: boolean;
 }
 
 /**
