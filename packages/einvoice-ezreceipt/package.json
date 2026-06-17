@@ -1,0 +1,52 @@
+{
+  "name": "@paid-tw/einvoice-ezreceipt",
+  "version": "0.0.0",
+  "description": "ezReceipt 易發票 (COIMOTION API) adapter for @paid-tw/einvoice — order-centric REST e-invoices with token auth.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/paid-tw/einvoice.git",
+    "directory": "packages/einvoice-ezreceipt"
+  },
+  "homepage": "https://github.com/paid-tw/einvoice/tree/main/packages/einvoice-ezreceipt#readme",
+  "bugs": "https://github.com/paid-tw/einvoice/issues",
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@paid-tw/einvoice": "workspace:*",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "tsup": "^8.3.0",
+    "typescript": "^5.6.0"
+  },
+  "keywords": [
+    "einvoice",
+    "電子發票",
+    "ezreceipt",
+    "易發票",
+    "coimotion",
+    "taiwan"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}
