@@ -8,6 +8,7 @@ import {
   InvoiceErrorCode,
   type InvoiceProvider,
   InvoiceStatus,
+  isValidMobileBarcode,
   type IssueInvoiceInput,
   type IssueInvoiceResult,
   type QueryInvoiceInput,
@@ -23,7 +24,13 @@ import {
   voidAllowanceInputSchema,
   voidInvoiceInputSchema,
 } from "@paid-tw/einvoice";
-import { type EzpayResponse, type EzpayResult, ezpayRequest, ezpayTimestamp } from "./client.js";
+import {
+  type EzpayResponse,
+  type EzpayResult,
+  ezpayCarrierCheck,
+  ezpayRequest,
+  ezpayTimestamp,
+} from "./client.js";
 import type { EzpayConfig } from "./config.js";
 import { encryptPostData, makeCheckCode } from "./crypto.js";
 import { ENDPOINTS } from "./endpoints.js";
@@ -89,6 +96,7 @@ export class EzpayProvider implements InvoiceProvider {
     Capability.MIXED_TAX,
     Capability.QUERY_BY_ORDER_ID,
     Capability.SCHEDULED_ISSUE,
+    Capability.CARRIER_VALIDATION,
   ]);
 
   constructor(private readonly config: EzpayConfig) {}
@@ -427,6 +435,44 @@ export class EzpayProvider implements InvoiceProvider {
       items: [],
       raw,
     };
+  }
+
+  /**
+   * 手機條碼驗證: check a mobile-barcode carrier (手機條碼) is registered at 財政部.
+   * Resolves `true` when it exists. The `/XXXXXXX` format is checked first
+   * (unless `validatePayload` is disabled).
+   */
+  async validateMobileBarcode(barcode: string): Promise<boolean> {
+    if (this.config.validatePayload !== false && !isValidMobileBarcode(barcode)) {
+      throw new InvoiceError(`Invalid mobile barcode format: ${barcode}`, {
+        provider: "ezpay",
+        code: InvoiceErrorCode.VALIDATION,
+        rawMessage: "CellphoneBarcode must be '/' followed by 7 of [0-9A-Z.+-]",
+      });
+    }
+    const { exists } = await ezpayCarrierCheck(this.config, ENDPOINTS.checkBarcode.path, {
+      CellphoneBarcode: barcode,
+    });
+    return exists;
+  }
+
+  /**
+   * 愛心碼驗證: check a donation (愛心碼/捐贈碼) is registered at 財政部. Resolves
+   * `true` when it exists. The 3–7 digit format is checked first (unless
+   * `validatePayload` is disabled).
+   */
+  async validateLoveCode(loveCode: string): Promise<boolean> {
+    if (this.config.validatePayload !== false && !/^\d{3,7}$/.test(loveCode)) {
+      throw new InvoiceError(`Invalid love code format: ${loveCode}`, {
+        provider: "ezpay",
+        code: InvoiceErrorCode.VALIDATION,
+        rawMessage: "LoveCode must be 3–7 digits",
+      });
+    }
+    const { exists } = await ezpayCarrierCheck(this.config, ENDPOINTS.checkLoveCode.path, {
+      LoveCode: loveCode,
+    });
+    return exists;
   }
 }
 

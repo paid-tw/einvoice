@@ -77,6 +77,19 @@ A held (`Status=3`) scheduled invoice can also be issued early with
 `triggerIssue`. A confirmed allowance uploads the next day and can no longer be
 cancelled — void an uploaded one with `voidAllowance` instead.
 
+## Carrier validation (手機條碼 / 愛心碼)
+
+Check whether a mobile-barcode carrier or a donation code is registered at the
+tax authority before issuing — backed by ezPay's `/Api_inv_application/` lookups:
+
+```ts
+await invoices.validateMobileBarcode("/ABC1234"); // → boolean (IsExist)
+await invoices.validateLoveCode("8585"); // → boolean
+```
+
+Format is checked locally first (barcode `/` + 7 of `[0-9A-Z.+-]`; love code 3–7
+digits). Declared as the `CARRIER_VALIDATION` capability.
+
 ## Browser Form POST (build without sending)
 
 For flows where the browser POSTs straight to ezPay — e.g. a query whose result

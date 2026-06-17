@@ -29,6 +29,8 @@ export const Capability = {
   QUERY_BY_ORDER_ID: "QUERY_BY_ORDER_ID",
   /** Schedule an invoice to be issued automatically at a future date. */
   SCHEDULED_ISSUE: "SCHEDULED_ISSUE",
+  /** Validate a carrier (手機條碼 / 愛心碼) against the tax authority. */
+  CARRIER_VALIDATION: "CARRIER_VALIDATION",
 } as const;
 export type Capability = (typeof Capability)[keyof typeof Capability];
 

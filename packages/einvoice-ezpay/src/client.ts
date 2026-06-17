@@ -1,6 +1,6 @@
 import { InvoiceError, InvoiceErrorCode } from "@paid-tw/einvoice";
 import { type EzpayConfig, resolveBaseUrl } from "./config.js";
-import { encryptPostData } from "./crypto.js";
+import { decryptPostData, encryptPostData, makeCheckValue } from "./crypto.js";
 
 /** Raw ezPay response envelope (RespondType=JSON). */
 export interface EzpayResponse {
@@ -85,6 +85,87 @@ export async function ezpayRequest(
       : ((json.Result ?? {}) as Record<string, unknown>);
 
   return { status: json.Status, message: json.Message, result, raw: json };
+}
+
+export interface CarrierCheckResult {
+  /** Whether the barcode / love code exists (財政部 `IsExist=Y`). */
+  exists: boolean;
+  /** The decrypted Result fields, keyed verbatim (echoed code casing varies). */
+  fields: Record<string, string>;
+  raw: EzpayResponse;
+}
+
+/**
+ * Call a 手機條碼/愛心碼驗證 endpoint (`/Api_inv_application/...`). Unlike the
+ * invoice API these take top-level `Version`/`RespondType`/`CheckValue` form
+ * fields and return an **AES-encrypted** `Result` (a `&`-joined query string,
+ * not JSON). Throws an {@link InvoiceError} when `Status !== "SUCCESS"`.
+ */
+export async function ezpayCarrierCheck(
+  config: EzpayConfig,
+  path: string,
+  fields: Record<string, string | number>,
+): Promise<CarrierCheckResult> {
+  const baseUrl = resolveBaseUrl(config);
+  const doFetch = config.fetch ?? fetch;
+  const postData = encryptPostData(
+    { TimeStamp: Math.floor(Date.now() / 1000), ...fields },
+    config.hashKey,
+    config.hashIV,
+  );
+  const body = new URLSearchParams({
+    MerchantID_: config.merchantId,
+    Version: "1.0",
+    RespondType: config.respondType ?? "JSON",
+    PostData_: postData,
+    CheckValue: makeCheckValue(postData, config.hashKey, config.hashIV),
+  });
+
+  let res: Response;
+  try {
+    res = await doFetch(`${baseUrl}${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body,
+      signal: config.timeoutMs ? AbortSignal.timeout(config.timeoutMs) : undefined,
+    });
+  } catch (cause) {
+    throw new InvoiceError("ezPay carrier-check request failed", {
+      provider: "ezpay",
+      code: InvoiceErrorCode.NETWORK,
+      cause,
+    });
+  }
+
+  let json: EzpayResponse;
+  try {
+    json = (await res.json()) as EzpayResponse;
+  } catch (cause) {
+    throw new InvoiceError("ezPay returned a non-JSON response", {
+      provider: "ezpay",
+      code: InvoiceErrorCode.PROVIDER,
+      rawCode: String(res.status),
+      cause,
+    });
+  }
+
+  if (json.Status !== "SUCCESS") {
+    throw new InvoiceError(json.Message || "ezPay returned an error", {
+      provider: "ezpay",
+      code: mapEzpayError(json.Status),
+      rawCode: json.Status,
+      rawMessage: json.Message,
+      raw: json,
+    });
+  }
+
+  // Result is AES-encrypted; decrypt then parse the `&`-joined key=value pairs.
+  const decrypted = decryptPostData(String(json.Result ?? ""), config.hashKey, config.hashIV);
+  const fieldsOut = Object.fromEntries(new URLSearchParams(decrypted)) as Record<string, string>;
+  // IsExist casing is stable, but the echoed code key varies (LoveCode vs
+  // Lovecode), so read IsExist case-insensitively to be safe.
+  const isExist = Object.entries(fieldsOut).find(([k]) => k.toLowerCase() === "isexist")?.[1];
+  return { exists: isExist === "Y", fields: fieldsOut, raw: json };
 }
 
 /**

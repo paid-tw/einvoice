@@ -69,3 +69,13 @@ export function makeCheckCode(
   const raw = `HashIV=${hashIV}&${qs.toString()}&HashKey=${hashKey}`;
   return createHash("sha256").update(raw).digest("hex").toUpperCase();
 }
+
+/**
+ * The `CheckValue` for the 手機條碼/愛心碼驗證 API: SHA256 over the *encrypted*
+ * PostData_ hex wrapped by `HashKey=…&` (front) and `&HashIV=…` (back),
+ * uppercased. Note the wrap order is the reverse of {@link makeCheckCode}.
+ */
+export function makeCheckValue(postDataHex: string, hashKey: string, hashIV: string): string {
+  const raw = `HashKey=${hashKey}&${postDataHex}&HashIV=${hashIV}`;
+  return createHash("sha256").update(raw).digest("hex").toUpperCase();
+}

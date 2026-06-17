@@ -1,5 +1,6 @@
+import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { buildQuery, decryptPostData, encryptPostData, makeCheckCode } from "./crypto.js";
+import { buildQuery, decryptPostData, encryptPostData, makeCheckCode, makeCheckValue } from "./crypto.js";
 
 // The example HashKey/HashIV from the official ezPay manual appendix.
 const KEY = "abcdefghijklmnopqrstuvwxyzabcdef"; // 32
@@ -20,6 +21,18 @@ describe("makeCheckCode", () => {
       IV,
     );
     expect(code).toBe("303AB800650B724733B5D91CBCE075D9EA09E4CDE9CD33461D45F07D5EC7EECB");
+  });
+});
+
+describe("makeCheckValue (carrier-validation API)", () => {
+  it("wraps the encrypted PostData_ as HashKey=…&<data>&HashIV=… and SHA256-uppercases it", () => {
+    const postData = "deadbeef";
+    const expected = createHash("sha256")
+      .update(`HashKey=${KEY}&${postData}&HashIV=${IV}`)
+      .digest("hex")
+      .toUpperCase();
+    expect(makeCheckValue(postData, KEY, IV)).toBe(expected);
+    expect(makeCheckValue(postData, KEY, IV)).toMatch(/^[0-9A-F]{64}$/);
   });
 });
 

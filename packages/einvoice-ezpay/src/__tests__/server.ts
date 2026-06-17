@@ -1,6 +1,6 @@
 import { setupServer } from "msw/node";
 import { createEzpayProvider } from "../provider.js";
-import { decryptPostData, makeCheckCode } from "../crypto.js";
+import { decryptPostData, encryptPostData, makeCheckCode } from "../crypto.js";
 
 export const BASE = "https://ezpay.test";
 export const MERCHANT = "TEST1234567890";
@@ -37,6 +37,18 @@ export function ezSuccess(result: Record<string, unknown>, message = "處理成�
 /** An error envelope (Status = error code). */
 export function ezError(code: string, message: string) {
   return { Status: code, Message: message };
+}
+
+/**
+ * A carrier-check SUCCESS envelope. `fields` (e.g. { IsExist: "Y", Lovecode:
+ * "8585" }) is AES-encrypted into Result, mirroring the live API.
+ */
+export function ezCarrierSuccess(fields: Record<string, string>) {
+  return {
+    Status: "SUCCESS",
+    Message: "查詢成功",
+    Result: encryptPostData(fields, KEY, IV),
+  };
 }
 
 /** Attach a valid issue-family CheckCode (over the 5 fields) using the test key/iv. */

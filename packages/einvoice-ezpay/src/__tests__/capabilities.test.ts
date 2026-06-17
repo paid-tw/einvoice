@@ -22,10 +22,11 @@ describe("ezPay capabilities", () => {
     }
   });
 
-  it("supports B2B, mixed tax, order-id lookup and scheduled issue", () => {
+  it("supports B2B, mixed tax, order-id lookup, scheduled issue and carrier validation", () => {
     expect(supports(provider, Capability.B2B)).toBe(true);
     expect(supports(provider, Capability.MIXED_TAX)).toBe(true);
     expect(supports(provider, Capability.QUERY_BY_ORDER_ID)).toBe(true);
     expect(supports(provider, Capability.SCHEDULED_ISSUE)).toBe(true);
+    expect(supports(provider, Capability.CARRIER_VALIDATION)).toBe(true);
   });
 });

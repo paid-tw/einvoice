@@ -132,6 +132,25 @@ describe.skipIf(!live)("ezPay live — 觸發開立 lifecycle", () => {
   });
 });
 
+describe.skipIf(!live)("ezPay live — 手機條碼/愛心碼驗證", () => {
+  const provider = createEzpayProvider({
+    merchantId: process.env.EZPAY_MERCHANT_ID!,
+    hashKey: process.env.EZPAY_HASH_KEY!,
+    hashIV: process.env.EZPAY_HASH_IV!,
+    mode: "TEST",
+  });
+
+  // Covers IsExist=N: an unregistered barcode.
+  it("validateMobileBarcode returns false for an unregistered barcode", async () => {
+    expect(await provider.validateMobileBarcode("/ABC1234")).toBe(false);
+  });
+
+  // Covers IsExist=Y + the 'Lovecode' response-key casing quirk.
+  it("validateLoveCode returns true for a registered love code (8585)", async () => {
+    expect(await provider.validateLoveCode("8585")).toBe(true);
+  });
+});
+
 describe.skipIf(!live)("ezPay live — 觸發折讓 (held → cancel)", () => {
   const provider = createEzpayProvider({
     merchantId: process.env.EZPAY_MERCHANT_ID!,

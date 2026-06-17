@@ -5,10 +5,11 @@ export {
   encryptPostData,
   decryptPostData,
   makeCheckCode,
+  makeCheckValue,
 } from "./crypto.js";
 export { ENDPOINTS as EZPAY_ENDPOINTS } from "./endpoints.js";
-export { ezpayRequest, mapEzpayError, ezpayTimestamp } from "./client.js";
-export type { EzpayResponse, EzpayResult } from "./client.js";
+export { ezpayRequest, ezpayCarrierCheck, mapEzpayError, ezpayTimestamp } from "./client.js";
+export type { EzpayResponse, EzpayResult, CarrierCheckResult } from "./client.js";
 export { createEzpayProvider, EzpayProvider, ezpayTaxType, ezpayTaxRate } from "./provider.js";
 export type {
   EzpayPendingInvoice,

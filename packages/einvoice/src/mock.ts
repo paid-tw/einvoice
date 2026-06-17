@@ -52,6 +52,7 @@ export class MockProvider implements InvoiceProvider {
     Capability.MIXED_TAX,
     Capability.QUERY_BY_ORDER_ID,
     Capability.SCHEDULED_ISSUE,
+    Capability.CARRIER_VALIDATION,
   ]);
   private readonly track: string;
   private seq: number;
