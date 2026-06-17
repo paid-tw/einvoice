@@ -278,6 +278,37 @@ describe("觸發折讓 (triggerAllowance)", () => {
   });
 });
 
+describe("local payload validation (wired per endpoint)", () => {
+  it("void rejects an over-long InvalidReason before any network call", async () => {
+    // core accepts the reason (min 1); ezPay caps it at 20 bytes.
+    await expect(
+      testProvider().void({ invoiceNumber: "BB00000001", reason: "x".repeat(21) }),
+    ).rejects.toMatchObject({ code: "VALIDATION", provider: "ezpay" });
+  });
+
+  it("query rejects a SearchType-0 lookup with no RandomNum", async () => {
+    await expect(testProvider().query({ invoiceNumber: "BB00000001" })).rejects.toMatchObject({
+      code: "VALIDATION",
+      provider: "ezpay",
+    });
+  });
+
+  it("validatePayload:false bypasses local validation (reaches the network)", async () => {
+    let hit = false;
+    server.use(
+      http.post(url(EZPAY_ENDPOINTS.void), () => {
+        hit = true;
+        return HttpResponse.json(ezSuccess({ MerchantID: MERCHANT, InvoiceNumber: "BB00000001" }));
+      }),
+    );
+    await testProvider({ validatePayload: false }).void({
+      invoiceNumber: "BB00000001",
+      reason: "x".repeat(21), // would fail validation if it were on
+    });
+    expect(hit).toBe(true);
+  });
+});
+
 describe("allowance / voidAllowance / query", () => {
   it("allowance posts InvoiceNo + per-line tax and returns the AllowanceNo", async () => {
     let p: Record<string, string> | undefined;

@@ -17,6 +17,18 @@ export type {
 } from "./provider.js";
 export {
   ezpayIssuePayloadSchema,
+  ezpayVoidPayloadSchema,
+  ezpayTouchIssuePayloadSchema,
+  ezpayAllowancePayloadSchema,
+  ezpayAllowanceTouchPayloadSchema,
+  ezpayVoidAllowancePayloadSchema,
+  ezpaySearchPayloadSchema,
   assertValidIssuePayload,
+  assertValidVoidPayload,
+  assertValidTouchIssuePayload,
+  assertValidAllowancePayload,
+  assertValidAllowanceTouchPayload,
+  assertValidVoidAllowancePayload,
+  assertValidSearchPayload,
 } from "./validation.js";
 export type { EzpayIssuePayload } from "./validation.js";

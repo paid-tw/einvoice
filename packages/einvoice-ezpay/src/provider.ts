@@ -24,7 +24,15 @@ import {
 import { type EzpayResponse, type EzpayResult, ezpayRequest, ezpayTimestamp } from "./client.js";
 import type { EzpayConfig } from "./config.js";
 import { ENDPOINTS } from "./endpoints.js";
-import { assertValidIssuePayload } from "./validation.js";
+import {
+  assertValidAllowancePayload,
+  assertValidAllowanceTouchPayload,
+  assertValidIssuePayload,
+  assertValidSearchPayload,
+  assertValidTouchIssuePayload,
+  assertValidVoidAllowancePayload,
+  assertValidVoidPayload,
+} from "./validation.js";
 
 /** Unified carrier type → ezPay CarrierType. */
 const CARRIER_TYPE: Record<Carrier["type"], string> = {
@@ -84,6 +92,11 @@ export class EzpayProvider implements InvoiceProvider {
 
   private respondType() {
     return this.config.respondType ?? "JSON";
+  }
+
+  /** Run a payload assertion unless `validatePayload` is disabled. */
+  private validate(assert: (data: unknown) => void, postData: unknown): void {
+    if (this.config.validatePayload !== false) assert(postData);
   }
 
   /** Escape hatch: call any ezPay endpoint with raw PostData_ params. */
@@ -173,7 +186,7 @@ export class EzpayProvider implements InvoiceProvider {
    * {@link EzpayProvider.issuePending} or a `Status=3` scheduled one) now.
    */
   async triggerIssue(opts: TriggerIssueInput): Promise<IssueInvoiceResult> {
-    const { result, raw } = await ezpayRequest(this.config, ENDPOINTS.touchIssue.path, {
+    const postData = {
       RespondType: this.respondType(),
       Version: ENDPOINTS.touchIssue.version,
       TimeStamp: ezpayTimestamp(),
@@ -182,7 +195,9 @@ export class EzpayProvider implements InvoiceProvider {
       TotalAmt: opts.totalAmount,
       TransNum: opts.transNum,
       ...(opts.providerOptions ?? {}),
-    });
+    };
+    this.validate(assertValidTouchIssuePayload, postData);
+    const { result, raw } = await ezpayRequest(this.config, ENDPOINTS.touchIssue.path, postData);
     return {
       invoiceNumber: String(result.InvoiceNumber ?? ""),
       invoiceDate: parseEzpayDate(result.CreateTime),
@@ -196,14 +211,16 @@ export class EzpayProvider implements InvoiceProvider {
 
   async void(input: VoidInvoiceInput): Promise<VoidInvoiceResult> {
     const parsed = voidInvoiceInputSchema.parse(input);
-    const { raw } = await ezpayRequest(this.config, ENDPOINTS.void.path, {
+    const postData = {
       RespondType: this.respondType(),
       Version: ENDPOINTS.void.version,
       TimeStamp: ezpayTimestamp(),
       InvoiceNumber: parsed.invoiceNumber,
       InvalidReason: parsed.reason,
       ...(parsed.providerOptions ?? {}),
-    });
+    };
+    this.validate(assertValidVoidPayload, postData);
+    const { raw } = await ezpayRequest(this.config, ENDPOINTS.void.path, postData);
     return { invoiceNumber: parsed.invoiceNumber, status: InvoiceStatus.VOIDED, raw };
   }
 
@@ -214,7 +231,7 @@ export class EzpayProvider implements InvoiceProvider {
     // ezPay keys an allowance off the invoice number + the invoice's order no.
     const merchantOrderNo = (opts.merchantOrderNo as string) ?? parsed.allowanceId;
 
-    const { result, raw } = await ezpayRequest(this.config, ENDPOINTS.allowance.path, {
+    const postData = {
       RespondType: this.respondType(),
       Version: ENDPOINTS.allowance.version,
       TimeStamp: ezpayTimestamp(),
@@ -230,7 +247,9 @@ export class EzpayProvider implements InvoiceProvider {
       BuyerEmail: opts.buyerEmail as string | undefined,
       Status: (opts.status as string) ?? "1", // 立即確認折讓
       ...(opts.extra as Record<string, unknown> | undefined),
-    });
+    };
+    this.validate(assertValidAllowancePayload, postData);
+    const { result, raw } = await ezpayRequest(this.config, ENDPOINTS.allowance.path, postData);
     return {
       allowanceNumber: String(result.AllowanceNo ?? ""),
       invoiceNumber: parsed.invoiceNumber,
@@ -242,14 +261,16 @@ export class EzpayProvider implements InvoiceProvider {
 
   async voidAllowance(input: VoidAllowanceInput): Promise<VoidAllowanceResult> {
     const parsed = voidAllowanceInputSchema.parse(input);
-    const { raw } = await ezpayRequest(this.config, ENDPOINTS.voidAllowance.path, {
+    const postData = {
       RespondType: this.respondType(),
       Version: ENDPOINTS.voidAllowance.version,
       TimeStamp: ezpayTimestamp(),
       AllowanceNo: parsed.allowanceNumber,
       InvalidReason: parsed.reason ?? "作廢折讓",
       ...(parsed.providerOptions ?? {}),
-    });
+    };
+    this.validate(assertValidVoidAllowancePayload, postData);
+    const { raw } = await ezpayRequest(this.config, ENDPOINTS.voidAllowance.path, postData);
     return { allowanceNumber: parsed.allowanceNumber, raw };
   }
 
@@ -260,7 +281,7 @@ export class EzpayProvider implements InvoiceProvider {
    * {@link EzpayProvider.voidAllowance} to void an uploaded one instead).
    */
   async triggerAllowance(opts: TriggerAllowanceInput): Promise<AllowanceResult> {
-    const { result, raw } = await ezpayRequest(this.config, ENDPOINTS.allowanceTouch.path, {
+    const postData = {
       RespondType: this.respondType(),
       Version: ENDPOINTS.allowanceTouch.version,
       TimeStamp: ezpayTimestamp(),
@@ -269,7 +290,9 @@ export class EzpayProvider implements InvoiceProvider {
       MerchantOrderNo: opts.orderId,
       TotalAmt: opts.totalAmount,
       ...(opts.providerOptions ?? {}),
-    });
+    };
+    this.validate(assertValidAllowanceTouchPayload, postData);
+    const { result, raw } = await ezpayRequest(this.config, ENDPOINTS.allowanceTouch.path, postData);
     return {
       allowanceNumber: String(result.AllowanceNo ?? opts.allowanceNumber),
       invoiceNumber: opts.invoiceNumber ?? "",
@@ -301,12 +324,14 @@ export class EzpayProvider implements InvoiceProvider {
           RandomNum: opts.randomNum as string | undefined,
         };
 
-    const { result, raw } = await ezpayRequest(this.config, ENDPOINTS.search.path, {
+    const fullPostData = {
       RespondType: this.respondType(),
       Version: ENDPOINTS.search.version,
       TimeStamp: ezpayTimestamp(),
       ...postData,
-    });
+    };
+    this.validate(assertValidSearchPayload, fullPostData);
+    const { result, raw } = await ezpayRequest(this.config, ENDPOINTS.search.path, fullPostData);
 
     return {
       invoiceNumber: String(result.InvoiceNumber ?? parsed.invoiceNumber ?? ""),

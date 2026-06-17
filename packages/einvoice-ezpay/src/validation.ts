@@ -115,17 +115,185 @@ export const ezpayIssuePayloadSchema = z
 
 export type EzpayIssuePayload = z.input<typeof ezpayIssuePayloadSchema>;
 
-/** Validate a built issue payload, throwing an {@link InvoiceError} on failure. */
-export function assertValidIssuePayload(data: unknown): void {
-  const result = ezpayIssuePayloadSchema.safeParse(data);
+/** UTF-8 byte length (ezPay length limits like "中文6字/英文20字" are byte-ish). */
+function utf8Len(s: string): number {
+  return new TextEncoder().encode(s).length;
+}
+
+/** 作廢原因: required, 中文6字 / 英文20字 ⇒ ≤20 UTF-8 bytes. */
+const invalidReasonSchema = z
+  .string()
+  .min(1, "InvalidReason is required")
+  .refine((s) => utf8Len(s) <= 20, "InvalidReason must be ≤20 bytes (中文6字/英文20字)");
+
+/** ezPay 發票號碼: 2 letters + 8 digits, but the field is just Varchar(10). */
+const invoiceNumberField = z
+  .string()
+  .min(1, "InvoiceNumber is required")
+  .max(10, "InvoiceNumber must be ≤10 chars");
+
+const merchantOrderNoField = z
+  .string()
+  .min(1, "MerchantOrderNo is required")
+  .max(20, "MerchantOrderNo must be ≤20 chars")
+  .regex(/^[A-Za-z0-9_]+$/, "MerchantOrderNo allows only letters, digits and _");
+
+/** Assert that the | -delimited item fields all have the same segment count. */
+function refineEqualItemSegments(keys: string[]) {
+  return (p: Record<string, unknown>, ctx: z.RefinementCtx) => {
+    const counts = keys.map((k) => String(p[k] ?? "").split("|").length);
+    if (new Set(counts).size > 1) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Item fields (${keys.join("/")}) must have equal segment counts`,
+        path: [keys[0] ?? "ItemName"],
+      });
+    }
+  };
+}
+
+// --- invoice_invalid (作廢發票) -------------------------------------------------
+export const ezpayVoidPayloadSchema = z
+  .object({ InvoiceNumber: invoiceNumberField, InvalidReason: invalidReasonSchema })
+  .passthrough();
+
+// --- invoice_touch_issue (觸發開立發票) ----------------------------------------
+export const ezpayTouchIssuePayloadSchema = z
+  .object({
+    InvoiceTransNo: z
+      .string()
+      .min(1, "InvoiceTransNo is required")
+      .max(20, "InvoiceTransNo must be ≤20 chars"),
+    MerchantOrderNo: merchantOrderNoField,
+    TotalAmt: nonNegInt,
+  })
+  .passthrough();
+
+// --- allowance_issue (開立折讓) ------------------------------------------------
+export const ezpayAllowancePayloadSchema = z
+  .object({
+    InvoiceNo: invoiceNumberField,
+    MerchantOrderNo: merchantOrderNoField,
+    ItemName: z.string().min(1, "ItemName is required"),
+    ItemCount: z.string().min(1, "ItemCount is required"),
+    ItemUnit: z.string().min(1, "ItemUnit is required"),
+    ItemPrice: z.string().min(1, "ItemPrice is required"),
+    ItemAmt: z.string().min(1, "ItemAmt is required"),
+    ItemTaxAmt: z.string().min(1, "ItemTaxAmt is required"),
+    TotalAmt: nonNegInt,
+    Status: z.enum(["0", "1"]),
+    BuyerEmail: z
+      .string()
+      .email("BuyerEmail must be a valid email")
+      .max(50)
+      .optional()
+      .or(z.literal("")),
+    TaxTypeForMixed: z.string().optional(), // pipe-joined 1/2/3, only when TaxType=9
+  })
+  .passthrough()
+  .superRefine((p, ctx) => {
+    refineEqualItemSegments(["ItemName", "ItemCount", "ItemUnit", "ItemPrice", "ItemAmt", "ItemTaxAmt"])(
+      p,
+      ctx,
+    );
+    // ItemUnit: 中文2字 / 英數6字 ⇒ ≤6 UTF-8 bytes per segment.
+    for (const seg of String(p.ItemUnit ?? "").split("|")) {
+      if (utf8Len(seg) > 6) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Each ItemUnit must be ≤2 中文字 / 6 英數字",
+          path: ["ItemUnit"],
+        });
+        break;
+      }
+    }
+  });
+
+// --- allowance_touch_issue (觸發確認/取消折讓) --------------------------------
+export const ezpayAllowanceTouchPayloadSchema = z
+  .object({
+    AllowanceStatus: z.enum(["C", "D"]),
+    AllowanceNo: z.string().min(1, "AllowanceNo is required").max(25, "AllowanceNo must be ≤25 chars"),
+    MerchantOrderNo: merchantOrderNoField,
+    TotalAmt: nonNegInt,
+  })
+  .passthrough();
+
+// --- allowanceInvalid (作廢折讓) ----------------------------------------------
+export const ezpayVoidAllowancePayloadSchema = z
+  .object({
+    AllowanceNo: z.string().min(1, "AllowanceNo is required").max(25, "AllowanceNo must be ≤25 chars"),
+    InvalidReason: invalidReasonSchema,
+  })
+  .passthrough();
+
+// --- invoice_search (查詢發票) ------------------------------------------------
+export const ezpaySearchPayloadSchema = z
+  .object({
+    SearchType: z.enum(["0", "1"]).optional(),
+    InvoiceNumber: z.string().max(10).optional().or(z.literal("")),
+    RandomNum: z.string().regex(/^\d{4}$/, "RandomNum must be 4 digits").optional(),
+    MerchantOrderNo: z.string().max(20).optional().or(z.literal("")),
+    TotalAmt: z.coerce.number().int().nonnegative().optional(),
+  })
+  .passthrough()
+  .superRefine((p, ctx) => {
+    const type = p.SearchType ?? "0";
+    if (type === "1") {
+      // 以訂單編號 + 發票金額查詢.
+      if (!p.MerchantOrderNo)
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "MerchantOrderNo is required for SearchType 1", path: ["MerchantOrderNo"] });
+      if (p.TotalAmt === undefined)
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "TotalAmt is required for SearchType 1", path: ["TotalAmt"] });
+    } else {
+      // 以發票號碼 + 隨機碼查詢.
+      if (!p.InvoiceNumber)
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "InvoiceNumber is required for SearchType 0", path: ["InvoiceNumber"] });
+      if (!p.RandomNum)
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "RandomNum is required for SearchType 0", path: ["RandomNum"] });
+    }
+  });
+
+/** Validate a built payload against `schema`, throwing {@link InvoiceError} on failure. */
+function assertValid(label: string, schema: z.ZodTypeAny, data: unknown): void {
+  const result = schema.safeParse(data);
   if (result.success) return;
   const detail = result.error.issues
     .map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`)
     .join("; ");
-  throw new InvoiceError(`Invalid ezPay invoice payload — ${detail}`, {
+  throw new InvoiceError(`Invalid ezPay ${label} payload — ${detail}`, {
     provider: "ezpay",
     code: InvoiceErrorCode.VALIDATION,
     rawMessage: detail,
     cause: result.error,
   });
+}
+
+/** Validate a built issue payload, throwing an {@link InvoiceError} on failure. */
+export function assertValidIssuePayload(data: unknown): void {
+  assertValid("invoice", ezpayIssuePayloadSchema, data);
+}
+
+export function assertValidVoidPayload(data: unknown): void {
+  assertValid("void", ezpayVoidPayloadSchema, data);
+}
+
+export function assertValidTouchIssuePayload(data: unknown): void {
+  assertValid("touch-issue", ezpayTouchIssuePayloadSchema, data);
+}
+
+export function assertValidAllowancePayload(data: unknown): void {
+  assertValid("allowance", ezpayAllowancePayloadSchema, data);
+}
+
+export function assertValidAllowanceTouchPayload(data: unknown): void {
+  assertValid("allowance-touch", ezpayAllowanceTouchPayloadSchema, data);
+}
+
+export function assertValidVoidAllowancePayload(data: unknown): void {
+  assertValid("void-allowance", ezpayVoidAllowancePayloadSchema, data);
+}
+
+export function assertValidSearchPayload(data: unknown): void {
+  assertValid("search", ezpaySearchPayloadSchema, data);
 }
