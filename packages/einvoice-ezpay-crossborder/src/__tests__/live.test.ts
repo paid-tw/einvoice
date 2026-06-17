@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { EZPAY_CB_CURRENCIES } from "../currencies.js";
 import { createEzpayCrossBorderProvider } from "../provider.js";
 
 /**
@@ -117,5 +118,40 @@ describe.skipIf(!live)("ezPay cross-border live (test env) — allowance + two-p
     const trig = await p.triggerIssue({ invoiceTransNo: pend.invoiceTransNo, orderId, totalAmount: 105 });
     expect(trig.invoiceNumber).toMatch(/^[A-Z]{2}\d{8}$/);
     expect(trig.status).toBe("ISSUED");
+  });
+});
+
+describe.skipIf(!live)("ezPay cross-border live (test env) — every currency (附件三)", LIVE_OPTS, () => {
+  const p = provider();
+
+  it.each(EZPAY_CB_CURRENCIES)("issues a %s invoice", async (currency) => {
+    const foreign = currency !== "TWD";
+    const res = await p.issue({
+      orderId: oid("CC"),
+      buyer,
+      items: [{ description: `${currency}商品`, quantity: 1, unitPrice: 21, amount: 21 }],
+      amount: { salesAmount: 20, taxAmount: 1, totalAmount: 21 },
+      taxType: "TAXABLE",
+      priceMode: "TAX_INCLUSIVE",
+      currency,
+      ...(foreign ? { exchangeRate: 1 } : {}),
+    });
+    expect(res.invoiceNumber).toMatch(/^[A-Z]{2}\d{8}$/);
+  });
+
+  // Verified live: a currency outside 附件三 is rejected with INV10002.
+  it.each(["INR", "BRL", "ZZZ"])("rejects unlisted currency %s with INV10002", async (currency) => {
+    await expect(
+      p.issue({
+        orderId: oid("CX"),
+        buyer,
+        items: [{ description: "x", quantity: 1, unitPrice: 21, amount: 21 }],
+        amount: { salesAmount: 20, taxAmount: 1, totalAmount: 21 },
+        taxType: "TAXABLE",
+        priceMode: "TAX_INCLUSIVE",
+        currency,
+        exchangeRate: 1,
+      }),
+    ).rejects.toMatchObject({ code: "VALIDATION", rawCode: "INV10002" });
   });
 });
