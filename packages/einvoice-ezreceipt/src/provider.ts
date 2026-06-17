@@ -45,6 +45,14 @@ export function ezreceiptTaxType(taxType: TaxType): number {
 const fail = (message: string, code = InvoiceErrorCode.VALIDATION) =>
   new InvoiceError(message, { provider: "ezreceipt", code, rawMessage: message });
 
+/** One used/unused number range within a 字軌 segment's `usage`. */
+export interface InvoiceTrackUsage {
+  startNo: number;
+  endNo: number;
+  /** -1 非易發票使用 / 0 未使用 / 1 已使用. */
+  status: number;
+}
+
 /** One 字軌 segment (分段字軌) from {@link EzreceiptProvider.listInvoiceTracks}. */
 export interface InvoiceTrack {
   /** 字軌識別碼 (inID) — key for {@link EzreceiptProvider.adjustInvoiceTrack}. */
@@ -61,10 +69,26 @@ export interface InvoiceTrack {
   invType: number;
   /** 0 不限 / 1 無統編 / 2 有統編. */
   bizType: number;
+  /** 備註. */
+  memo?: string | null;
   /** 是否已關閉 (0/1). */
   isClosed: number;
+  /** 0 使用中 / 1 未來期別 / 2 過期 / 3 用盡 (不可開啟). */
+  closedCode?: number;
   /** 字軌所屬平台 (1 易發票 / 100 其他 / null 未設定). */
   platform: number | null;
+  /** 商標識別碼. */
+  sgoID?: number | null;
+  /** 空白號碼上傳財政部的時間. */
+  uploadTime?: string | null;
+  /** 上傳狀態: -2 未知錯誤 / -1 處理中 / 0 成功 / 1 合約到期 / 51 字軌授權到期. */
+  resultCode?: number;
+  /** 各號碼區間的使用狀況. */
+  usage?: InvoiceTrackUsage[];
+  /** 最後修改者 ({ userID, dspName 膩稱 }). */
+  modifier?: { userID?: number; dspName?: string | null } | null;
+  /** 最後修改日期. */
+  modifyTime?: string | null;
 }
 
 /** Filters for {@link EzreceiptProvider.listInvoiceTracks}. */
@@ -75,8 +99,14 @@ export interface ListInvoiceTracksInput {
   invType?: 7 | 8;
   /** 0 不限 / 1 無統編 / 2 有統編. */
   bizType?: 0 | 1 | 2;
+  /** Strict-match the `bizType` (forceBiz=true). */
+  forceBiz?: boolean;
   /** Only the currently-open 字軌 (isActive=1). */
   activeOnly?: boolean;
+  /** Only tracks used on a platform: 1 易發票 / 100 其他. */
+  platform?: 1 | 100;
+  /** Sort order by 字軌 year/month/number. `"DESC"` (default) / `"ASC"`. */
+  order?: "ASC" | "DESC";
   /** Page number (1-based). */
   page?: number;
   /** Page size (default 10). */
@@ -234,7 +264,10 @@ export class EzreceiptProvider implements InvoiceProvider {
       ...(input.period ? { period: input.period } : {}),
       ...(input.invType ? { invType: input.invType } : {}),
       ...(input.bizType != null ? { bizType: input.bizType } : {}),
+      ...(input.forceBiz ? { forceBiz: true } : {}),
       ...(input.activeOnly ? { isActive: 1 } : {}),
+      ...(input.platform ? { platform: input.platform } : {}),
+      ...(input.order ? { dspOrder: input.order === "ASC" ? 2 : 1 } : {}),
       ...(input.page ? { _pn: input.page } : {}),
       ...(input.pageSize ? { _ps: input.pageSize } : {}),
     });
@@ -255,6 +288,56 @@ export class EzreceiptProvider implements InvoiceProvider {
     return this.client.request<InvoiceTrack>(ENDPOINTS.invNumberAdjustNo(inID), {
       ...(change.startNo != null ? { startNo: String(change.startNo) } : {}),
       ...(change.endNo != null ? { endNo: String(change.endNo) } : {}),
+    });
+  }
+
+  /**
+   * 開啟/關閉字軌分段 — a closed track's numbers can't be issued; an exhausted or
+   * expired track can't be re-opened.
+   */
+  async setInvoiceTrackStatus(inID: string | number, action: "OPEN" | "CLOSE"): Promise<{ inID: number; action: number }> {
+    return this.client.request<{ inID: number; action: number }>(ENDPOINTS.invNumberClose(inID), {
+      action: action === "CLOSE" ? 1 : 0,
+    });
+  }
+
+  /**
+   * 設定字軌印製發票的商標 (logo) by its `sgoID`. Pass `null` to clear it (printed
+   * invoices then use no logo).
+   */
+  async setInvoiceTrackLogo(inID: string | number, sgoID: number | null): Promise<{ inID: number }> {
+    return this.client.request<{ inID: number }>(ENDPOINTS.invNumberSetLogo(inID), { sgoID });
+  }
+
+  /**
+   * 字軌分段 — split a (closed, 易發票-owned) track in two at `startNo`. The front
+   * segment keeps everything but its 迄號 (→ `startNo`-1); the returned BACK
+   * segment starts at `startNo` and copies the rest (override `bizType` / `memo`).
+   */
+  async splitInvoiceTrack(
+    inID: string | number,
+    args: { startNo: string | number; bizType?: 0 | 1 | 2; memo?: string },
+  ): Promise<{ inID: number; startNo: number; bizType: number; memo: string | null }> {
+    return this.client.request(ENDPOINTS.invNumberSplit(inID), {
+      startNo: String(args.startNo),
+      ...(args.bizType != null ? { bizType: args.bizType } : {}),
+      ...(args.memo ? { memo: args.memo } : {}),
+    });
+  }
+
+  /**
+   * 異動分段字軌 — update `bizType` / `platform` / `memo`. An in-use track only
+   * accepts `memo`; `platform` (1 易發票 / 100 其他) can be set ONCE and never
+   * changed again.
+   */
+  async updateInvoiceTrack(
+    inID: string | number,
+    args: { bizType?: 0 | 1 | 2; platform?: 1 | 100; memo?: string },
+  ): Promise<{ inID: number; bizType: number; platform: number | null; memo: string | null }> {
+    return this.client.request(ENDPOINTS.invNumberUpdate(inID), {
+      ...(args.bizType != null ? { bizType: args.bizType } : {}),
+      ...(args.platform != null ? { platform: args.platform } : {}),
+      ...(args.memo != null ? { memo: args.memo } : {}),
     });
   }
 

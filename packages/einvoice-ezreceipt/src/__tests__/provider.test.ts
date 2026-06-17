@@ -294,9 +294,9 @@ describe("字軌 management (extension)", () => {
         return ok({ list: [track], entries: 1 });
       }),
     );
-    const res = await testProvider().listInvoiceTracks({ period: "202605", invType: 7, bizType: 0, activeOnly: true, page: 1, pageSize: 50 });
+    const res = await testProvider().listInvoiceTracks({ period: "202605", invType: 7, bizType: 0, forceBiz: true, activeOnly: true, platform: 1, order: "ASC", page: 1, pageSize: 50 });
     expect(res).toEqual([track]);
-    expect(body).toMatchObject({ period: "202605", invType: 7, bizType: 0, isActive: 1, _pn: 1, _ps: 50 });
+    expect(body).toMatchObject({ period: "202605", invType: 7, bizType: 0, forceBiz: true, isActive: 1, platform: 1, dspOrder: 2, _pn: 1, _ps: 50 });
   });
 
   it("targets the stID path when configured (partner access)", async () => {
@@ -326,6 +326,77 @@ describe("字軌 management (extension)", () => {
   it("maps an invalid track id (20) to NOT_FOUND", async () => {
     server.use(loginHandler(), http.post(url(EP.invNumberAdjustNo(1)), () => fail(20, "字軌分段識別碼無效")));
     await expect(testProvider().adjustInvoiceTrack(1, { endNo: 60722399 })).rejects.toMatchObject({ code: "NOT_FOUND", rawCode: "20" });
+  });
+
+  it("opens/closes a track (action 0/1)", async () => {
+    const seen: Record<string, unknown>[] = [];
+    server.use(
+      loginHandler(),
+      http.post(url(EP.invNumberClose(21307)), async ({ request }) => {
+        seen.push((await request.json()) as Record<string, unknown>);
+        return ok({ inID: 21307, action: seen.length === 1 ? 1 : 0 });
+      }),
+    );
+    expect((await testProvider().setInvoiceTrackStatus(21307, "CLOSE")).action).toBe(1);
+    expect((await testProvider().setInvoiceTrackStatus(21307, "OPEN")).action).toBe(0);
+    expect(seen).toEqual([{ action: 1 }, { action: 0 }]);
+  });
+
+  it("maps an exhausted-track close (1216) to CONFLICT", async () => {
+    server.use(loginHandler(), http.post(url(EP.invNumberClose(1)), () => fail(1216, "號碼已使用完畢的字軌，無法再做開啟或關閉。")));
+    await expect(testProvider().setInvoiceTrackStatus(1, "OPEN")).rejects.toMatchObject({ code: "CONFLICT", rawCode: "1216" });
+  });
+
+  it("sets and clears a track's print logo (sgoID, null clears)", async () => {
+    const seen: Record<string, unknown>[] = [];
+    server.use(
+      loginHandler(),
+      http.post(url(EP.invNumberSetLogo(21307)), async ({ request }) => {
+        seen.push((await request.json()) as Record<string, unknown>);
+        return ok({ inID: 21307 });
+      }),
+    );
+    await testProvider().setInvoiceTrackLogo(21307, 42);
+    await testProvider().setInvoiceTrackLogo(21307, null);
+    expect(seen).toEqual([{ sgoID: 42 }, { sgoID: null }]);
+  });
+
+  it("splits a track at startNo (sent as string), returning the back segment", async () => {
+    let body: Record<string, unknown> | undefined;
+    server.use(
+      loginHandler(),
+      http.post(url(EP.invNumberSplit(21307)), async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>;
+        return ok({ inID: 21308, startNo: 60722000, bizType: 1, memo: "後段" });
+      }),
+    );
+    const res = await testProvider().splitInvoiceTrack(21307, { startNo: 60722000, bizType: 1, memo: "後段" });
+    expect(res).toMatchObject({ inID: 21308, startNo: 60722000, bizType: 1 });
+    expect(body).toEqual({ startNo: "60722000", bizType: 1, memo: "後段" });
+  });
+
+  it("maps a split on an open track (1222) to CONFLICT", async () => {
+    server.use(loginHandler(), http.post(url(EP.invNumberSplit(1)), () => fail(1222, "字軌必須在關閉（停止使用）的狀態，才能進行分段作業。")));
+    await expect(testProvider().splitInvoiceTrack(1, { startNo: 60722000 })).rejects.toMatchObject({ code: "CONFLICT", rawCode: "1222" });
+  });
+
+  it("updates a track's bizType / platform / memo", async () => {
+    let body: Record<string, unknown> | undefined;
+    server.use(
+      loginHandler(),
+      http.post(url(EP.invNumberUpdate(21307)), async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>;
+        return ok({ inID: 21307, bizType: 2, platform: 1, memo: "備註" });
+      }),
+    );
+    const res = await testProvider().updateInvoiceTrack(21307, { bizType: 2, platform: 1, memo: "備註" });
+    expect(res).toMatchObject({ inID: 21307, bizType: 2, platform: 1 });
+    expect(body).toEqual({ bizType: 2, platform: 1, memo: "備註" });
+  });
+
+  it("maps a platform-already-set update (1201) to CONFLICT", async () => {
+    server.use(loginHandler(), http.post(url(EP.invNumberUpdate(1)), () => fail(1201, "此字軌已設定過使用平台，無法再次變更使用平台")));
+    await expect(testProvider().updateInvoiceTrack(1, { platform: 100 })).rejects.toMatchObject({ code: "CONFLICT", rawCode: "1201" });
   });
 });
 

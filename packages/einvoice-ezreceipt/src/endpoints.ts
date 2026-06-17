@@ -39,4 +39,12 @@ export const ENDPOINTS = {
   invNumberList: (stID?: string | number) => `/eInvoice/invNumber/list${stID != null ? `/${stID}` : ""}`,
   /** 調整字軌分段的起始/結束號碼 (by inID). Body: `{ startNo?, endNo? }`. */
   invNumberAdjustNo: (inID: string | number) => `/eInvoice/invNumber/adjustNo/${inID}`,
+  /** 開啟/關閉字軌分段 (by inID). Body: `{ action }` (1 close / 0 open). */
+  invNumberClose: (inID: string | number) => `/eInvoice/invNumber/close/${inID}`,
+  /** 設定字軌印製發票的商標 (by inID). Body: `{ sgoID }` (null clears it). */
+  invNumberSetLogo: (inID: string | number) => `/eInvoice/invNumber/setLogo/${inID}`,
+  /** 字軌分段 (by inID; closed tracks only). Body: `{ startNo, bizType?, memo? }`. */
+  invNumberSplit: (inID: string | number) => `/eInvoice/invNumber/split/${inID}`,
+  /** 異動分段字軌資訊 (by inID). Body: `{ bizType?, platform?, memo? }` (in-use → memo only; platform once-only). */
+  invNumberUpdate: (inID: string | number) => `/eInvoice/invNumber/update/${inID}`,
 } as const;
