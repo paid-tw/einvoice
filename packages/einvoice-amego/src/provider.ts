@@ -55,9 +55,12 @@ export class AmegoProvider implements InvoiceProvider {
 
   constructor(private readonly config: AmegoConfig) {}
 
-  /** Escape hatch: call any Amego endpoint directly with a raw payload. */
+  /**
+   * Escape hatch: call any Amego endpoint directly with a raw payload. Omit
+   * `data` for no-data endpoints (sends an empty data string, as Amego expects).
+   */
   raw(path: string, data?: unknown): Promise<AmegoResponse> {
-    return amegoRequest(this.config, path, data ?? {});
+    return amegoRequest(this.config, path, data);
   }
 
   // -------------------------------------------------------------------------
@@ -348,10 +351,10 @@ export class AmegoProvider implements InvoiceProvider {
     status: (year: number, period: 0 | 1 | 2 | 3 | 4 | 5) =>
       this.raw(ENDPOINTS.lotteryStatus, { Year: year, Period: period }),
     /**
-     * 獎項定義. NOTE: Amego's sandbox currently returns code 16 (sign error)
-     * for this endpoint regardless of payload — a known server-side quirk.
+     * 獎項定義 (prize-type definitions). Takes NO data — the request must send an
+     * empty data string (passing `{}` fails sign verification with code 16).
      */
-    type: () => this.raw(ENDPOINTS.lotteryType, {}),
+    type: () => this.raw(ENDPOINTS.lotteryType),
   };
 
   /** 字軌 (number track) endpoints for self-numbering merchants. */

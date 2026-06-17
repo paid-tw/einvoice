@@ -20,11 +20,15 @@ export function testProvider() {
 /** Parse a captured form-urlencoded Amego request body. */
 export function parseBody(text: string) {
   const params = new URLSearchParams(text);
+  const dataStr = params.get("data") ?? "";
   return {
     invoice: params.get("invoice"),
     time: params.get("time"),
     sign: params.get("sign"),
-    data: JSON.parse(params.get("data") ?? "{}") as Record<string, unknown>,
+    /** The raw `data` field (empty string for no-data endpoints). */
+    dataStr,
+    /** Parsed `data` ({} when empty). */
+    data: JSON.parse(dataStr || "{}") as Record<string, unknown>,
     raw: params,
   };
 }

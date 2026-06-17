@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { http, HttpResponse } from "msw";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import type { AmegoProvider } from "../provider.js";
@@ -8,8 +9,14 @@ import {
   TRACK_SOURCE,
   TRACK_STATUS,
 } from "../endpoints.js";
-import { BASE, parseBody, server, testProvider } from "./server.js";
-import { TIME_OK, TRACK_ALL_OK, TRACK_GET_OK, TRACK_STATUS_OK } from "./fixtures.js";
+import { APP_KEY, BASE, parseBody, server, testProvider } from "./server.js";
+import {
+  LOTTERY_TYPE_OK,
+  TIME_OK,
+  TRACK_ALL_OK,
+  TRACK_GET_OK,
+  TRACK_STATUS_OK,
+} from "./fixtures.js";
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => server.resetHandlers());
@@ -106,12 +113,6 @@ const CASES: Array<{
     expectData: { date_select: 1, date_start: 20260601, date_end: 20260630, limit: 50, page: 1 },
   },
   {
-    name: "lottery.type (no data)",
-    path: ENDPOINTS.lotteryType,
-    invoke: (p) => p.lottery.type(),
-    expectData: {},
-  },
-  {
     name: "track.all (Year/Period PascalCase)",
     path: ENDPOINTS.trackAll,
     invoke: (p) => p.track.all({ year: 2026, period: 2 }),
@@ -180,6 +181,27 @@ describe("Amego endpoint contracts (verified live shapes)", () => {
   it("raw() can call any endpoint directly", async () => {
     server.use(http.post(`${BASE}/json/anything`, () => HttpResponse.json({ code: 0, ok: true })));
     expect(await testProvider().raw("/json/anything", { foo: "bar" })).toMatchObject({ ok: true });
+  });
+
+  it("lottery.type sends an EMPTY data string (not '{}') and returns the prize types", async () => {
+    let dataStr: string | undefined;
+    let sign: string | null = null;
+    let time: string | null = null;
+    server.use(
+      http.post(`${BASE}${ENDPOINTS.lotteryType}`, async ({ request }) => {
+        const body = parseBody(await request.text());
+        dataStr = body.dataStr;
+        sign = body.sign;
+        time = body.time;
+        return HttpResponse.json(LOTTERY_TYPE_OK);
+      }),
+    );
+    const res = await testProvider().lottery.type();
+    // data must be empty, and the signature must be md5("" + time + appKey)
+    expect(dataStr).toBe("");
+    expect(sign).toBe(createHash("md5").update("" + time + APP_KEY).digest("hex"));
+    const rows = res.data as Array<Record<string, unknown>>;
+    expect(rows[0]).toEqual({ type: 11, name: "特別獎(1,000萬)" });
   });
 
   it("track.all returns the nested 3-layer tree (financial → amego → list leaf)", async () => {

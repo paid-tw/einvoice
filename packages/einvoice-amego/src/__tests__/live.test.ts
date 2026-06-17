@@ -52,6 +52,15 @@ describe.skipIf(!live)("Amego live lifecycle", () => {
     expect(res).not.toHaveProperty("code");
   });
 
+  it("reads prize-type definitions (lottery.type — empty data)", async () => {
+    const res = await provider.lottery.type();
+    expect(res.code).toBe(0);
+    const rows = res.data as Array<Record<string, unknown>>;
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows[0]).toHaveProperty("type");
+    expect(rows[0]).toHaveProperty("name");
+  });
+
   it("reads the full track tree (track_all, nested layers)", async () => {
     const res = await provider.track.all({ year: 2026, period: 2 });
     expect(res.code).toBe(0);

@@ -185,6 +185,17 @@ export const TRACK_STATUS_OK = {
   ],
 };
 
+/** Real lottery_type response (prize-type definitions). Takes no request data. */
+export const LOTTERY_TYPE_OK = {
+  code: 0,
+  msg: "",
+  data: [
+    { type: 11, name: "特別獎(1,000萬)" },
+    { type: 12, name: "特獎(200萬元)" },
+    { type: 13, name: "頭獎(20萬元)" },
+  ],
+};
+
 export const VOID_OK = { code: 0, msg: "" };
 export const BAN_QUERY_OK = {
   code: 0,

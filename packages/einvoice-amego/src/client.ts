@@ -94,7 +94,9 @@ async function doRequest(
 ): Promise<AmegoResponse> {
   const baseUrl = resolveBaseUrl(config);
   const doFetch = config.fetch ?? fetch;
-  const dataJson = JSON.stringify(data ?? {});
+  // No-data endpoints (e.g. lottery_type) need an EMPTY data string, not "{}":
+  // Amego strips data and verifies the sign over "", so "{}" → code 16.
+  const dataJson = data == null ? "" : JSON.stringify(data);
   const time = await getTimestamp(config, now);
 
   const body = new URLSearchParams({
