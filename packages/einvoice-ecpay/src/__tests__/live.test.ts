@@ -58,6 +58,38 @@ describe.skipIf(!live)("ECPay live (stage) — issue → query → void", LIVE_O
   });
 });
 
+describe.skipIf(!live)("ECPay live (stage) — Issue field-rule audit", LIVE_OPTS, () => {
+  const p = provider();
+  const base = (o = {}) => ({
+    orderId: `AU${Date.now()}${Math.floor(Math.random() * 1000)}`,
+    buyer: { email: "test@example.com" },
+    items: [{ description: "商品", quantity: 1, unitPrice: 100, amount: 100 }],
+    amount: { salesAmount: 100, taxAmount: 0, totalAmount: 100 },
+    taxType: "TAXABLE" as const,
+    priceMode: "TAX_INCLUSIVE" as const,
+    carrier: { type: "MEMBER" as const },
+    ...o,
+  });
+
+  // Verified live: zero-rated REQUIRES ClearanceMark (API: 5000007), but the
+  // docs' "ZeroTaxRateReason required" is NOT enforced.
+  it("issues a zero-rated invoice with ClearanceMark (no ZeroTaxRateReason needed)", async () => {
+    const res = await p.issue(base({ taxType: "ZERO_RATED", providerOptions: { clearanceMark: "2" } }));
+    expect(res.invoiceNumber).toMatch(/^[A-Z]{2}\d{8}$/);
+  });
+
+  it("rejects a zero-rated invoice with no ClearanceMark locally", async () => {
+    await expect(p.issue(base({ taxType: "ZERO_RATED" }))).rejects.toMatchObject({ code: "VALIDATION" });
+  });
+
+  // Verified live: a B2B (統編) invoice CAN store a carrier (情境二) — our schema
+  // no longer wrongly rejects it.
+  it("issues a B2B invoice that stores an ECPay carrier", async () => {
+    const res = await p.issue(base({ buyer: { ubn: "53538851", name: "歐付寶", email: "test@example.com" } }));
+    expect(res.invoiceNumber).toMatch(/^[A-Z]{2}\d{8}$/);
+  });
+});
+
 describe.skipIf(!live)("ECPay live (stage) — 延遲/觸發開立", LIVE_OPTS, () => {
   const p = provider();
   const orderId = `TP${Date.now()}`;

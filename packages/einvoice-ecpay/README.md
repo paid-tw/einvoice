@@ -98,6 +98,11 @@ await invoices.setInvoiceWordStatus(trackId, "ENABLE"); // or "PAUSE" / "DISABLE
 
 ## Notes
 
+- Zero-rated invoices (`taxType: "ZERO_RATED"` or mixed) require a customs mark:
+  pass `providerOptions: { clearanceMark: "1" | "2" }` (1=非經海關, 2=經海關). The
+  validation rules are checked against live API behaviour, not just the docs (e.g.
+  ECPay's `ZeroTaxRateReason`/`SpecialTaxType` "requirements" aren't enforced by
+  the API, and carrier+donation / B2B+carrier are accepted).
 - `void` and `allowance` need the invoice's date — pass it via
   `providerOptions: { invoiceDate: "YYYY-MM-DD" }` (the issue result carries it).
   It defaults to today (Asia/Taipei) when omitted.

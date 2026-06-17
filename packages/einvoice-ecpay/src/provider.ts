@@ -466,6 +466,7 @@ export class EcpayProvider implements InvoiceProvider {
     const category = parsed.category ?? deriveCategory(parsed.buyer);
     const carrier = parsed.carrier;
     const donating = Boolean(parsed.donation);
+    const opts = (parsed.providerOptions ?? {}) as Record<string, unknown>;
     // Carrier/donation invoices are electronic; everything else prints.
     const print = carrier || donating ? "0" : "1";
 
@@ -488,7 +489,12 @@ export class EcpayProvider implements InvoiceProvider {
       Items: toEcpayItems(parsed.items, parsed.providerOptions, parsed.taxType),
       InvType: parsed.taxType === "SPECIAL" ? "08" : "07",
       vat: parsed.priceMode === "TAX_EXCLUSIVE" ? "0" : "1",
-      ...(parsed.providerOptions?.data as Record<string, unknown> | undefined),
+      // 零稅率 (TaxType 2/9): ClearanceMark is required by the API; ZeroTaxRateReason
+      // is accepted but not enforced. Both come through providerOptions.
+      ClearanceMark: opts.clearanceMark as string | undefined,
+      ZeroTaxRateReason: opts.zeroTaxRateReason as string | undefined,
+      SpecialTaxType: opts.specialTaxType as string | number | undefined,
+      ...(opts.data as Record<string, unknown> | undefined),
     };
     if (this.config.validatePayload !== false) assertValidIssuePayload(data);
     return data;
