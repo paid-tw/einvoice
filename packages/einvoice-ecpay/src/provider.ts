@@ -77,6 +77,49 @@ export class EcpayProvider implements InvoiceProvider {
     };
   }
 
+  /**
+   * 延遲(待觸發)開立 (DelayIssue, DelayFlag=2): create a held invoice that is only
+   * issued when {@link EcpayProvider.triggerIssue} is called. Returns the
+   * `relateNumber` to trigger with.
+   */
+  async issuePending(input: IssueInvoiceInput): Promise<{ relateNumber: string; raw: EcpayResult }> {
+    const parsed = issueInvoiceInputSchema.parse(input);
+    const opts = (parsed.providerOptions ?? {}) as Record<string, unknown>;
+    const result = await ecpayRequest(this.config, ENDPOINTS.delayIssue, {
+      ...this.buildIssueData(parsed),
+      DelayFlag: "2", // 待觸發
+      DelayDay: "0",
+      Tsr: parsed.orderId,
+      PayType: "2",
+      PayAct: (opts.payAct as string) ?? "ECPAY",
+    });
+    return { relateNumber: parsed.orderId, raw: result };
+  }
+
+  /**
+   * 觸發開立 (TriggerIssue): issue a held invoice now, then look up the assigned
+   * number (the trigger reply itself carries no InvoiceNo). Success replies use
+   * RtnCode 4000003/4000004.
+   */
+  async triggerIssue(opts: { relateNumber: string; payAct?: string }): Promise<IssueInvoiceResult> {
+    await ecpayRequest(
+      this.config,
+      ENDPOINTS.triggerIssue,
+      { Tsr: opts.relateNumber, PayType: "2", PayAct: opts.payAct ?? "ECPAY" },
+      { successCodes: [4000003, 4000004] },
+    );
+    const q = await this.query({ orderId: opts.relateNumber });
+    return {
+      invoiceNumber: q.invoiceNumber,
+      invoiceDate: q.invoiceDate,
+      randomCode: q.randomCode,
+      orderId: opts.relateNumber,
+      totalAmount: q.amount.totalAmount,
+      status: q.status,
+      raw: q.raw,
+    };
+  }
+
   async void(input: VoidInvoiceInput): Promise<VoidInvoiceResult> {
     const parsed = voidInvoiceInputSchema.parse(input);
     const opts = (parsed.providerOptions ?? {}) as Record<string, unknown>;

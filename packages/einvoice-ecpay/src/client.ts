@@ -28,10 +28,19 @@ export function ecpayTimestamp(): number {
  * unwrap — verifying the transport `TransCode` and the business `RtnCode`.
  * Throws an {@link InvoiceError} on either failure.
  */
+export interface EcpayRequestOptions {
+  /**
+   * Business `RtnCode`s to treat as success besides `1`. Needed for TriggerIssue,
+   * whose "開立發票成功" replies use 4000003/4000004 (live-verified).
+   */
+  successCodes?: number[];
+}
+
 export async function ecpayRequest(
   config: EcpayConfig,
   path: string,
   data: Record<string, unknown>,
+  options: EcpayRequestOptions = {},
 ): Promise<EcpayResult> {
   const baseUrl = resolveBaseUrl(config);
   const doFetch = config.fetch ?? fetch;
@@ -82,8 +91,9 @@ export async function ecpayRequest(
 
   const result = decryptData<EcpayResult>(envelope.Data, config.hashKey, config.hashIV);
 
-  // RtnCode is the business result (1 = success).
-  if (Number(result.RtnCode) !== 1) {
+  // RtnCode is the business result (1 = success, plus any opted-in extras).
+  const ok = new Set([1, ...(options.successCodes ?? [])]);
+  if (!ok.has(Number(result.RtnCode))) {
     throw new InvoiceError(result.RtnMsg || "ECPay returned an error", {
       provider: "ecpay",
       code: mapEcpayError(Number(result.RtnCode), result.RtnMsg),
