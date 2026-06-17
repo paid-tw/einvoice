@@ -42,10 +42,16 @@ const CASES: Array<{
   expectData: unknown;
 }> = [
   {
-    name: "invoice.query (snake_case + type)",
+    name: "invoice.query by invoiceNumber (type:invoice)",
     path: ENDPOINTS.invoiceQuery,
-    invoke: (p) => p.invoice.query("AA1"),
+    invoke: (p) => p.invoice.query({ invoiceNumber: "AA1" }),
     expectData: { type: "invoice", invoice_number: "AA1" },
+  },
+  {
+    name: "invoice.query by orderId (type:order)",
+    path: ENDPOINTS.invoiceQuery,
+    invoke: (p) => p.invoice.query({ orderId: "O1" }),
+    expectData: { type: "order", order_id: "O1" },
   },
   {
     name: "invoice.list (date_select/date_start/date_end/limit, numeric YYYYMMDD)",

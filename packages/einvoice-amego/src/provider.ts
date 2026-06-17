@@ -236,6 +236,8 @@ export class AmegoProvider implements InvoiceProvider {
             unitPrice: Number(it.unit_price ?? 0),
             amount: Number(it.amount ?? 0),
             unit: it.unit ? String(it.unit) : undefined,
+            taxType: fromAmegoTaxType(it.tax_type),
+            remark: it.remark ? String(it.remark) : undefined,
           }))
         : [],
       raw: res,
@@ -258,9 +260,18 @@ export class AmegoProvider implements InvoiceProvider {
 
   /** 發票 management endpoints. */
   readonly invoice = {
-    /** 發票查詢 — snake_case + `type` discriminator; returns nested `data`. */
-    query: (invoiceNumber: string) =>
-      this.raw(ENDPOINTS.invoiceQuery, { type: "invoice", invoice_number: invoiceNumber }),
+    /**
+     * 發票查詢 — look up by `invoiceNumber` or `orderId` (snake_case + `type`
+     * discriminator). Returns the full nested `data` (incl. product_item[],
+     * wait[], allowance[]).
+     */
+    query: (opts: { invoiceNumber?: string; orderId?: string }) =>
+      this.raw(
+        ENDPOINTS.invoiceQuery,
+        opts.orderId
+          ? { type: "order", order_id: opts.orderId }
+          : { type: "invoice", invoice_number: opts.invoiceNumber },
+      ),
     /**
      * 發票列表. Fields are `date_select` + `date_start`/`date_end` (numeric
      * YYYYMMDD) + `limit` (20–500) + `page`; response paginates as
@@ -482,6 +493,20 @@ export function createAmegoProvider(config: AmegoConfig): AmegoProvider {
 }
 
 // --- helpers ---------------------------------------------------------------
+
+/** Amego per-item tax_type number → unified TaxType. */
+function fromAmegoTaxType(value: unknown): TaxType | undefined {
+  switch (Number(value)) {
+    case 1:
+      return "TAXABLE";
+    case 2:
+      return "ZERO_RATED";
+    case 3:
+      return "TAX_FREE";
+    default:
+      return undefined;
+  }
+}
 
 function resolveItemTaxType(item: InvoiceItem, fallback: TaxType): AmegoProductTaxType {
   const t = item.taxType ?? fallback;

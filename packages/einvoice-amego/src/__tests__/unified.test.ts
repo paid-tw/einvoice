@@ -291,6 +291,7 @@ describe("query (invoice_query) — type discriminator + nested data", () => {
     expect(res.orderId).toBe("LC1781650039");
     expect(res.items).toHaveLength(1);
     expect(res.items[0]?.unitPrice).toBe(105);
+    expect(res.items[0]?.taxType).toBe("TAXABLE"); // mapped from tax_type 1
     // invoice_date 20260617 → Date
     expect(res.invoiceDate.getFullYear()).toBe(2026);
     expect(res.status).toBe("ISSUED");
