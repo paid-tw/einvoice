@@ -318,6 +318,40 @@ export class EcpayProvider implements InvoiceProvider {
   }
 
   /**
+   * 統一編號驗證 + 公司名稱 (GetCompanyNameByTaxID): resolve the company name for a
+   * 統編, or `undefined` when the number is well-formed but not in any public
+   * dataset (查無資料 / 財政部API異常 — these do NOT mean the 統編 is invalid, so
+   * keep issuing). Throws VALIDATION only for a bad checksum/format (1200125 /
+   * 2027000) — the cases where you should stop.
+   */
+  async lookupCompanyName(ban: string): Promise<string | undefined> {
+    if (this.config.validatePayload !== false && !/^\d{8}$/.test(ban)) {
+      throw new InvoiceError(`Invalid 統一編號: ${ban}`, {
+        provider: "ecpay",
+        code: InvoiceErrorCode.VALIDATION,
+        rawMessage: "統一編號 must be 8 digits",
+      });
+    }
+    // 7 (查無資料) and 9000001 (財政部API失敗) are "proceed" outcomes, not errors.
+    const result = await ecpayRequest(
+      this.config,
+      ENDPOINTS.getCompanyNameByTaxID,
+      { UnifiedBusinessNo: ban },
+      { successCodes: [7, 9000001] },
+    );
+    return Number(result.RtnCode) === 1 && result.CompanyName ? String(result.CompanyName) : undefined;
+  }
+
+  /**
+   * 統一編號驗證: `true` when a company name was found for the 統編. A well-formed
+   * 統編 with no public data resolves `false` (it may still be valid — see
+   * {@link EcpayProvider.lookupCompanyName}); a bad checksum/format throws.
+   */
+  async validateBan(ban: string): Promise<boolean> {
+    return (await this.lookupCompanyName(ban)) !== undefined;
+  }
+
+  /**
    * 查詢財政部配號結果 (GetGovInvoiceWordSetting): list the invoice number ranges
    * (字軌) the tax authority has allocated to this merchant for a given 民國年
    * (e.g. `"115"` — only last/current/next year). Throws NOT_FOUND (查無資料)

@@ -223,6 +223,51 @@ describe("設定字軌號碼狀態 (UpdateInvoiceWordStatus)", () => {
   });
 });
 
+describe("統一編號驗證 (GetCompanyNameByTaxID)", () => {
+  it("returns the company name and validateBan=true on RtnCode 1", async () => {
+    let data: Record<string, unknown> | undefined;
+    server.use(
+      http.post(url(ECPAY_ENDPOINTS.getCompanyNameByTaxID), async ({ request }) => {
+        data = parseRequest(await request.text()).data;
+        return HttpResponse.json(ecSuccess({ CompanyName: "綠界科技股份有限公司" }));
+      }),
+    );
+    expect(await testProvider().lookupCompanyName("97025978")).toBe("綠界科技股份有限公司");
+    expect(data).toMatchObject({ UnifiedBusinessNo: "97025978" });
+    expect(await testProvider().validateBan("97025978")).toBe(true);
+  });
+
+  it("treats 查無資料 (RtnCode 7) as proceed: undefined / false, not an error", async () => {
+    server.use(
+      http.post(url(ECPAY_ENDPOINTS.getCompanyNameByTaxID), () => HttpResponse.json(ecError(7, "查無資料"))),
+    );
+    expect(await testProvider().lookupCompanyName("00000000")).toBeUndefined();
+    expect(await testProvider().validateBan("00000000")).toBe(false);
+  });
+
+  it("treats a 財政部API failure (9000001) as proceed", async () => {
+    server.use(
+      http.post(url(ECPAY_ENDPOINTS.getCompanyNameByTaxID), () =>
+        HttpResponse.json(ecError(9000001, "呼叫財政部API失敗")),
+      ),
+    );
+    expect(await testProvider().validateBan("97025978")).toBe(false);
+  });
+
+  it("throws VALIDATION on a checksum failure (1200125)", async () => {
+    server.use(
+      http.post(url(ECPAY_ENDPOINTS.getCompanyNameByTaxID), () =>
+        HttpResponse.json(ecError(1200125, "統一編號檢查碼驗證失敗，請再確認")),
+      ),
+    );
+    await expect(testProvider().validateBan("12345678")).rejects.toMatchObject({ code: "VALIDATION", rawCode: "1200125" });
+  });
+
+  it("rejects a non 8-digit 統編 locally", async () => {
+    await expect(testProvider().lookupCompanyName("123")).rejects.toMatchObject({ code: "VALIDATION" });
+  });
+});
+
 describe("raw() escape hatch", () => {
   it("posts an arbitrary Data payload and returns the decrypted result", async () => {
     let data: Record<string, unknown> | undefined;

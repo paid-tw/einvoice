@@ -57,8 +57,18 @@ await invoices.validateMobileBarcode("/ABC1234"); // → boolean (CheckBarcode)
 await invoices.validateLoveCode("168001"); // → boolean (CheckLoveCode)
 ```
 
-Declared as the `CARRIER_VALIDATION` capability. (ECPay's B2C API has no working
-統編 validation endpoint, so there is no `validateBan`.)
+Declared as the `CARRIER_VALIDATION` capability.
+
+### 統一編號 validation
+
+```ts
+await invoices.lookupCompanyName("97025978"); // → "綠界科技股份有限公司" | undefined
+await invoices.validateBan("97025978"); // → boolean
+```
+
+⚠️ A 統編 with no public data (政府/醫療/福委會, etc.) resolves to
+`undefined`/`false` — that does **not** mean it is invalid, so keep issuing.
+Only a bad checksum/format throws `VALIDATION` (the case where you should stop).
 
 ## Config
 

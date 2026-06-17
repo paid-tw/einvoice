@@ -80,6 +80,12 @@ describe.skipIf(!live)("ECPay live (stage) — 載具驗證", LIVE_OPTS, () => {
   it("validateLoveCode resolves true for a registered code", async () => {
     expect(await p.validateLoveCode("168001")).toBe(true);
   });
+
+  it("lookupCompanyName resolves a real company; 查無 → undefined; bad checksum throws", async () => {
+    expect(await p.lookupCompanyName("97025978")).toContain("綠界");
+    expect(await p.lookupCompanyName("00000000")).toBeUndefined(); // valid format, no data
+    await expect(p.validateBan("12345678")).rejects.toMatchObject({ code: "VALIDATION" }); // bad checksum
+  });
 });
 
 describe.skipIf(!live)("ECPay live (stage) — 查詢財政部配號", LIVE_OPTS, () => {

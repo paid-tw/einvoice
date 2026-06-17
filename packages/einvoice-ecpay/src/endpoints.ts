@@ -19,7 +19,7 @@ export const ENDPOINTS = {
   getAllowanceInvalid: "/B2CInvoice/GetAllowanceInvalid", // 查詢作廢折讓
   checkBarcode: "/B2CInvoice/CheckBarcode", // 手機條碼驗證
   checkLoveCode: "/B2CInvoice/CheckLoveCode", // 愛心碼驗證
-  checkUnifiedBusinessNo: "/B2CInvoice/CheckUnifiedBussinesNo", // 統編驗證 (ECPay's spelling)
+  getCompanyNameByTaxID: "/B2CInvoice/GetCompanyNameByTaxID", // 統一編號驗證 + 公司名稱
   invoiceNotify: "/B2CInvoice/InvoiceNotify", // 發送通知
   invoicePrint: "/B2CInvoice/InvoicePrint", // 列印
   getInvoiceWordSetting: "/B2CInvoice/GetInvoiceWordSetting", // 查詢字軌
