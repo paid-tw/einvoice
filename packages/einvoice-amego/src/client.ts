@@ -209,6 +209,9 @@ export function mapAmegoErrorCode(rawCode: number | string): InvoiceErrorCode {
   // g0401 original-invoice / allowance-number state conflicts (開立中 / 已作廢 / 已註銷 / 已存在折讓)
   if (code >= 4040152 && code <= 4040154) return InvoiceErrorCode.CONFLICT;
   if (code >= 4040161 && code <= 4040163) return InvoiceErrorCode.CONFLICT;
+  // g0501 allowance-void state conflicts (折讓開立中 / 已作廢 / 超過修改期限 / 等待排程)
+  if (code === 4050131 || code === 4050132 || code === 4050135 || code === 4050141)
+    return InvoiceErrorCode.CONFLICT;
 
   // Payload shape / query-param errors: "data 應為陣列字串" (23/3050112/4050112),
   // print/query type & param errors (31–36 — verified live).
@@ -218,7 +221,9 @@ export function mapAmegoErrorCode(rawCode: number | string): InvoiceErrorCode {
     code === 3050111 || // f0501 CancelInvoiceNumber 錯誤
     code === 3050112 ||
     code === 3050124 || // 發票類型錯誤
-    code === 4050112
+    code === 4050112 || // g0501 data 應為陣列
+    code === 4050121 || // g0501 CancelAllowanceNumber 錯誤
+    code === 4050133 // g0501 折讓類型錯誤
   )
     return InvoiceErrorCode.VALIDATION;
 

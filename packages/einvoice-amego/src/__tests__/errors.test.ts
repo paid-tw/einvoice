@@ -98,6 +98,24 @@ describe("mapAmegoErrorCode (from info_detail?mid=71)", () => {
     expect(mapAmegoErrorCode("4040123")).toBe("VALIDATION");
   });
 
+  // Audit: every documented g0501 (作廢折讓) error code is categorized (string codes).
+  it("categorizes the full g0501 error-code family", () => {
+    const expected: Record<number, string> = {
+      4050112: "VALIDATION", // data 應為陣列
+      4050121: "VALIDATION", // CancelAllowanceNumber 錯誤
+      4050131: "CONFLICT", // 折讓開立中
+      4050132: "CONFLICT", // 已存在作廢折讓
+      4050133: "VALIDATION", // 折讓類型錯誤
+      4050134: "NOT_FOUND", // 折讓單不存在
+      4050135: "CONFLICT", // 已超過修改期限
+      4050141: "CONFLICT", // 等待排程
+    };
+    for (const [code, cat] of Object.entries(expected)) {
+      expect(mapAmegoErrorCode(Number(code))).toBe(cat);
+      expect(mapAmegoErrorCode(code)).toBe(cat); // g0501 returns string codes
+    }
+  });
+
   // Audit: f0401_custom surfaces per-record field errors as code 99.
   it("maps the f0401_custom record error (99) to VALIDATION", () => {
     expect(mapAmegoErrorCode(99)).toBe("VALIDATION");
