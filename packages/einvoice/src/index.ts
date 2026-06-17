@@ -3,5 +3,7 @@ export * from "./provider.js";
 export * from "./errors.js";
 export * from "./schemas.js";
 export * from "./utils.js";
+export { isValidUbn } from "./ubn.js";
+export type { UbnOptions } from "./ubn.js";
 export { MockProvider } from "./mock.js";
 export type { MockProviderOptions } from "./mock.js";

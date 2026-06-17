@@ -39,7 +39,7 @@ import { ENDPOINTS } from "./endpoints.js";
 import {
   assertValidCustomIssuePayload,
   assertValidIssuePayload,
-  isValidTaxId,
+  isValidUbn,
 } from "./validation.js";
 
 /** Amego/MIG carrier type codes (member carrier is the literal `amego`). */
@@ -74,14 +74,14 @@ export class AmegoProvider implements InvoiceProvider {
     }));
     const amounts = computeAmegoAmounts({
       lines,
-      buyerHasTaxId: category === "B2B",
+      buyerHasUbn: category === "B2B",
       taxRate: parsed.taxRate,
       priceExclusive,
     });
 
     const data: Record<string, unknown> = {
       OrderId: parsed.orderId,
-      BuyerIdentifier: parsed.buyer.taxId ?? "0000000000",
+      BuyerIdentifier: parsed.buyer.ubn ?? "0000000000",
       BuyerName: parsed.buyer.name ?? (category === "B2B" ? "" : "消費者"),
       BuyerAddress: parsed.buyer.address,
       BuyerTelephoneNumber: parsed.buyer.phone,
@@ -152,7 +152,7 @@ export class AmegoProvider implements InvoiceProvider {
         AllowanceNumber: parsed.allowanceId,
         AllowanceDate: allowanceDate,
         AllowanceType: (opts.allowanceType as string) ?? "2",
-        BuyerIdentifier: buyer.taxId ?? "0000000000",
+        BuyerIdentifier: buyer.ubn ?? "0000000000",
         BuyerName: buyer.name ?? "",
         BuyerEmailAddress: buyer.email,
         ProductItem: parsed.items.map((item) => {
@@ -216,7 +216,7 @@ export class AmegoProvider implements InvoiceProvider {
       },
       buyer: {
         name: d.buyer_name ? String(d.buyer_name) : undefined,
-        taxId:
+        ubn:
           d.buyer_identifier && d.buyer_identifier !== "0000000000"
             ? String(d.buyer_identifier)
             : undefined,
@@ -399,7 +399,7 @@ export class AmegoProvider implements InvoiceProvider {
    */
   async banQuery(...bans: string[]): Promise<AmegoResponse> {
     if (this.config.validatePayload !== false) {
-      const bad = bans.filter((b) => !isValidTaxId(b));
+      const bad = bans.filter((b) => !isValidUbn(b));
       if (bad.length > 0) {
         throw new InvoiceError(`Invalid 統一編號: ${bad.join(", ")}`, {
           provider: "amego",

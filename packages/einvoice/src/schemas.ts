@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isValidUbn } from "./ubn.js";
 
 /**
  * Runtime validation for the unified inputs. Adapters call these before mapping
@@ -22,14 +23,14 @@ export const carrierTypeSchema = z.enum([
   "MEMBER",
 ]);
 
-/** 統一編號: 8 digits. */
-export const taxIdSchema = z
+/** 統一編號 (UBN): 8 digits with a valid checksum. */
+export const ubnSchema = z
   .string()
-  .regex(/^\d{8}$/, "統一編號 must be 8 digits");
+  .refine((v) => isValidUbn(v), "統一編號 has an invalid checksum");
 
 export const buyerSchema = z.object({
   name: z.string().min(1).optional(),
-  taxId: taxIdSchema.optional(),
+  ubn: ubnSchema.optional(),
   email: z.string().email().optional(),
   address: z.string().optional(),
   phone: z.string().optional(),
@@ -117,7 +118,7 @@ export const issueInvoiceInputSchema = z
         path: ["donation"],
       });
     }
-    if (input.donation && input.buyer.taxId) {
+    if (input.donation && input.buyer.ubn) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "B2B invoices (with 統一編號) cannot be donated",

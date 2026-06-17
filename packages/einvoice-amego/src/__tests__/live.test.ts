@@ -14,7 +14,7 @@ const live = process.env.AMEGO_LIVE === "1";
 
 describe.skipIf(!live)("Amego live lifecycle", () => {
   const provider = createAmegoProvider({
-    sellerTaxId: process.env.AMEGO_SELLER ?? "12345678",
+    sellerUbn: process.env.AMEGO_SELLER ?? "12345678",
     appKey: process.env.AMEGO_APP_KEY ?? "",
   });
 
@@ -23,7 +23,7 @@ describe.skipIf(!live)("Amego live lifecycle", () => {
   beforeAll(async () => {
     const res = await provider.issue({
       orderId: `IT${Date.now()}`,
-      buyer: { taxId: "28080623", name: "光貿科技有限公司" },
+      buyer: { ubn: "28080623", name: "光貿科技有限公司" },
       items: [{ description: "整合測試商品", quantity: 1, unitPrice: 105, amount: 105 }],
       amount: { salesAmount: 100, taxAmount: 5, totalAmount: 105 },
       taxType: "TAXABLE",
@@ -36,7 +36,7 @@ describe.skipIf(!live)("Amego live lifecycle", () => {
   it("queries the issued invoice (nested data, type discriminator)", async () => {
     const res = await provider.query({ invoiceNumber });
     expect(res.amount.totalAmount).toBe(105);
-    expect(res.buyer.taxId).toBe("28080623");
+    expect(res.buyer.ubn).toBe("28080623");
     expect(res.items.length).toBeGreaterThan(0);
   });
 
@@ -116,7 +116,7 @@ describe.skipIf(!live)("Amego live lifecycle", () => {
 const mutate = process.env.AMEGO_LIVE === "1" && process.env.AMEGO_LIVE_MUTATE === "1";
 describe.skipIf(!mutate)("Amego live — custom numbering (consumes a booklet)", () => {
   const provider = createAmegoProvider({
-    sellerTaxId: process.env.AMEGO_SELLER ?? "12345678",
+    sellerUbn: process.env.AMEGO_SELLER ?? "12345678",
     appKey: process.env.AMEGO_APP_KEY ?? "",
   });
 
@@ -153,7 +153,7 @@ describe.skipIf(!mutate)("Amego live — custom numbering (consumes a booklet)",
  */
 describe.skipIf(!live)("Amego live — server rejects invalid values", () => {
   const provider = createAmegoProvider({
-    sellerTaxId: process.env.AMEGO_SELLER ?? "12345678",
+    sellerUbn: process.env.AMEGO_SELLER ?? "12345678",
     appKey: process.env.AMEGO_APP_KEY ?? "",
   });
   const item = { Description: "x", Quantity: "1", UnitPrice: "105", Amount: "105", TaxType: "1" };

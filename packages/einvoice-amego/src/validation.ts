@@ -1,5 +1,9 @@
-import { InvoiceError, InvoiceErrorCode } from "@paid-tw/einvoice";
+import { InvoiceError, InvoiceErrorCode, isValidUbn } from "@paid-tw/einvoice";
 import { z } from "zod";
+
+// 統一編號 validation is a provider-agnostic primitive; re-exported here for
+// convenience (canonical home: @paid-tw/einvoice).
+export { isValidUbn };
 
 /**
  * Field-level validation for the Amego f0401 (開立發票) payload.
@@ -17,28 +21,6 @@ import { z } from "zod";
  * The schema is `.passthrough()` so provider-specific extras (via
  * `providerOptions`) are not rejected.
  */
-
-/**
- * Validate a Taiwan 統一編號 (unified business number) including its checksum
- * (the post-2023 "divisible by 5" revision). Amego enforces this server-side
- * (bad checksums → 3040122 / 99), so we check it locally to fail fast.
- *
- * Algorithm: weights [1,2,1,2,1,2,4,1]; sum the digit-sums of each weighted
- * product; valid when the total is divisible by 5. Special case: when the 7th
- * digit is 7, a +1 is also accepted.
- */
-export function isValidTaxId(id: string): boolean {
-  if (!/^\d{8}$/.test(id)) return false;
-  const weights = [1, 2, 1, 2, 1, 2, 4, 1];
-  const digits = id.split("").map(Number);
-  let sum = 0;
-  for (let i = 0; i < 8; i++) {
-    const product = digits[i]! * weights[i]!;
-    sum += Math.floor(product / 10) + (product % 10);
-  }
-  if (sum % 5 === 0) return true;
-  return digits[6] === 7 && (sum + 1) % 5 === 0;
-}
 
 /** ≤ `max` decimal places. */
 const maxDecimals = (max: number) => (v: number) => {
@@ -82,7 +64,7 @@ const issueBaseObject = z.object({
   BuyerIdentifier: z
     .string()
     .refine(
-      (v) => v === "0000000000" || isValidTaxId(v),
+      (v) => v === "0000000000" || isValidUbn(v),
       "BuyerIdentifier must be a valid 統一編號 (8-digit checksum) or 0000000000",
     ),
   BuyerName: z

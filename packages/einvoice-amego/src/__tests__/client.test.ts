@@ -10,7 +10,7 @@ afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
 beforeEach(() => clearTimeSyncCache());
 
-const cfg = { sellerTaxId: "12345678", appKey: "k", baseUrl: BASE };
+const cfg = { sellerUbn: "12345678", appKey: "k", baseUrl: BASE };
 
 describe("retry (network only, opt-in)", () => {
   it("retries transient network failures then succeeds", async () => {

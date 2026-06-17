@@ -26,6 +26,6 @@ describe("amount helpers", () => {
 
   it("deriveCategory keys off the buyer 統編", () => {
     expect(deriveCategory({})).toBe("B2C");
-    expect(deriveCategory({ taxId: "28080623" })).toBe("B2B");
+    expect(deriveCategory({ ubn: "28080623" })).toBe("B2B");
   });
 });

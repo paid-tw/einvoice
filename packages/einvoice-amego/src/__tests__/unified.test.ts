@@ -77,7 +77,7 @@ describe("issue (f0401)", () => {
     );
     await testProvider().issue(
       issueInput({
-        buyer: { taxId: "28080623", name: "光貿科技有限公司" },
+        buyer: { ubn: "28080623", name: "光貿科技有限公司" },
         amount: { salesAmount: 100, taxAmount: 5, totalAmount: 105 },
       }),
     );
@@ -144,7 +144,7 @@ describe("issue — local payload validation", () => {
         return HttpResponse.json(ISSUE_OK);
       }),
     );
-    const provider = createAmegoProvider({ sellerTaxId: "12345678", appKey: "k", baseUrl: BASE, validatePayload: false });
+    const provider = createAmegoProvider({ sellerUbn: "12345678", appKey: "k", baseUrl: BASE, validatePayload: false });
     await provider.issue(issueInput({ items: [{ description: "字".repeat(257), quantity: 1, unitPrice: 105, amount: 105 }] }));
     expect(hit).toBe(true);
   });
@@ -228,7 +228,7 @@ describe("allowance (g0401) — array, tax-exclusive, per-line Tax", () => {
       allowanceId: "ALW-1",
       items: [{ description: "退款", quantity: 1, unitPrice: 100, amount: 100 }],
       amount: { salesAmount: 100, taxAmount: 5, totalAmount: 105 },
-      providerOptions: { originalInvoiceDate: 20260617, buyer: { taxId: "28080623" } },
+      providerOptions: { originalInvoiceDate: 20260617, buyer: { ubn: "28080623" } },
     });
     const arr = body?.data as unknown as Array<Record<string, unknown>>;
     expect(Array.isArray(arr)).toBe(true);
@@ -287,7 +287,7 @@ describe("query (invoice_query) — type discriminator + nested data", () => {
     const res = await testProvider().query({ invoiceNumber: "AA26513024" });
     expect(data).toMatchObject({ type: "invoice", invoice_number: "AA26513024" });
     expect(res.amount).toEqual({ salesAmount: 100, taxAmount: 5, totalAmount: 105 });
-    expect(res.buyer.taxId).toBe("28080623");
+    expect(res.buyer.ubn).toBe("28080623");
     expect(res.orderId).toBe("LC1781650039");
     expect(res.items).toHaveLength(1);
     expect(res.items[0]?.unitPrice).toBe(105);

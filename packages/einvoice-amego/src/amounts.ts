@@ -51,12 +51,12 @@ export interface AmegoLineAmount {
 
 export function computeAmegoAmounts(opts: {
   lines: AmegoLineAmount[];
-  buyerHasTaxId: boolean;
+  buyerHasUbn: boolean;
   taxRate?: number;
   /** true when line amounts are tax-exclusive (未稅). Default false (含稅). */
   priceExclusive?: boolean;
 }): AmegoAmounts {
-  const { lines, buyerHasTaxId, priceExclusive = false } = opts;
+  const { lines, buyerHasUbn, priceExclusive = false } = opts;
   const taxRate = opts.taxRate ?? 0.05;
 
   let taxableSum = 0; // tax type 1
@@ -75,7 +75,7 @@ export function computeAmegoAmounts(opts: {
   const zeroTaxSalesAmount = Math.round(zeroRateSum);
   let taxAmount = 0;
 
-  if (buyerHasTaxId && salesAmount > 0) {
+  if (buyerHasUbn && salesAmount > 0) {
     if (priceExclusive) {
       taxAmount = Math.round(salesAmount * taxRate);
     } else {

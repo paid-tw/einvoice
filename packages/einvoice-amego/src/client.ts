@@ -98,7 +98,7 @@ async function doRequest(
   const time = await getTimestamp(config, now);
 
   const body = new URLSearchParams({
-    invoice: config.sellerTaxId,
+    invoice: config.sellerUbn,
     data: dataJson,
     time: String(time),
     sign: sign(dataJson, time, config.appKey),

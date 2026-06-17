@@ -30,7 +30,7 @@ export const TaxType = {
 export type TaxType = (typeof TaxType)[keyof typeof TaxType];
 
 /**
- * Invoice category. Derived from whether the buyer has a 統一編號 (taxId):
+ * Invoice category. Derived from whether the buyer has a 統一編號 (ubn):
  * B2B = triplicate (三聯式), B2C = duplicate (二聯式).
  */
 export const InvoiceCategory = {
@@ -74,7 +74,7 @@ export interface Buyer {
   /** 買受人名稱. Defaults to a placeholder for anonymous B2C if omitted. */
   name?: string;
   /** 統一編號 (8 digits). Presence implies a B2B / triplicate invoice. */
-  taxId?: string;
+  ubn?: string;
   /** Used by providers to email the invoice / notify the buyer. */
   email?: string;
   /** 買受人地址 (mainly B2B). */
@@ -143,8 +143,8 @@ export interface IssueInvoiceInput {
   taxRate?: number;
   priceMode: PriceMode;
   /**
-   * Category. Optional — if omitted, adapters derive it from `buyer.taxId`
-   * (taxId present → B2B, else B2C).
+   * Category. Optional — if omitted, adapters derive it from `buyer.ubn`
+   * (ubn present → B2B, else B2C).
    */
   category?: InvoiceCategory;
   /** Mutually exclusive with `donation` in practice. */

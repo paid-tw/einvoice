@@ -36,7 +36,7 @@ describe("issueInvoiceInputSchema", () => {
   it("rejects donating a B2B invoice", () => {
     const r = issueInvoiceInputSchema.safeParse({
       ...valid,
-      buyer: { taxId: "28080623" },
+      buyer: { ubn: "28080623" },
       donation: { npoban: "168" },
     });
     expect(r.success).toBe(false);

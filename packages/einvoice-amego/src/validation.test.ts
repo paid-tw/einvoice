@@ -2,19 +2,19 @@ import { describe, expect, it } from "vitest";
 import {
   amegoCustomIssuePayloadSchema,
   amegoIssuePayloadSchema,
-  isValidTaxId,
+  isValidUbn,
 } from "./validation.js";
 
-describe("isValidTaxId (統一編號 checksum)", () => {
+describe("isValidUbn (統一編號 checksum)", () => {
   it("accepts valid numbers (verified live)", () => {
-    expect(isValidTaxId("28080623")).toBe(true);
-    expect(isValidTaxId("10458575")).toBe(true);
+    expect(isValidUbn("28080623")).toBe(true);
+    expect(isValidUbn("10458575")).toBe(true);
   });
-  it("rejects a flipped check digit", () => expect(isValidTaxId("28080624")).toBe(false));
+  it("rejects a flipped check digit", () => expect(isValidUbn("28080624")).toBe(false));
   it("rejects non-8-digit input", () => {
-    expect(isValidTaxId("123")).toBe(false);
-    expect(isValidTaxId("1234567x")).toBe(false);
-    expect(isValidTaxId("0000000000")).toBe(false);
+    expect(isValidUbn("123")).toBe(false);
+    expect(isValidUbn("1234567x")).toBe(false);
+    expect(isValidUbn("0000000000")).toBe(false);
   });
 });
 

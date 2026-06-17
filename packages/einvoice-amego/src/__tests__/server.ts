@@ -11,7 +11,7 @@ export const server = setupServer();
 /** A provider pointed at the mocked host. */
 export function testProvider() {
   return createAmegoProvider({
-    sellerTaxId: SELLER,
+    sellerUbn: SELLER,
     appKey: APP_KEY,
     baseUrl: BASE,
   });

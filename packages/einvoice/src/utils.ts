@@ -2,8 +2,8 @@ import type { InvoiceCategory } from "./types.js";
 import { InvoiceCategory as Category } from "./types.js";
 
 /** Derive B2B vs B2C from the buyer's 統一編號. */
-export function deriveCategory(buyer: { taxId?: string }): InvoiceCategory {
-  return buyer.taxId ? Category.B2B : Category.B2C;
+export function deriveCategory(buyer: { ubn?: string }): InvoiceCategory {
+  return buyer.ubn ? Category.B2B : Category.B2C;
 }
 
 /**
