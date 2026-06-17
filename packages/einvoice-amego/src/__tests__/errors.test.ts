@@ -84,6 +84,25 @@ describe("mapAmegoErrorCode (from info_detail?mid=71)", () => {
     }
   });
 
+  // Audit: every documented g0401 (開立折讓) error code is categorized.
+  it("categorizes the full g0401 error-code family", () => {
+    const conflict = [4040152, 4040153, 4040154, 4040161, 4040162, 4040163];
+    const notFound = [4040156];
+    const all = [4040112, ...range(4040121, 4040142), ...range(4040151, 4040156), ...range(4040161, 4040163), 4040171, 4040173];
+    for (const c of conflict) expect(mapAmegoErrorCode(c)).toBe("CONFLICT");
+    for (const c of notFound) expect(mapAmegoErrorCode(c)).toBe("NOT_FOUND");
+    const validation = all.filter((c) => !conflict.includes(c) && !notFound.includes(c));
+    for (const c of validation) expect(mapAmegoErrorCode(c)).toBe("VALIDATION");
+    // g0401/g0501/f0501 also return these as STRING codes — must coerce.
+    expect(mapAmegoErrorCode("4040156")).toBe("NOT_FOUND");
+    expect(mapAmegoErrorCode("4040123")).toBe("VALIDATION");
+  });
+
+  // Audit: f0401_custom surfaces per-record field errors as code 99.
+  it("maps the f0401_custom record error (99) to VALIDATION", () => {
+    expect(mapAmegoErrorCode(99)).toBe("VALIDATION");
+  });
+
   // Audit: every documented f0401 (開立發票) error code is categorized, never
   // left as a bare PROVIDER fallthrough except the system print-format error.
   it("categorizes the full f0401 error-code family", () => {
