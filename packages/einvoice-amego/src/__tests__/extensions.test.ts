@@ -3,7 +3,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import type { AmegoProvider } from "../provider.js";
 import { ENDPOINTS, TRACK_STATUS } from "../endpoints.js";
 import { BASE, parseBody, server, testProvider } from "./server.js";
-import { TRACK_STATUS_OK } from "./fixtures.js";
+import { TRACK_GET_OK, TRACK_STATUS_OK } from "./fixtures.js";
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => server.resetHandlers());
@@ -118,10 +118,10 @@ const CASES: Array<{
     expectData: { level: 1 },
   },
   {
-    name: "track.get (pass-through)",
+    name: "track.get (Year/Period/Book PascalCase)",
     path: ENDPOINTS.trackGet,
-    invoke: (p) => p.track.get({ count: 50 }),
-    expectData: { count: 50 },
+    invoke: (p) => p.track.get({ year: 2026, period: 2, book: 1 }),
+    expectData: { Year: 2026, Period: 2, Book: 1 },
   },
   {
     name: "track.status (Year/Period PascalCase)",
@@ -149,6 +149,23 @@ describe("Amego endpoint contracts (verified live shapes)", () => {
   it("raw() can call any endpoint directly", async () => {
     server.use(http.post(`${BASE}/json/anything`, () => HttpResponse.json({ code: 0, ok: true })));
     expect(await testProvider().raw("/json/anything", { foo: "bar" })).toMatchObject({ ok: true });
+  });
+
+  it("track.get allocates a booklet and returns the { code, start, end } range", async () => {
+    let data: unknown;
+    server.use(
+      http.post(`${BASE}${ENDPOINTS.trackGet}`, async ({ request }) => {
+        data = parseBody(await request.text()).data;
+        return HttpResponse.json(TRACK_GET_OK);
+      }),
+    );
+    const res = await testProvider().track.get({ year: 2026, period: 2, book: 1 });
+    expect(data).toEqual({ Year: 2026, Period: 2, Book: 1 });
+    // response data is an OBJECT (not an array)
+    const d = res.data as Record<string, unknown>;
+    expect(d.code).toBe("EE");
+    expect(d.start).toBe("00006850");
+    expect(d.end).toBe("00006899");
   });
 
   it("track.status omits Period/TrackApiCode when not given", async () => {

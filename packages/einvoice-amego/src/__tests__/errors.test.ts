@@ -75,6 +75,7 @@ describe("error propagation", () => {
         OrderId: "o1",
         InvoiceDate: "20260617",
         InvoiceTime: "16:40:42",
+        PrintMark: "Y",
         BuyerIdentifier: "0000000000",
         BuyerName: "消費者",
         ProductItem: [{ Description: "x", Quantity: 1, UnitPrice: 105, Amount: 105, TaxType: 1 }],

@@ -94,6 +94,44 @@ describe.skipIf(!live)("Amego live lifecycle", () => {
 });
 
 /**
+ * Mutating flow: allocate a number booklet (track_get) then issue a self-numbered
+ * invoice. Gated behind AMEGO_LIVE_MUTATE because each run irreversibly consumes
+ * 50 invoice numbers from the merchant's track.
+ */
+const mutate = process.env.AMEGO_LIVE === "1" && process.env.AMEGO_LIVE_MUTATE === "1";
+describe.skipIf(!mutate)("Amego live — custom numbering (consumes a booklet)", () => {
+  const provider = createAmegoProvider({
+    sellerTaxId: process.env.AMEGO_SELLER ?? "12345678",
+    appKey: process.env.AMEGO_APP_KEY ?? "",
+  });
+
+  it("track_get → issueCustom returns the allocated number in data[]", async () => {
+    const alloc = await provider.track.get({ year: 2026, period: 2, book: 1 });
+    const range = alloc.data as { code: string; start: string };
+    const invoiceNumber = `${range.code}${range.start}`;
+    const res = await provider.invoice.issueCustom(invoiceNumber, {
+      order_id: `LCUST${Date.now()}`,
+      InvoiceDate: "20260617",
+      InvoiceTime: "16:40:42",
+      RandomNumber: "4321",
+      PrintMark: "Y",
+      BuyerIdentifier: "0000000000",
+      BuyerName: "消費者",
+      ProductItem: [{ Description: "自訂配號測試", Quantity: 1, UnitPrice: 105, Amount: 105, TaxType: 1 }],
+      SalesAmount: 105,
+      FreeTaxSalesAmount: 0,
+      ZeroTaxSalesAmount: 0,
+      TaxType: 1,
+      TaxRate: "0.05",
+      TaxAmount: 0,
+      TotalAmount: 105,
+    });
+    const out = (res.data as Array<{ invoice_number: string }>)[0];
+    expect(out?.invoice_number).toBe(invoiceNumber);
+  });
+});
+
+/**
  * Deliberately send invalid field values straight to the real API (via raw(),
  * bypassing local validation) and assert the exact error code Amego returns.
  * These are the source-of-truth for the offline error fixtures.

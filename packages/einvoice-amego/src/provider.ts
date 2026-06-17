@@ -345,7 +345,19 @@ export class AmegoProvider implements InvoiceProvider {
   /** 字軌 (number track) endpoints for self-numbering merchants. */
   readonly track = {
     all: (data: Record<string, unknown>) => this.raw(ENDPOINTS.trackAll, data),
-    get: (data: Record<string, unknown>) => this.raw(ENDPOINTS.trackGet, data),
+    /**
+     * 字軌取號 — allocate a booklet of "API 配號" numbers. ⚠️ Mutating &
+     * irreversible: each `book` reserves 50 invoice numbers. Returns
+     * `data: { code, start, end }` (the allocated range). `period` is 0:01-02 …
+     * 5:11-12; the `Book`/`Year`/`Period` fields are PascalCase.
+     */
+    get: (opts: { year: number; period: 0 | 1 | 2 | 3 | 4 | 5; book: number; trackApiCode?: string }) =>
+      this.raw(ENDPOINTS.trackGet, {
+        Year: opts.year,
+        Period: opts.period,
+        Book: opts.book,
+        ...(opts.trackApiCode ? { TrackApiCode: opts.trackApiCode } : {}),
+      }),
     /**
      * 字軌狀態 — status of "API 配號" tracks. `period` is 0:01-02 … 5:11-12.
      * Returns `data[]` of { code, start, end, now, total_booklet, used_booklet,

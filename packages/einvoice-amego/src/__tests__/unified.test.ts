@@ -155,6 +155,8 @@ describe("issueCustom (f0401_custom) — array + validation", () => {
     OrderId: "o1",
     InvoiceDate: "20260617",
     InvoiceTime: "16:40:42",
+    RandomNumber: "4321",
+    PrintMark: "Y",
     BuyerIdentifier: "0000000000",
     BuyerName: "消費者",
     ProductItem: [{ Description: "x", Quantity: 1, UnitPrice: 105, Amount: 105, TaxType: 1 }],
@@ -175,14 +177,14 @@ describe("issueCustom (f0401_custom) — array + validation", () => {
         return HttpResponse.json(CUSTOM_ISSUE_OK);
       }),
     );
-    const res = await testProvider().invoice.issueCustom("SD30001200", validRecord);
+    const res = await testProvider().invoice.issueCustom("EE00006850", validRecord);
     // request: array carrying the InvoiceNumber
     const arr = body?.data as unknown as Array<Record<string, unknown>>;
     expect(Array.isArray(arr)).toBe(true);
-    expect(arr[0]?.InvoiceNumber).toBe("SD30001200");
+    expect(arr[0]?.InvoiceNumber).toBe("EE00006850");
     // response: data[] array (no invoice_time/random_number), incl. base64_data slot
     const out = (res.data as Array<Record<string, unknown>>)[0]!;
-    expect(out.invoice_number).toBe("SD30001200");
+    expect(out.invoice_number).toBe("EE00006850");
     expect(out.qrcode_right).toContain("自訂配號");
     expect("base64_data" in out).toBe(true);
     expect("invoice_time" in out).toBe(false);

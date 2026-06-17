@@ -128,11 +128,17 @@ describe("amegoIssuePayloadSchema — conditional rules", () => {
 describe("amegoCustomIssuePayloadSchema (f0401_custom)", () => {
   const validCustom = (o: Record<string, unknown> = {}) =>
     amegoCustomIssuePayloadSchema.safeParse(
-      validIssue({ InvoiceNumber: "AA00000010", InvoiceDate: "20260617", InvoiceTime: "16:40:42", RandomNumber: "1234", order_id: "C1", OrderId: undefined, ...o }),
+      validIssue({ InvoiceNumber: "AA00000010", InvoiceDate: "20260617", InvoiceTime: "16:40:42", RandomNumber: "1234", PrintMark: "Y", order_id: "C1", OrderId: undefined, ...o }),
     ).success;
 
   it("accepts a valid custom record", () => expect(validCustom()).toBe(true));
   it("requires InvoiceNumber", () => expect(validCustom({ InvoiceNumber: undefined })).toBe(false));
+  it("requires PrintMark (verified live)", () => expect(validCustom({ PrintMark: undefined })).toBe(false));
+  it("PrintMark=N requires a carrier or donation", () => {
+    expect(validCustom({ PrintMark: "N" })).toBe(false);
+    expect(validCustom({ PrintMark: "N", NPOBAN: "168" })).toBe(true);
+    expect(validCustom({ PrintMark: "N", CarrierType: "3J0002", CarrierId1: "/ABC1234" })).toBe(true);
+  });
   it("requires InvoiceDate as YYYYMMDD", () => {
     expect(validCustom({ InvoiceDate: "2026-06-17" })).toBe(false);
     expect(validCustom({ InvoiceDate: "20260617" })).toBe(true);

@@ -211,6 +211,8 @@ export const amegoCustomIssuePayloadSchema = issueBaseObject
     InvoiceTime: z.string().regex(/^\d{2}:\d{2}:\d{2}$/, "InvoiceTime must be hh:mm:ss"),
     RandomNumber: z.string().regex(/^\d{4}$/, "RandomNumber must be 4 digits").optional(),
     SellerPersonInCharge: z.string().max(30, "SellerPersonInCharge must be ≤30 chars").optional(),
+    // f0401_custom requires PrintMark (verified live: omitting it → "PrintMark 錯誤").
+    PrintMark: z.enum(["Y", "N"], { required_error: "PrintMark (Y/N) is required for f0401_custom" }),
   })
   .passthrough()
   .superRefine((p, ctx) => {
@@ -220,6 +222,15 @@ export const amegoCustomIssuePayloadSchema = issueBaseObject
         code: z.ZodIssueCode.custom,
         message: "order_id is required",
         path: ["order_id"],
+      });
+    }
+    // A non-printed invoice (PrintMark=N) must have somewhere to go: a carrier
+    // or a donation (verified live: otherwise "載具類型錯誤").
+    if (p.PrintMark === "N" && !p.CarrierType && !p.NPOBAN) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "PrintMark=N requires a carrier or a donation (NPOBAN)",
+        path: ["PrintMark"],
       });
     }
   });

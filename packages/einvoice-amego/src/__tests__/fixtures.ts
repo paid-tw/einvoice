@@ -109,24 +109,30 @@ export const INVOICE_LIST_OK = {
 };
 
 /**
- * f0401_custom success. Unlike f0401, the response is a `data[]` array (one
- * entry per uploaded invoice) and carries NO invoice_time / random_number —
- * those are merchant-supplied. Shape per the official spec; a live success
- * couldn't be captured because the sandbox's tracks aren't configured for
- * current-period API custom numbering (error paths were verified live).
+ * Real f0401_custom success, captured live (invoice EE00006850, allocated via
+ * track_get). Unlike f0401, the response is a `data[]` array (one entry per
+ * uploaded invoice) and carries NO invoice_time / random_number — those are
+ * merchant-supplied.
  */
 export const CUSTOM_ISSUE_OK = {
   code: 0,
   msg: "",
   data: [
     {
-      invoice_number: "SD30001200",
-      barcode: "11506SD300012001234",
-      qrcode_left: "SD30001200115061712340000006400000069...",
+      invoice_number: "EE00006850",
+      barcode: "11506EE000068504321",
+      qrcode_left: "EE000068501150617432100000064000000690000000012345678goMz1DO3V133QXLaMhZpDQ==:**********:1:1:0:",
       qrcode_right: "**自訂配號測試:1:105",
       base64_data: "",
     },
   ],
+};
+
+/** Real track_get success (allocates a 50-number booklet). data is an OBJECT. */
+export const TRACK_GET_OK = {
+  code: 0,
+  msg: "",
+  data: { code: "EE", start: "00006850", end: "00006899" },
 };
 
 /** Real track_status response (Year 2026, Period 2) — current-period API tracks. */
