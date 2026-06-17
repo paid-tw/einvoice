@@ -45,6 +45,13 @@ describe.skipIf(!live)("Amego live lifecycle", () => {
     expect(res.code).toBe(0);
   });
 
+  it("reads server time via a plain GET (no code envelope)", async () => {
+    const res = await provider.time();
+    expect(typeof res.timestamp).toBe("number");
+    expect(res.year).toBeGreaterThan(2024);
+    expect(res).not.toHaveProperty("code");
+  });
+
   it("reads API-numbering track status (Year/Period)", async () => {
     const res = await provider.track.status({ year: 2026, period: 2 });
     expect(res.code).toBe(0);

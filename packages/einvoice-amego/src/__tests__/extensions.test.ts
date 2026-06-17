@@ -3,7 +3,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import type { AmegoProvider } from "../provider.js";
 import { ENDPOINTS, TRACK_STATUS } from "../endpoints.js";
 import { BASE, parseBody, server, testProvider } from "./server.js";
-import { TRACK_GET_OK, TRACK_STATUS_OK } from "./fixtures.js";
+import { TIME_OK, TRACK_GET_OK, TRACK_STATUS_OK } from "./fixtures.js";
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => server.resetHandlers());
@@ -106,12 +106,6 @@ const CASES: Array<{
     expectData: {},
   },
   {
-    name: "time",
-    path: ENDPOINTS.time,
-    invoke: (p) => p.time(),
-    expectData: {},
-  },
-  {
     name: "track.all (pass-through)",
     path: ENDPOINTS.trackAll,
     invoke: (p) => p.track.all({ level: 1 }),
@@ -145,6 +139,23 @@ describe("Amego endpoint contracts (verified live shapes)", () => {
       expect(data).toEqual(c.expectData);
     });
   }
+
+  it("time() is a plain GET (no signing) and returns the time breakdown", async () => {
+    let method: string | undefined;
+    let hadBody = true;
+    server.use(
+      http.get(`${BASE}${ENDPOINTS.time}`, ({ request }) => {
+        method = request.method;
+        hadBody = request.body !== null;
+        return HttpResponse.json(TIME_OK);
+      }),
+    );
+    const res = await testProvider().time();
+    expect(method).toBe("GET");
+    expect(hadBody).toBe(false);
+    expect(res.timestamp).toBe(TIME_OK.timestamp);
+    expect(res.hour).toBe(8);
+  });
 
   it("raw() can call any endpoint directly", async () => {
     server.use(http.post(`${BASE}/json/anything`, () => HttpResponse.json({ code: 0, ok: true })));

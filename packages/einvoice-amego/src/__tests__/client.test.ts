@@ -56,7 +56,7 @@ describe("time sync (opt-in)", () => {
   it("applies the server clock offset to the signed timestamp", async () => {
     let sentTime: string | undefined;
     server.use(
-      http.post(`${BASE}/json/time`, () => HttpResponse.json(TIME_OK)),
+      http.get(`${BASE}/json/time`, () => HttpResponse.json(TIME_OK)),
       http.post(`${BASE}/json/f0501`, async ({ request }) => {
         sentTime = parseBody(await request.text()).time ?? undefined;
         return HttpResponse.json({ code: 0 });

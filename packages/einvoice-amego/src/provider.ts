@@ -26,7 +26,12 @@ import {
   type AmegoProductTaxType,
   computeAmegoAmounts,
 } from "./amounts.js";
-import { type AmegoResponse, amegoRequest } from "./client.js";
+import {
+  type AmegoResponse,
+  type AmegoTimeResponse,
+  amegoRequest,
+  fetchServerTime,
+} from "./client.js";
 import type { AmegoConfig } from "./config.js";
 import { ENDPOINTS } from "./endpoints.js";
 import { assertValidCustomIssuePayload, assertValidIssuePayload } from "./validation.js";
@@ -382,9 +387,9 @@ export class AmegoProvider implements InvoiceProvider {
     return this.raw(ENDPOINTS.barcode, { barCode });
   }
 
-  /** 伺服器時間. */
-  time(): Promise<AmegoResponse> {
-    return this.raw(ENDPOINTS.time, {});
+  /** 伺服器時間 — a plain GET (no signing); returns the full time breakdown. */
+  time(): Promise<AmegoTimeResponse> {
+    return fetchServerTime(this.config);
   }
 }
 

@@ -152,7 +152,17 @@ export const BAN_QUERY_OK = {
   msg: "",
   data: [{ ban: "28080623", name: "光貿科技股份有限公司" }],
 };
-export const TIME_OK = { timestamp: 1781650038, text: "2026/06/17 06:47:18" };
+/** Real GET /json/time response (no `code` envelope). */
+export const TIME_OK = {
+  timestamp: 1781654751,
+  text: "2026/06/17 08:05:51",
+  year: 2026,
+  month: 6,
+  day: 17,
+  hour: 8,
+  minute: 5,
+  second: 51,
+};
 
 /** Real error envelopes (code !== 0), captured live by sending invalid values. */
 export const ERR_VOID_NOT_ARRAY = { code: 3050112, msg: "此 API 支援傳輸多張發票，data 欄位資料應為陣列字串" };

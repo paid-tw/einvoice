@@ -24,6 +24,41 @@ export interface AmegoResponse {
   [key: string]: unknown;
 }
 
+/** Response of `/json/time` — note there is NO `code` field. */
+export interface AmegoTimeResponse {
+  timestamp: number;
+  text: string;
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+  second: number;
+}
+
+/**
+ * 伺服器時間. A plain GET — no `invoice`/`data`/`time`/`sign`, and the response
+ * carries no `code` envelope — so it bypasses {@link amegoRequest}.
+ */
+export async function fetchServerTime(config: AmegoConfig): Promise<AmegoTimeResponse> {
+  const baseUrl = resolveBaseUrl(config);
+  const doFetch = config.fetch ?? fetch;
+  let res: Response;
+  try {
+    res = await doFetch(`${baseUrl}/json/time`, {
+      method: "GET",
+      signal: config.timeoutMs ? AbortSignal.timeout(config.timeoutMs) : undefined,
+    });
+  } catch (cause) {
+    throw new InvoiceError("Amego time request failed", {
+      provider: "amego",
+      code: InvoiceErrorCode.NETWORK,
+      cause,
+    });
+  }
+  return (await res.json()) as AmegoTimeResponse;
+}
+
 /** Cached server-clock offset (seconds) per base URL, 5 min TTL. */
 const timeOffsetCache = new Map<string, { offset: number; at: number }>();
 const TIME_TTL_MS = 5 * 60 * 1000;
@@ -39,14 +74,11 @@ async function getTimestamp(config: AmegoConfig, now: number): Promise<number> {
   const cached = timeOffsetCache.get(baseUrl);
   if (cached && Date.now() - cached.at < TIME_TTL_MS) return now + cached.offset;
 
-  const doFetch = config.fetch ?? fetch;
   try {
-    const res = await doFetch(`${baseUrl}/json/time`, { method: "POST" });
-    const json = (await res.json()) as { timestamp?: number };
-    if (typeof json.timestamp === "number") {
-      const offset = json.timestamp - now;
-      timeOffsetCache.set(baseUrl, { offset, at: Date.now() });
-      return json.timestamp;
+    const { timestamp } = await fetchServerTime(config);
+    if (typeof timestamp === "number") {
+      timeOffsetCache.set(baseUrl, { offset: timestamp - now, at: Date.now() });
+      return timestamp;
     }
   } catch {
     // fall through to local time on sync failure
