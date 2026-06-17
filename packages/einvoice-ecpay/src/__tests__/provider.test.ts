@@ -212,6 +212,19 @@ describe("void / allowance / voidAllowance", () => {
     expect(data).toMatchObject({ InvoiceNo: "JU11082062", AllowanceNo: "A1", Reason: "作廢折讓" });
     expect(res.allowanceNumber).toBe("A1");
   });
+
+  it("voidAllowance rejects an over-long Reason locally; maps re-void (2000063) to CONFLICT", async () => {
+    await expect(
+      testProvider().voidAllowance({ invoiceNumber: "JU1", allowanceNumber: "A1", reason: "x".repeat(21) }),
+    ).rejects.toMatchObject({ code: "VALIDATION" });
+
+    server.use(
+      http.post(url(ECPAY_ENDPOINTS.allowanceInvalid), () => HttpResponse.json(ecError(2000063, "該折讓單已作廢過，請確認"))),
+    );
+    await expect(
+      testProvider().voidAllowance({ invoiceNumber: "JU1", allowanceNumber: "A1" }),
+    ).rejects.toMatchObject({ code: "CONFLICT", rawCode: "2000063" });
+  });
 });
 
 describe("query (GetIssue)", () => {

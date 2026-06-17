@@ -9,6 +9,8 @@ describe("mapEcpayError (keyword-based, ECPay RtnMsg)", () => {
     [1100040, "發票字軌已用完", "NUMBER_EXHAUSTED"],
     [0, "發票已作廢過", "CONFLICT"],
     [5070450, "該發票已被折讓過，無法直接作廢發票", "CONFLICT"], // void blocked by an allowance
+    [2000063, "該折讓單已作廢過，請確認", "CONFLICT"], // re-void an allowance
+    [2000039, "查無折讓單資料，請確認!", "NOT_FOUND"], // unknown allowance
     [0, "自訂編號不可重複", "CONFLICT"],
     [0, "特店編號不存在", "AUTH"],
     [0, "資料解密錯誤，請確認金鑰", "AUTH"],

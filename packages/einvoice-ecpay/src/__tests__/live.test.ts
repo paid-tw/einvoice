@@ -81,6 +81,10 @@ describe.skipIf(!live)("ECPay live (stage) — issue → query → void", LIVE_O
     expect(al.allowanceNumber).toMatch(/^\d+$/);
     const va = await p.voidAllowance({ invoiceNumber, allowanceNumber: al.allowanceNumber, reason: "測試作廢" });
     expect(va.raw.RtnCode).toBe(1);
+    // Voiding it again → 2000063 該折讓單已作廢過 → CONFLICT.
+    await expect(
+      p.voidAllowance({ invoiceNumber, allowanceNumber: al.allowanceNumber }),
+    ).rejects.toMatchObject({ code: "CONFLICT" });
   });
 
   it("voids it (Invalid)", async () => {

@@ -392,12 +392,25 @@ export class EcpayProvider implements InvoiceProvider {
     };
   }
 
+  /**
+   * 作廢折讓 (AllowanceInvalid): void a single 折讓單 (not the whole invoice).
+   * An already-voided allowance → 2000063 (CONFLICT); an unknown one → 2000039
+   * (NOT_FOUND).
+   */
   async voidAllowance(input: VoidAllowanceInput): Promise<VoidAllowanceResult> {
     const parsed = voidAllowanceInputSchema.parse(input);
+    const reason = parsed.reason ?? "作廢折讓";
+    if (this.config.validatePayload !== false && reason.length > 20) {
+      throw new InvoiceError("Reason must be ≤20 chars", {
+        provider: "ecpay",
+        code: InvoiceErrorCode.VALIDATION,
+        rawMessage: "作廢折讓原因 (Reason) must be ≤20 chars",
+      });
+    }
     const result = await ecpayRequest(this.config, ENDPOINTS.allowanceInvalid, {
       InvoiceNo: parsed.invoiceNumber,
       AllowanceNo: parsed.allowanceNumber,
-      Reason: parsed.reason ?? "作廢折讓",
+      Reason: reason,
     });
     return { allowanceNumber: parsed.allowanceNumber, raw: result };
   }
