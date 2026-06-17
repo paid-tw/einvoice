@@ -17,6 +17,7 @@ export {
   amegoProductItemSchema,
   assertValidIssuePayload,
   assertValidCustomIssuePayload,
+  isValidTaxId,
 } from "./validation.js";
 export type { AmegoIssuePayload, AmegoCustomIssuePayload } from "./validation.js";
 export { computeAmegoAmounts, amegoTaxType } from "./amounts.js";

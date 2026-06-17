@@ -163,6 +163,13 @@ describe("Amego endpoint contracts (verified live shapes)", () => {
     expect(res.hour).toBe(8);
   });
 
+  it("banQuery rejects an invalid 統編 checksum locally (no network call)", async () => {
+    await expect(testProvider().banQuery("28080624")).rejects.toMatchObject({
+      code: "VALIDATION",
+      provider: "amego",
+    });
+  });
+
   it("raw() can call any endpoint directly", async () => {
     server.use(http.post(`${BASE}/json/anything`, () => HttpResponse.json({ code: 0, ok: true })));
     expect(await testProvider().raw("/json/anything", { foo: "bar" })).toMatchObject({ ok: true });

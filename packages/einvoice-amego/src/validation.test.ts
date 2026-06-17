@@ -2,7 +2,21 @@ import { describe, expect, it } from "vitest";
 import {
   amegoCustomIssuePayloadSchema,
   amegoIssuePayloadSchema,
+  isValidTaxId,
 } from "./validation.js";
+
+describe("isValidTaxId (統一編號 checksum)", () => {
+  it("accepts valid numbers (verified live)", () => {
+    expect(isValidTaxId("28080623")).toBe(true);
+    expect(isValidTaxId("10458575")).toBe(true);
+  });
+  it("rejects a flipped check digit", () => expect(isValidTaxId("28080624")).toBe(false));
+  it("rejects non-8-digit input", () => {
+    expect(isValidTaxId("123")).toBe(false);
+    expect(isValidTaxId("1234567x")).toBe(false);
+    expect(isValidTaxId("0000000000")).toBe(false);
+  });
+});
 
 /** A valid built f0401 payload (B2C, 含稅 105). */
 function validIssue(overrides: Record<string, unknown> = {}) {
@@ -36,7 +50,10 @@ describe("amegoIssuePayloadSchema — buyer", () => {
     expect(ok({ BuyerIdentifier: "123" })).toBe(false);
     expect(ok({ BuyerIdentifier: "1234567x" })).toBe(false);
   });
-  it("accepts an 8-digit 統編", () => expect(ok({ BuyerIdentifier: "28080623" })).toBe(true));
+  it("accepts a valid 統編 but rejects a bad checksum (Amego enforces it too)", () => {
+    expect(ok({ BuyerIdentifier: "28080623" })).toBe(true);
+    expect(ok({ BuyerIdentifier: "28080624" })).toBe(false);
+  });
   it("rejects a malformed email (server silently accepts it)", () =>
     expect(ok({ BuyerEmailAddress: "not-an-email" })).toBe(false));
   it("accepts a valid email", () => expect(ok({ BuyerEmailAddress: "a@b.co" })).toBe(true));

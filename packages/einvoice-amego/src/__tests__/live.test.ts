@@ -184,6 +184,17 @@ describe.skipIf(!live)("Amego live — server rejects invalid values", () => {
     expect(err.code).toBe("VALIDATION");
   });
 
+  it("rejects a bad 統編 checksum in ban_query (99)", async () => {
+    const err = await provider.raw("/json/ban_query", [{ ban: "28080624" }]).catch((e) => e);
+    expect(err.rawCode).toBe("99");
+  });
+
+  it("returns an empty name for a valid-format 統編 with no company (not an error)", async () => {
+    const res = await provider.banQuery("10458575");
+    expect(res.code).toBe(0);
+    expect((res.data as Array<{ name: string }>)[0]?.name).toBe("");
+  });
+
   it("rejects a zero-rated invoice missing the customs mark (3040179)", async () => {
     const err = await provider
       .raw("/json/f0401", base({

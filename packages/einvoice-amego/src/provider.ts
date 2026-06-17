@@ -4,6 +4,8 @@ import {
   type Buyer,
   type Carrier,
   deriveCategory,
+  InvoiceError,
+  InvoiceErrorCode,
   type InvoiceItem,
   type InvoiceProvider,
   InvoiceStatus,
@@ -34,7 +36,11 @@ import {
 } from "./client.js";
 import type { AmegoConfig } from "./config.js";
 import { ENDPOINTS } from "./endpoints.js";
-import { assertValidCustomIssuePayload, assertValidIssuePayload } from "./validation.js";
+import {
+  assertValidCustomIssuePayload,
+  assertValidIssuePayload,
+  isValidTaxId,
+} from "./validation.js";
 
 /** Amego/MIG carrier type codes (member carrier is the literal `amego`). */
 const CARRIER_TYPE: Record<Carrier["type"], string> = {
@@ -386,8 +392,22 @@ export class AmegoProvider implements InvoiceProvider {
       }),
   };
 
-  /** 公司名稱查詢 — look up company names by 統一編號 (batch). */
-  banQuery(...bans: string[]): Promise<AmegoResponse> {
+  /**
+   * 公司名稱查詢 — look up company names by 統一編號 (batch). Each id is checksum-
+   * validated locally first (Amego rejects bad checksums with 統一編號格式錯誤).
+   * An empty `name` in the response means "no company found", not an error.
+   */
+  async banQuery(...bans: string[]): Promise<AmegoResponse> {
+    if (this.config.validatePayload !== false) {
+      const bad = bans.filter((b) => !isValidTaxId(b));
+      if (bad.length > 0) {
+        throw new InvoiceError(`Invalid 統一編號: ${bad.join(", ")}`, {
+          provider: "amego",
+          code: InvoiceErrorCode.VALIDATION,
+          rawMessage: `Invalid 統一編號 checksum: ${bad.join(", ")}`,
+        });
+      }
+    }
     return this.raw(ENDPOINTS.banQuery, bans.map((ban) => ({ ban })));
   }
 

@@ -18,6 +18,28 @@ import { z } from "zod";
  * `providerOptions`) are not rejected.
  */
 
+/**
+ * Validate a Taiwan 統一編號 (unified business number) including its checksum
+ * (the post-2023 "divisible by 5" revision). Amego enforces this server-side
+ * (bad checksums → 3040122 / 99), so we check it locally to fail fast.
+ *
+ * Algorithm: weights [1,2,1,2,1,2,4,1]; sum the digit-sums of each weighted
+ * product; valid when the total is divisible by 5. Special case: when the 7th
+ * digit is 7, a +1 is also accepted.
+ */
+export function isValidTaxId(id: string): boolean {
+  if (!/^\d{8}$/.test(id)) return false;
+  const weights = [1, 2, 1, 2, 1, 2, 4, 1];
+  const digits = id.split("").map(Number);
+  let sum = 0;
+  for (let i = 0; i < 8; i++) {
+    const product = digits[i]! * weights[i]!;
+    sum += Math.floor(product / 10) + (product % 10);
+  }
+  if (sum % 5 === 0) return true;
+  return digits[6] === 7 && (sum + 1) % 5 === 0;
+}
+
 /** ≤ `max` decimal places. */
 const maxDecimals = (max: number) => (v: number) => {
   if (!Number.isFinite(v)) return false;
@@ -59,7 +81,10 @@ const issueBaseObject = z.object({
   BrandName: z.string().optional(),
   BuyerIdentifier: z
     .string()
-    .refine((v) => v === "0000000000" || /^\d{8}$/.test(v), "BuyerIdentifier must be 8 digits or 0000000000"),
+    .refine(
+      (v) => v === "0000000000" || isValidTaxId(v),
+      "BuyerIdentifier must be a valid 統一編號 (8-digit checksum) or 0000000000",
+    ),
   BuyerName: z
     .string()
     .min(1, "BuyerName is required")
