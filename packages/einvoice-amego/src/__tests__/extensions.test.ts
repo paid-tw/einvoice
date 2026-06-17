@@ -11,6 +11,7 @@ import {
 } from "../endpoints.js";
 import { APP_KEY, BASE, parseBody, server, testProvider } from "./server.js";
 import {
+  FILE_URL_OK,
   LOTTERY_STATUS_OK,
   LOTTERY_TYPE_OK,
   TIME_OK,
@@ -182,6 +183,28 @@ describe("Amego endpoint contracts (verified live shapes)", () => {
   it("raw() can call any endpoint directly", async () => {
     server.use(http.post(`${BASE}/json/anything`, () => HttpResponse.json({ code: 0, ok: true })));
     expect(await testProvider().raw("/json/anything", { foo: "bar" })).toMatchObject({ ok: true });
+  });
+
+  it("invoice.file / allowances.file return data.file_url (PDF link)", async () => {
+    let invData: Record<string, unknown> | undefined;
+    let alwData: Record<string, unknown> | undefined;
+    server.use(
+      http.post(`${BASE}${ENDPOINTS.invoiceFile}`, async ({ request }) => {
+        invData = parseBody(await request.text()).data;
+        return HttpResponse.json(FILE_URL_OK);
+      }),
+      http.post(`${BASE}${ENDPOINTS.allowanceFile}`, async ({ request }) => {
+        alwData = parseBody(await request.text()).data;
+        return HttpResponse.json(FILE_URL_OK);
+      }),
+    );
+    const inv = await testProvider().invoice.file("AA26513024", 1);
+    expect(invData).toEqual({ type: "invoice", invoice_number: "AA26513024", download_style: 1 });
+    expect((inv.data as { file_url: string }).file_url).toContain("https://");
+
+    const alw = await testProvider().allowances.file("ALW1", 3);
+    expect(alwData).toEqual({ allowance_number: "ALW1", download_style: 3 });
+    expect((alw.data as { file_url: string }).file_url).toContain("https://");
   });
 
   it("lottery.status sends { Year, Period } and parses the winning-invoice rows", async () => {

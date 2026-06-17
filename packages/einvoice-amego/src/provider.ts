@@ -340,7 +340,11 @@ export class AmegoProvider implements InvoiceProvider {
         printer_type: printerType,
         ...(lang !== undefined ? { printer_lang: lang } : {}),
       }),
-    file: (allowanceNumber: string, downloadStyle: 0 | 1 | 2 | 3 = 0) =>
+    /**
+     * 折讓檔案 (PDF). Returns `data.file_url` (valid 10 minutes). `downloadStyle`:
+     * 0 A4整張 / 1 A4(地址+A5) / 3 A5.
+     */
+    file: (allowanceNumber: string, downloadStyle: 0 | 1 | 3 = 0) =>
       this.raw(ENDPOINTS.allowanceFile, {
         allowance_number: allowanceNumber,
         download_style: downloadStyle,

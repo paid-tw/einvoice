@@ -211,6 +211,13 @@ export const LOTTERY_TYPE_OK = {
   ],
 };
 
+/** Real invoice_file success — `data.file_url` (link valid 10 minutes). */
+export const FILE_URL_OK = {
+  code: 0,
+  msg: "",
+  data: { file_url: "https://invoice.amego.tw/user/invoice_print_type?token=1781657356_65e6f89b3ed08441931fc647eab8e6a0&type=0" },
+};
+
 export const VOID_OK = { code: 0, msg: "" };
 export const BAN_QUERY_OK = {
   code: 0,

@@ -117,6 +117,12 @@ describe.skipIf(!live)("Amego live lifecycle", () => {
     expect(res.invoiceNumber).toMatch(/^[A-Z]{2}\d{8}$/);
   });
 
+  it("downloads the invoice PDF link (invoice.file → data.file_url)", async () => {
+    const res = await provider.invoice.file(invoiceNumber, 0);
+    expect(res.code).toBe(0);
+    expect((res.data as { file_url?: string }).file_url).toMatch(/^https:\/\//);
+  });
+
   it("voids the invoice (array payload, no CancelReason)", async () => {
     const res = await provider.void({ invoiceNumber, reason: "整合測試作廢" });
     expect(res.status).toBe("VOIDED");
