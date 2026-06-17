@@ -1,23 +1,21 @@
 import { beforeAll, describe, expect, it } from "vitest";
+import { AMEGO_SANDBOX } from "../config.js";
 import { createAmegoProvider } from "../provider.js";
 
 /**
  * Live lifecycle test against the real Amego sandbox. Skipped unless AMEGO_LIVE=1
- * so the normal/CI suite stays offline and deterministic.
+ * so the normal/CI suite stays offline and deterministic. Credentials default to
+ * the public {@link AMEGO_SANDBOX}, so `AMEGO_LIVE=1` alone is enough; override
+ * with AMEGO_SELLER / AMEGO_APP_KEY for your own account.
  *
- *   AMEGO_LIVE=1 \
- *   AMEGO_SELLER=12345678 \
- *   AMEGO_APP_KEY=... \
- *   pnpm --filter @paid-tw/einvoice-amego exec vitest run live
+ *   AMEGO_LIVE=1 pnpm --filter @paid-tw/einvoice-amego exec vitest run live
  */
-// Requires credentials too, so a stray AMEGO_LIVE=1 without an app key skips
-// rather than failing against the real sandbox with empty auth.
-const live = process.env.AMEGO_LIVE === "1" && Boolean(process.env.AMEGO_APP_KEY);
+const live = process.env.AMEGO_LIVE === "1";
 
 describe.skipIf(!live)("Amego live lifecycle", () => {
   const provider = createAmegoProvider({
-    sellerUbn: process.env.AMEGO_SELLER ?? "12345678",
-    appKey: process.env.AMEGO_APP_KEY ?? "",
+    sellerUbn: process.env.AMEGO_SELLER ?? AMEGO_SANDBOX.sellerUbn,
+    appKey: process.env.AMEGO_APP_KEY ?? AMEGO_SANDBOX.appKey,
   });
 
   let invoiceNumber: string;
@@ -173,8 +171,8 @@ describe.skipIf(!live)("Amego live lifecycle", () => {
 const mutate = process.env.AMEGO_LIVE === "1" && process.env.AMEGO_LIVE_MUTATE === "1";
 describe.skipIf(!mutate)("Amego live — custom numbering (consumes a booklet)", () => {
   const provider = createAmegoProvider({
-    sellerUbn: process.env.AMEGO_SELLER ?? "12345678",
-    appKey: process.env.AMEGO_APP_KEY ?? "",
+    sellerUbn: process.env.AMEGO_SELLER ?? AMEGO_SANDBOX.sellerUbn,
+    appKey: process.env.AMEGO_APP_KEY ?? AMEGO_SANDBOX.appKey,
   });
 
   it("track_get → issueCustom returns the allocated number in data[]", async () => {
@@ -210,8 +208,8 @@ describe.skipIf(!mutate)("Amego live — custom numbering (consumes a booklet)",
  */
 describe.skipIf(!live)("Amego live — server rejects invalid values", () => {
   const provider = createAmegoProvider({
-    sellerUbn: process.env.AMEGO_SELLER ?? "12345678",
-    appKey: process.env.AMEGO_APP_KEY ?? "",
+    sellerUbn: process.env.AMEGO_SELLER ?? AMEGO_SANDBOX.sellerUbn,
+    appKey: process.env.AMEGO_APP_KEY ?? AMEGO_SANDBOX.appKey,
   });
   const item = { Description: "x", Quantity: "1", UnitPrice: "105", Amount: "105", TaxType: "1" };
   const base = (extra: Record<string, unknown>) => ({

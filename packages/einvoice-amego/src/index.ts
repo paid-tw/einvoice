@@ -1,6 +1,6 @@
 export { createAmegoProvider, AmegoProvider } from "./provider.js";
 export type { AmegoConfig, AmegoRetryOptions } from "./config.js";
-export { AMEGO_BASE_URL } from "./config.js";
+export { AMEGO_BASE_URL, AMEGO_SANDBOX } from "./config.js";
 export {
   ENDPOINTS as AMEGO_ENDPOINTS,
   TRACK_STATUS,

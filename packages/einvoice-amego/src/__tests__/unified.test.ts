@@ -52,6 +52,42 @@ describe("issue (f0401)", () => {
     expect(captured?.sign).toBe(expectedSign);
   });
 
+  it("obeys Amego's wire rules: form-urlencoded Content-Type, url-encoded data, sign over the raw JSON", async () => {
+    let rawBody = "";
+    let contentType = "";
+    server.use(
+      http.post(`${BASE}/json/f0401`, async ({ request }) => {
+        contentType = request.headers.get("content-type") ?? "";
+        rawBody = await request.text();
+        return HttpResponse.json(ISSUE_OK);
+      }),
+    );
+    // A buyer name with chars that MUST be url-encoded on the wire (中文 + &).
+    await testProvider().issue(
+      issueInput({ buyer: { ubn: "28080623", name: "測試 & 公司" } }),
+    );
+
+    // (3) Content-Type is form-urlencoded, never application/json.
+    expect(contentType).toContain("application/x-www-form-urlencoded");
+    expect(contentType).not.toContain("application/json");
+
+    // (2) The `data` segment on the wire is url-encoded (%XX), not literal — so
+    //     Amego's single url-decode recovers the JSON. The `&` inside the JSON
+    //     must be %26, else it would split the form fields.
+    const rawData = /(?:^|&)data=([^&]*)/.exec(rawBody)![1]!;
+    expect(rawData).toMatch(/%[0-9A-Fa-f]{2}/);
+    expect(rawData).not.toContain("測"); // Chinese is encoded, not literal
+    expect(rawData).toContain("%26"); // the JSON's & is encoded
+    const decoded = decodeURIComponent(rawData.replace(/\+/g, " "));
+    expect(JSON.parse(decoded).BuyerName).toBe("測試 & 公司");
+
+    // (1) sign = md5(rawJSON + time + appKey) — over the DECODED json (what Amego
+    //     sees after its url-decode), NOT the encoded wire form.
+    const time = /(?:^|&)time=([^&]*)/.exec(rawBody)![1]!;
+    const wireSign = /(?:^|&)sign=([^&]*)/.exec(rawBody)![1]!;
+    expect(wireSign).toBe(createHash("md5").update(decoded + time + APP_KEY).digest("hex"));
+  });
+
   it("sends B2C amounts (SalesAmount = total, TaxAmount = 0) + DetailVat=1 for anonymous buyers", async () => {
     let data: Record<string, unknown> | undefined;
     server.use(

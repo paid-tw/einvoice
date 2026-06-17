@@ -6,6 +6,7 @@ describe("package barrel", () => {
     expect(typeof amego.createAmegoProvider).toBe("function");
     expect(typeof amego.AmegoProvider).toBe("function");
     expect(amego.AMEGO_BASE_URL).toMatch(/^https:\/\//);
+    expect(amego.AMEGO_SANDBOX).toEqual({ sellerUbn: "12345678", appKey: "sHeq7t8G1wiQvhAuIM27" });
     expect(amego.AMEGO_ENDPOINTS.invoiceQuery).toBe("/json/invoice_query");
     expect(typeof amego.sign).toBe("function");
     expect(typeof amego.assertValidIssuePayload).toBe("function");

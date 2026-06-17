@@ -40,6 +40,17 @@ export interface AmegoConfig extends BaseProviderConfig {
  */
 export const AMEGO_BASE_URL = "https://invoice-api.amego.tw";
 
+/**
+ * Amego's public shared **sandbox** credentials, published for testing against
+ * the same host. Use them to try the SDK without an account:
+ * `createAmegoProvider(AMEGO_SANDBOX)`. Never use these in production — swap in
+ * your own `sellerUbn` + `appKey`.
+ */
+export const AMEGO_SANDBOX = {
+  sellerUbn: "12345678",
+  appKey: "sHeq7t8G1wiQvhAuIM27",
+} as const;
+
 export function resolveBaseUrl(config: AmegoConfig): string {
   return config.baseUrl ?? AMEGO_BASE_URL;
 }

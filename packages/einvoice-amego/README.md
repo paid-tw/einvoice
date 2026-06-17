@@ -12,12 +12,25 @@ pnpm add @paid-tw/einvoice @paid-tw/einvoice-amego
 import { createAmegoProvider } from "@paid-tw/einvoice-amego";
 
 const invoices = createAmegoProvider({
-  sellerTaxId: "12345678",     // 賣方統一編號
+  sellerUbn: "12345678",            // 賣方統一編號
   appKey: process.env.AMEGO_APP_KEY!,
-  mode: "PRODUCTION",          // or "TEST"
 });
 
 await invoices.issue({ /* IssueInvoiceInput */ });
+```
+
+Amego uses a **single host** for test and production — the environment is
+selected by your credentials, not a URL or mode.
+
+### Try it without an account
+
+Amego publishes shared **sandbox** credentials. Use the exported `AMEGO_SANDBOX`
+to issue against the test merchant straight away:
+
+```ts
+import { createAmegoProvider, AMEGO_SANDBOX } from "@paid-tw/einvoice-amego";
+
+const invoices = createAmegoProvider(AMEGO_SANDBOX); // 統編 12345678 — never use in production
 ```
 
 ## Status
