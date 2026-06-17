@@ -67,11 +67,16 @@ describe.skipIf(!live)("Amego live lifecycle", () => {
     expect(rows[0]).toHaveProperty("name");
   });
 
-  it("lists allowances with real date filters (allowance.list)", async () => {
-    const res = await provider.allowances.list({ startDate: 20260601, endDate: 20260630, limit: 20 });
+  it("lists allowances, then queries the first one (allowance.list → allowance.query)", async () => {
+    const list = await provider.allowances.list({ startDate: 20260601, endDate: 20260630, limit: 20 });
+    expect(list.code).toBe(0);
+    const rows = list.data as Array<{ allowance_number: string }>;
+    if (rows.length === 0) return; // no allowances in range — nothing to query
+    const res = await provider.allowances.query(rows[0]!.allowance_number);
     expect(res.code).toBe(0);
-    expect(Number(res.data_total)).toBeGreaterThanOrEqual(0);
-    expect(Array.isArray(res.data)).toBe(true);
+    const d = res.data as Record<string, unknown>;
+    expect(d.allowance_number).toBe(rows[0]!.allowance_number);
+    expect(Array.isArray(d.product_item)).toBe(true);
   });
 
   it("reads the full track tree (track_all, nested layers)", async () => {

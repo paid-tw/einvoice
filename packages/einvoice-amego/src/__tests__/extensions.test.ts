@@ -12,6 +12,7 @@ import {
 import { APP_KEY, BASE, parseBody, server, testProvider } from "./server.js";
 import {
   ALLOWANCE_LIST_OK,
+  ALLOWANCE_QUERY_OK,
   FILE_URL_OK,
   LOTTERY_STATUS_OK,
   LOTTERY_TYPE_OK,
@@ -184,6 +185,27 @@ describe("Amego endpoint contracts (verified live shapes)", () => {
   it("raw() can call any endpoint directly", async () => {
     server.use(http.post(`${BASE}/json/anything`, () => HttpResponse.json({ code: 0, ok: true })));
     expect(await testProvider().raw("/json/anything", { foo: "bar" })).toMatchObject({ ok: true });
+  });
+
+  it("allowances.query sends { allowance_number } and parses nested data + wait[]", async () => {
+    let data: Record<string, unknown> | undefined;
+    server.use(
+      http.post(`${BASE}${ENDPOINTS.allowanceQuery}`, async ({ request }) => {
+        data = parseBody(await request.text()).data;
+        return HttpResponse.json(ALLOWANCE_QUERY_OK);
+      }),
+    );
+    const res = await testProvider().allowances.query("ALW1781650040");
+    expect(data).toEqual({ allowance_number: "ALW1781650040" });
+    const d = res.data as Record<string, unknown>;
+    expect(d.invoice_type).toBe("D0401");
+    expect(d.total_amount).toBe(100); // 未稅
+    expect(d.detail_vat).toBe(0);
+    const item = (d.product_item as Array<Record<string, unknown>>)[0]!;
+    expect(item.original_invoice_number).toBe("AA26513024");
+    expect(item.tax).toBe(5);
+    // pending schedule (e.g. a queued void)
+    expect((d.wait as Array<Record<string, unknown>>)[0]?.invoice_type).toBe("D0501");
   });
 
   it("allowances.list parses pagination + 未稅 rows with original-invoice items", async () => {

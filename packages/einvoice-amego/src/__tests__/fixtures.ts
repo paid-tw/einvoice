@@ -100,18 +100,30 @@ export const ALLOWANCE_STATUS_OK = {
   data: [{ allowance_number: "ALW1781650040", type: "D0401", status: 1, tax_amount: 5, total_amount: 100 }],
 };
 
+/**
+ * Real allowance_query response (nested `data`). Captured live — includes the
+ * `wait[]` schedule (here a pending D0501 void) and amounts that are 未稅 + tax.
+ */
 export const ALLOWANCE_QUERY_OK = {
   code: 0,
   msg: "",
   data: {
     allowance_number: "ALW1781650040",
     invoice_type: "D0401",
+    invoice_status: 1,
     allowance_date: 20260617,
     allowance_type: 2,
     buyer_identifier: "28080623",
+    buyer_name: "光貿科技有限公司",
+    buyer_zip: 0,
+    buyer_address: "",
+    buyer_telephone_number: "",
+    buyer_email_address: "",
     tax_amount: 5,
-    total_amount: 100,
+    total_amount: 100, // 未稅
     cancel_date: 0,
+    detail_vat: 0,
+    create_date: 1781650040,
     product_item: [
       {
         original_invoice_number: "AA26513024",
@@ -120,10 +132,12 @@ export const ALLOWANCE_QUERY_OK = {
         description: "測試商品",
         unit_price: 100,
         quantity: 1,
+        unit: "",
         amount: 100,
         tax: 5,
       },
     ],
+    wait: [{ invoice_type: "D0501", create_date: 1781650041 }],
   },
 };
 
