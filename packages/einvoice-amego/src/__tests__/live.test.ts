@@ -317,6 +317,10 @@ describe.skipIf(!live)("Amego live — server rejects invalid values", () => {
     expect(await provider.validateBan("10458575")).toBe(false);
   });
 
+  it("validateBan → true for a real registered company (28080623)", async () => {
+    expect(await provider.validateBan("28080623")).toBe(true);
+  });
+
   it("rejects a zero-rated invoice missing the customs mark (3040179)", async () => {
     const err = await provider
       .raw("/json/f0401", base({
