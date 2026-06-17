@@ -92,6 +92,15 @@ describe.skipIf(!live)("ezReceipt live (test env) — variants", LIVE_OPTS, () =
     expect(res.invoiceNumber).toMatch(/^[A-Z]{2}\d{8}$/);
   });
 
+  it("lists the merchant's 字軌 tracks (extension)", async () => {
+    const tracks = await p.listInvoiceTracks();
+    expect(Array.isArray(tracks)).toBe(true);
+    if (tracks.length) {
+      expect(tracks[0]!.lead).toMatch(/^[A-Z]{2}$/);
+      expect(String(tracks[0]!.startNo)).toMatch(/^\d{8}$/);
+    }
+  });
+
   it("issues a mixed-tax invoice (應稅 + 免稅)", async () => {
     const m = member();
     const res = await p.issue({

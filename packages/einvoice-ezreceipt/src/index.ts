@@ -5,3 +5,4 @@ export { ENDPOINTS as EZRECEIPT_ENDPOINTS } from "./endpoints.js";
 export { EzreceiptClient, mapEzreceiptError, hashPassword } from "./client.js";
 export type { EzreceiptEnvelope } from "./client.js";
 export { createEzreceiptProvider, EzreceiptProvider, ezreceiptTaxType } from "./provider.js";
+export type { InvoiceTrack, ListInvoiceTracksInput } from "./provider.js";

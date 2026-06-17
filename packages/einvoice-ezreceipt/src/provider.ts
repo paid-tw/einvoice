@@ -45,6 +45,44 @@ export function ezreceiptTaxType(taxType: TaxType): number {
 const fail = (message: string, code = InvoiceErrorCode.VALIDATION) =>
   new InvoiceError(message, { provider: "ezreceipt", code, rawMessage: message });
 
+/** One 字軌 segment (分段字軌) from {@link EzreceiptProvider.listInvoiceTracks}. */
+export interface InvoiceTrack {
+  /** 字軌識別碼 (inID) — key for {@link EzreceiptProvider.adjustInvoiceTrack}. */
+  inID: number;
+  /** 期別 YYYYMM (起始月). */
+  period: string;
+  /** 字軌名稱, e.g. `"SX"`. */
+  lead: string;
+  /** 起始 8-digit 號碼. */
+  startNo: number;
+  /** 結束 8-digit 號碼. */
+  endNo: number;
+  /** 字軌類別: 7 一般稅額 / 8 特種稅額. */
+  invType: number;
+  /** 0 不限 / 1 無統編 / 2 有統編. */
+  bizType: number;
+  /** 是否已關閉 (0/1). */
+  isClosed: number;
+  /** 字軌所屬平台 (1 易發票 / 100 其他 / null 未設定). */
+  platform: number | null;
+}
+
+/** Filters for {@link EzreceiptProvider.listInvoiceTracks}. */
+export interface ListInvoiceTracksInput {
+  /** 期別 YYYYMM. Defaults to the current period. */
+  period?: string;
+  /** 7 一般稅額 / 8 特種稅額. */
+  invType?: 7 | 8;
+  /** 0 不限 / 1 無統編 / 2 有統編. */
+  bizType?: 0 | 1 | 2;
+  /** Only the currently-open 字軌 (isActive=1). */
+  activeOnly?: boolean;
+  /** Page number (1-based). */
+  page?: number;
+  /** Page size (default 10). */
+  pageSize?: number;
+}
+
 /** Parse an ezReceipt datetime ("YYYY-MM-DD HH:mm:ss", Asia/Taipei) → Date. */
 function parseDate(value: unknown): Date {
   const m = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/.exec(String(value ?? "").trim());
@@ -183,6 +221,41 @@ export class EzreceiptProvider implements InvoiceProvider {
       })),
       raw: r,
     };
+  }
+
+  // --- 字軌 management (extension — beyond the unified InvoiceProvider) -------
+
+  /**
+   * 字軌分段清單 — list this merchant's invoice-number tracks. (字軌 配號 itself is
+   * backend-only; the API can only manage existing tracks.)
+   */
+  async listInvoiceTracks(input: ListInvoiceTracksInput = {}): Promise<InvoiceTrack[]> {
+    const r = await this.client.request<{ list?: InvoiceTrack[] }>(ENDPOINTS.invNumberList(this.config.stID), {
+      ...(input.period ? { period: input.period } : {}),
+      ...(input.invType ? { invType: input.invType } : {}),
+      ...(input.bizType != null ? { bizType: input.bizType } : {}),
+      ...(input.activeOnly ? { isActive: 1 } : {}),
+      ...(input.page ? { _pn: input.page } : {}),
+      ...(input.pageSize ? { _ps: input.pageSize } : {}),
+    });
+    return r.list ?? [];
+  }
+
+  /**
+   * 調整字軌分段起訖號 — adjust a track segment's `startNo` and/or `endNo` (keyed by
+   * its `inID`). Subject to the API's neighbour-segment / already-used rules.
+   */
+  async adjustInvoiceTrack(
+    inID: string | number,
+    change: { startNo?: string | number; endNo?: string | number },
+  ): Promise<InvoiceTrack> {
+    if (this.config.validatePayload !== false && change.startNo == null && change.endNo == null) {
+      throw fail("adjustInvoiceTrack needs startNo and/or endNo");
+    }
+    return this.client.request<InvoiceTrack>(ENDPOINTS.invNumberAdjustNo(inID), {
+      ...(change.startNo != null ? { startNo: String(change.startNo) } : {}),
+      ...(change.endNo != null ? { endNo: String(change.endNo) } : {}),
+    });
   }
 
   /**

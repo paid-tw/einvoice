@@ -282,6 +282,53 @@ describe("allowance", () => {
   });
 });
 
+describe("字軌 management (extension)", () => {
+  const track = { inID: 21307, period: "202605", lead: "SX", startNo: 60721900, endNo: 60722399, invType: 7, bizType: 0, isClosed: 0, platform: 1 };
+
+  it("lists 字軌 tracks with the given filters", async () => {
+    let body: Record<string, unknown> | undefined;
+    server.use(
+      loginHandler(),
+      http.post(url(EP.invNumberList()), async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>;
+        return ok({ list: [track], entries: 1 });
+      }),
+    );
+    const res = await testProvider().listInvoiceTracks({ period: "202605", invType: 7, bizType: 0, activeOnly: true, page: 1, pageSize: 50 });
+    expect(res).toEqual([track]);
+    expect(body).toMatchObject({ period: "202605", invType: 7, bizType: 0, isActive: 1, _pn: 1, _ps: 50 });
+  });
+
+  it("targets the stID path when configured (partner access)", async () => {
+    server.use(loginHandler(), http.post(url(EP.invNumberList(9905)), () => ok({ list: [], entries: 0 })));
+    await expect(testProvider({ stID: 9905 }).listInvoiceTracks()).resolves.toEqual([]);
+  });
+
+  it("adjusts a track's start/end number (sent as strings)", async () => {
+    let body: Record<string, unknown> | undefined;
+    server.use(
+      loginHandler(),
+      http.post(url(EP.invNumberAdjustNo(21307)), async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>;
+        return ok({ ...track, startNo: 60721950 });
+      }),
+    );
+    const res = await testProvider().adjustInvoiceTrack(21307, { startNo: 60721950 });
+    expect(res.startNo).toBe(60721950);
+    expect(body).toEqual({ startNo: "60721950" });
+  });
+
+  it("rejects an adjust with neither startNo nor endNo", async () => {
+    server.use(loginHandler());
+    await expect(testProvider().adjustInvoiceTrack(21307, {})).rejects.toMatchObject({ code: "VALIDATION" });
+  });
+
+  it("maps an invalid track id (20) to NOT_FOUND", async () => {
+    server.use(loginHandler(), http.post(url(EP.invNumberAdjustNo(1)), () => fail(20, "字軌分段識別碼無效")));
+    await expect(testProvider().adjustInvoiceTrack(1, { endNo: 60722399 })).rejects.toMatchObject({ code: "NOT_FOUND", rawCode: "20" });
+  });
+});
+
 describe("voidAllowance", () => {
   it("voids by the allowance awID from providerOptions", async () => {
     let body: Record<string, unknown> | undefined;
