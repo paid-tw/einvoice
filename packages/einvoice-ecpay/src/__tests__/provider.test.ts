@@ -81,6 +81,28 @@ describe("issue (Issue)", () => {
     expect(data?.CarrierType).toBe("");
   });
 
+  it("maps an item's remark to ItemRemark (omitted when absent)", async () => {
+    let data: Record<string, unknown> | undefined;
+    server.use(
+      http.post(url(ECPAY_ENDPOINTS.issue), async ({ request }) => {
+        data = parseRequest(await request.text()).data;
+        return HttpResponse.json(ecSuccess(ISSUE_OK));
+      }),
+    );
+    await testProvider().issue(
+      issueInput({
+        items: [
+          { description: "有備註", quantity: 1, unitPrice: 60, amount: 60, remark: "備註1" },
+          { description: "無備註", quantity: 1, unitPrice: 40, amount: 40 },
+        ],
+        amount: { salesAmount: 100, taxAmount: 0, totalAmount: 100 },
+      }),
+    );
+    const items = data?.Items as Array<Record<string, unknown>>;
+    expect(items[0]?.ItemRemark).toBe("備註1");
+    expect(items[1]).not.toHaveProperty("ItemRemark");
+  });
+
   it("maps a business error (RtnCode ≠ 1) to the normalized code", async () => {
     server.use(
       http.post(url(ECPAY_ENDPOINTS.issue), () =>

@@ -820,6 +820,7 @@ function toEcpayItems(
     ItemPrice: item.unitPrice,
     ItemTaxType: ecpayTaxType(item.taxType ?? invoiceTaxType ?? "TAXABLE"),
     ItemAmount: item.amount,
+    ...(item.remark ? { ItemRemark: item.remark } : {}),
   }));
 }
 
