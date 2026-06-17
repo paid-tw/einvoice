@@ -12,7 +12,11 @@ const live =
   process.env.EZPAY_LIVE === "1" &&
   Boolean(process.env.EZPAY_MERCHANT_ID && process.env.EZPAY_HASH_KEY && process.env.EZPAY_HASH_IV);
 
-describe.skipIf(!live)("ezPay live (test env)", () => {
+// Retry live tests a couple of times: the shared sandbox occasionally throttles
+// under load, which is transient. Offline suites never use this.
+const LIVE_OPTS = { retry: 2 } as const;
+
+describe.skipIf(!live)("ezPay live (test env)", LIVE_OPTS, () => {
   const provider = createEzpayProvider({
     merchantId: process.env.EZPAY_MERCHANT_ID!,
     hashKey: process.env.EZPAY_HASH_KEY!,
@@ -52,7 +56,7 @@ describe.skipIf(!live)("ezPay live (test env)", () => {
   });
 });
 
-describe.skipIf(!live)("ezPay live — allowance lifecycle", () => {
+describe.skipIf(!live)("ezPay live — allowance lifecycle", LIVE_OPTS, () => {
   const provider = createEzpayProvider({
     merchantId: process.env.EZPAY_MERCHANT_ID!,
     hashKey: process.env.EZPAY_HASH_KEY!,
@@ -95,7 +99,7 @@ describe.skipIf(!live)("ezPay live — allowance lifecycle", () => {
   });
 });
 
-describe.skipIf(!live)("ezPay live — 觸發開立 lifecycle", () => {
+describe.skipIf(!live)("ezPay live — 觸發開立 lifecycle", LIVE_OPTS, () => {
   const provider = createEzpayProvider({
     merchantId: process.env.EZPAY_MERCHANT_ID!,
     hashKey: process.env.EZPAY_HASH_KEY!,
@@ -132,7 +136,7 @@ describe.skipIf(!live)("ezPay live — 觸發開立 lifecycle", () => {
   });
 });
 
-describe.skipIf(!live)("ezPay live — 手機條碼/愛心碼驗證", () => {
+describe.skipIf(!live)("ezPay live — 手機條碼/愛心碼驗證", LIVE_OPTS, () => {
   const provider = createEzpayProvider({
     merchantId: process.env.EZPAY_MERCHANT_ID!,
     hashKey: process.env.EZPAY_HASH_KEY!,
@@ -151,7 +155,7 @@ describe.skipIf(!live)("ezPay live — 手機條碼/愛心碼驗證", () => {
   });
 });
 
-describe.skipIf(!live)("ezPay live — 觸發折讓 (held → cancel)", () => {
+describe.skipIf(!live)("ezPay live — 觸發折讓 (held → cancel)", LIVE_OPTS, () => {
   const provider = createEzpayProvider({
     merchantId: process.env.EZPAY_MERCHANT_ID!,
     hashKey: process.env.EZPAY_HASH_KEY!,

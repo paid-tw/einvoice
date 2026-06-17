@@ -12,7 +12,12 @@ import { createAmegoProvider } from "../provider.js";
  */
 const live = process.env.AMEGO_LIVE === "1";
 
-describe.skipIf(!live)("Amego live lifecycle", () => {
+// Retry live tests a couple of times: the shared sandbox occasionally throttles
+// under load, which is transient. NOT applied to the booklet-consuming mutate
+// suite (a retry there would waste invoice numbers). Offline suites never retry.
+const LIVE_OPTS = { retry: 2 } as const;
+
+describe.skipIf(!live)("Amego live lifecycle", LIVE_OPTS, () => {
   const provider = createAmegoProvider({
     sellerUbn: process.env.AMEGO_SELLER ?? AMEGO_SANDBOX.sellerUbn,
     appKey: process.env.AMEGO_APP_KEY ?? AMEGO_SANDBOX.appKey,
@@ -206,7 +211,7 @@ describe.skipIf(!mutate)("Amego live — custom numbering (consumes a booklet)",
  * bypassing local validation) and assert the exact error code Amego returns.
  * These are the source-of-truth for the offline error fixtures.
  */
-describe.skipIf(!live)("Amego live — server rejects invalid values", () => {
+describe.skipIf(!live)("Amego live — server rejects invalid values", LIVE_OPTS, () => {
   const provider = createAmegoProvider({
     sellerUbn: process.env.AMEGO_SELLER ?? AMEGO_SANDBOX.sellerUbn,
     appKey: process.env.AMEGO_APP_KEY ?? AMEGO_SANDBOX.appKey,
