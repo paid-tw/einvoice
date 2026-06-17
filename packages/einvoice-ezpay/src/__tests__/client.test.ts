@@ -39,4 +39,19 @@ describe("ezpayRequest transport errors", () => {
     const res = await post();
     expect(res.result.InvoiceNumber).toBe("BB1");
   });
+
+  it("falls back to a generic message when an error envelope has none", async () => {
+    server.use(http.post(url, () => HttpResponse.json({ Status: "INV10013", Message: "" })));
+    const err = await post().catch((e) => e);
+    expect(err.code).toBe("VALIDATION");
+    expect(err.message).toBe("ezPay returned an error");
+  });
+
+  it("honors a configured request timeout", async () => {
+    server.use(http.post(url, () => HttpResponse.json({ Status: "SUCCESS", Message: "ok", Result: "{}" })));
+    const res = await ezpayRequest({ ...config, timeoutMs: 5000 }, EZPAY_ENDPOINTS.issue.path, {
+      RespondType: "JSON",
+    });
+    expect(res.status).toBe("SUCCESS");
+  });
 });

@@ -378,4 +378,38 @@ describe("allowance / voidAllowance / query", () => {
     expect(err.code).toBe("NOT_FOUND");
     expect(err.rawCode).toBe("INV20006");
   });
+
+  it("query treats a B2C placeholder BuyerUBN (0000000000) as no 統編", async () => {
+    server.use(
+      http.post(url(EZPAY_ENDPOINTS.search), () =>
+        HttpResponse.json(
+          ezSuccess({
+            InvoiceNumber: "BB00000001",
+            RandomNum: "1234",
+            BuyerUBN: "0000000000",
+            Amt: 100,
+            TaxAmt: 5,
+            TotalAmt: 105,
+          }),
+        ),
+      ),
+    );
+    const res = await testProvider().query({ invoiceNumber: "BB00000001", providerOptions: { randomNum: "1234" } });
+    expect(res.buyer.ubn).toBeUndefined();
+  });
+});
+
+describe("raw() escape hatch", () => {
+  it("posts arbitrary PostData_ to any endpoint and returns the parsed result", async () => {
+    let captured: ReturnType<typeof parsePostData> | undefined;
+    server.use(
+      http.post(url(EZPAY_ENDPOINTS.issue), async ({ request }) => {
+        captured = parsePostData(await request.text());
+        return HttpResponse.json(ezSuccess({ InvoiceNumber: "BB00000099" }));
+      }),
+    );
+    const res = await testProvider().raw(EZPAY_ENDPOINTS.issue.path, { Foo: "bar", N: 1 });
+    expect(captured?.params).toMatchObject({ Foo: "bar", N: "1" });
+    expect(res.result.InvoiceNumber).toBe("BB00000099");
+  });
 });

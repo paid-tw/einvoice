@@ -77,6 +77,11 @@ describe("ezpayAllowancePayloadSchema (allowance_issue)", () => {
     expect(ok(ezpayAllowancePayloadSchema, { ...base, BuyerEmail: "nope" })).toBe(false);
     expect(ok(ezpayAllowancePayloadSchema, { ...base, BuyerEmail: "b@x.com" })).toBe(true);
   });
+
+  it("rejects missing item fields (ItemUnit / ItemName absent)", () => {
+    expect(ok(ezpayAllowancePayloadSchema, { ...base, ItemUnit: undefined })).toBe(false);
+    expect(ok(ezpayAllowancePayloadSchema, { ...base, ItemName: undefined })).toBe(false);
+  });
 });
 
 describe("ezpayAllowanceTouchPayloadSchema (allowance_touch_issue)", () => {
