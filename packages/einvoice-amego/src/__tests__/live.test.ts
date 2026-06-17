@@ -136,7 +136,7 @@ describe.skipIf(!live)("Amego live lifecycle", () => {
   });
 
   it("downloads the invoice PDF link (invoice.file → data.file_url)", async () => {
-    const res = await provider.invoice.file(invoiceNumber, 0);
+    const res = await provider.invoice.file({ invoiceNumber, downloadStyle: 0 });
     expect(res.code).toBe(0);
     expect((res.data as { file_url?: string }).file_url).toMatch(/^https:\/\//);
   });

@@ -306,12 +306,22 @@ export class AmegoProvider implements InvoiceProvider {
         ...(opts.printInvoiceType !== undefined ? { print_invoice_type: opts.printInvoiceType } : {}),
         ...(opts.printInvoiceDetail !== undefined ? { print_invoice_detail: opts.printInvoiceDetail } : {}),
       }),
-    /** 發票檔案 — returns `data.file_url`. */
-    file: (invoiceNumber: string, downloadStyle: 0 | 1 | 2 | 3 = 0) =>
+    /**
+     * 發票檔案 (PDF) — look up by `invoiceNumber` or `orderId`. Returns
+     * `data.file_url` (valid 10 minutes). `downloadStyle` (有統編): 0 A4整張 /
+     * 1 A4(地址+A5) / 2 A4(A5x2) / 3 A5 / 5 QRcode_A4 (no-統編 supports only 0).
+     * Carrier invoices can only be downloaded after winning the lottery.
+     */
+    file: (opts: {
+      invoiceNumber?: string;
+      orderId?: string;
+      downloadStyle?: 0 | 1 | 2 | 3 | 5;
+    }) =>
       this.raw(ENDPOINTS.invoiceFile, {
-        type: "invoice",
-        invoice_number: invoiceNumber,
-        download_style: downloadStyle,
+        ...(opts.orderId
+          ? { type: "order", order_id: opts.orderId }
+          : { type: "invoice", invoice_number: opts.invoiceNumber }),
+        download_style: opts.downloadStyle ?? 0,
       }),
     /** 發票狀態 — ARRAY payload, nested `data[]`. */
     status: (invoiceNumbers: string[]) =>

@@ -65,10 +65,16 @@ const CASES: Array<{
     expectData: { type: "order", order_id: "O1", printer_type: 2, print_invoice_type: 1, print_invoice_detail: 1 },
   },
   {
-    name: "invoice.file (snake_case + type)",
+    name: "invoice.file by invoiceNumber (type:invoice)",
     path: ENDPOINTS.invoiceFile,
-    invoke: (p) => p.invoice.file("AA1"),
+    invoke: (p) => p.invoice.file({ invoiceNumber: "AA1" }),
     expectData: { type: "invoice", invoice_number: "AA1", download_style: 0 },
+  },
+  {
+    name: "invoice.file by orderId + style 5 (QRcode_A4)",
+    path: ENDPOINTS.invoiceFile,
+    invoke: (p) => p.invoice.file({ orderId: "O1", downloadStyle: 5 }),
+    expectData: { type: "order", order_id: "O1", download_style: 5 },
   },
   {
     name: "invoice.status (ARRAY)",
@@ -260,7 +266,7 @@ describe("Amego endpoint contracts (verified live shapes)", () => {
         return HttpResponse.json(FILE_URL_OK);
       }),
     );
-    const inv = await testProvider().invoice.file("AA26513024", 1);
+    const inv = await testProvider().invoice.file({ invoiceNumber: "AA26513024", downloadStyle: 1 });
     expect(invData).toEqual({ type: "invoice", invoice_number: "AA26513024", download_style: 1 });
     expect((inv.data as { file_url: string }).file_url).toContain("https://");
 
