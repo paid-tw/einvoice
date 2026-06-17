@@ -51,6 +51,26 @@ describe("延遲/觸發開立 two-phase", () => {
     await expect(testProvider().issuePending(issueInput, { delayDay: 16 })).rejects.toMatchObject({ code: "VALIDATION" });
   });
 
+  it("cancelDelayIssue posts the Tsr; unknown/cancelled → NOT_FOUND; empty → local VALIDATION", async () => {
+    let data: Record<string, unknown> | undefined;
+    server.use(
+      http.post(url(ECPAY_ENDPOINTS.cancelDelayIssue), async ({ request }) => {
+        data = parseRequest(await request.text()).data;
+        return HttpResponse.json(ecSuccess({}));
+      }),
+    );
+    await testProvider().cancelDelayIssue("ORDER_1");
+    expect(data).toEqual({ MerchantID: "2000132", Tsr: "ORDER_1" });
+
+    server.use(
+      http.post(url(ECPAY_ENDPOINTS.cancelDelayIssue), () =>
+        HttpResponse.json(ecError(5070305, "B2C取消延遲(或觸發)發票 查無可更新交易單號")),
+      ),
+    );
+    await expect(testProvider().cancelDelayIssue("NOPE")).rejects.toMatchObject({ code: "NOT_FOUND" });
+    await expect(testProvider().cancelDelayIssue("")).rejects.toMatchObject({ code: "VALIDATION" });
+  });
+
   it("editDelayIssue posts the full data + Tsr to EditDelayIssue", async () => {
     let data: Record<string, unknown> | undefined;
     server.use(

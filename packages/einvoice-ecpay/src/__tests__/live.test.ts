@@ -115,6 +115,13 @@ describe.skipIf(!live)("ECPay live (stage) — 延遲/觸發開立", LIVE_OPTS, 
     expect(res.raw.RtnCode).toBe(1);
   });
 
+  it("cancelDelayIssue cancels a still-pending invoice; cancelling again → NOT_FOUND", async () => {
+    const cid = `${orderId}C`;
+    await p.issuePending(carrierIssue(cid)); // TRIGGER mode → stays pending
+    await p.cancelDelayIssue(cid); // resolves on success (取消成功)
+    await expect(p.cancelDelayIssue(cid)).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
   it("editDelayIssue updates a still-pending invoice; unknown Tsr → NOT_FOUND", async () => {
     const eid = `${orderId}E`;
     await p.issuePending(carrierIssue(eid)); // TRIGGER mode → stays pending

@@ -57,6 +57,9 @@ await invoices.issuePending({ /* … */ }, { mode: "SCHEDULE", delayDay: 3 });
 
 // Edit a still-pending delayed invoice (keyed by its Tsr = orderId).
 await invoices.editDelayIssue({ /* updated IssueInvoiceInput */ });
+
+// Cancel a still-pending delayed invoice (before it issues/triggers).
+await invoices.cancelDelayIssue(relateNumber);
 ```
 
 ## Carrier validation (手機條碼 / 愛心碼)

@@ -268,6 +268,21 @@ export class EcpayProvider implements InvoiceProvider {
     };
   }
 
+  /**
+   * 取消延遲開立 (CancelDelayIssue): cancel a staged delayed invoice that hasn't
+   * been issued yet (預約時間未到 / 尚未觸發), keyed by its `Tsr` (= relateNumber).
+   */
+  async cancelDelayIssue(tsr: string): Promise<void> {
+    if (this.config.validatePayload !== false && !tsr) {
+      throw new InvoiceError("Tsr is required", {
+        provider: "ecpay",
+        code: InvoiceErrorCode.VALIDATION,
+        rawMessage: "Tsr is required",
+      });
+    }
+    await ecpayRequest(this.config, ENDPOINTS.cancelDelayIssue, { Tsr: tsr });
+  }
+
   async void(input: VoidInvoiceInput): Promise<VoidInvoiceResult> {
     const parsed = voidInvoiceInputSchema.parse(input);
     const opts = (parsed.providerOptions ?? {}) as Record<string, unknown>;
