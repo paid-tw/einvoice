@@ -135,6 +135,15 @@ describe.skipIf(!live)("Amego live lifecycle", () => {
     expect(res.invoiceNumber).toMatch(/^[A-Z]{2}\d{8}$/);
   });
 
+  it("reads invoice status in batch (real + NOT_FOUND for unknown)", async () => {
+    const res = await provider.invoice.status([invoiceNumber, "ZZ00000000"]);
+    expect(res.code).toBe(0);
+    const rows = res.data as Array<{ invoice_number: string; type: string }>;
+    const real = rows.find((r) => r.invoice_number === invoiceNumber);
+    expect(real?.type).toMatch(/^[A-Z]\d{4}$/); // e.g. C0401
+    expect(rows.some((r) => r.type === "NOT_FOUND")).toBe(true);
+  });
+
   it("downloads the invoice PDF link (invoice.file → data.file_url)", async () => {
     const res = await provider.invoice.file({ invoiceNumber, downloadStyle: 0 });
     expect(res.code).toBe(0);

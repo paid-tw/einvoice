@@ -17,6 +17,7 @@ import {
   ALLOWANCE_STATUS_OK,
   FILE_URL_OK,
   INVOICE_LIST_OK,
+  INVOICE_STATUS_OK,
   LOTTERY_STATUS_OK,
   LOTTERY_TYPE_OK,
   TIME_OK,
@@ -200,6 +201,23 @@ describe("Amego endpoint contracts (verified live shapes)", () => {
   it("raw() can call any endpoint directly", async () => {
     server.use(http.post(`${BASE}/json/anything`, () => HttpResponse.json({ code: 0, ok: true })));
     expect(await testProvider().raw("/json/anything", { foo: "bar" })).toMatchObject({ ok: true });
+  });
+
+  it("invoice.status sends the PascalCase array and parses the upload-status rows", async () => {
+    let data: unknown;
+    server.use(
+      http.post(`${BASE}${ENDPOINTS.invoiceStatus}`, async ({ request }) => {
+        data = parseBody(await request.text()).data;
+        return HttpResponse.json(INVOICE_STATUS_OK);
+      }),
+    );
+    const res = await testProvider().invoice.status(["AA26513024"]);
+    expect(data).toEqual([{ InvoiceNumber: "AA26513024" }]);
+    const row = (res.data as Array<Record<string, unknown>>)[0]!;
+    expect(row.invoice_number).toBe("AA26513024");
+    expect(row.type).toBe("C0401");
+    expect(row.status).toBe(UPLOAD_STATUS.PENDING);
+    expect(row.total_amount).toBe(105);
   });
 
   it("allowances.status sends the PascalCase array and parses the upload-status rows", async () => {
