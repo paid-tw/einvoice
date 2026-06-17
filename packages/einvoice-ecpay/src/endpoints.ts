@@ -6,6 +6,7 @@
 export const ENDPOINTS = {
   issue: "/B2CInvoice/Issue", // 一般開立
   delayIssue: "/B2CInvoice/DelayIssue", // 延遲(預約/觸發待開)開立
+  editDelayIssue: "/B2CInvoice/EditDelayIssue", // 編輯延遲開立
   triggerIssue: "/B2CInvoice/TriggerIssue", // 觸發延遲開立
   cancelDelayIssue: "/B2CInvoice/CancelDelayIssue", // 取消延遲開立
   invalid: "/B2CInvoice/Invalid", // 作廢

@@ -208,6 +208,24 @@ export class EcpayProvider implements InvoiceProvider {
   }
 
   /**
+   * 編輯延遲開立 (EditDelayIssue): replace a still-pending delayed invoice's data,
+   * keyed by its `Tsr` (defaults to the new input's `orderId`). The invoice must
+   * not have been triggered/issued yet.
+   */
+  async editDelayIssue(
+    input: IssueInvoiceInput,
+    options: { tsr?: string; notifyUrl?: string } = {},
+  ): Promise<{ relateNumber: string; raw: EcpayResult }> {
+    const parsed = issueInvoiceInputSchema.parse(input);
+    const result = await ecpayRequest(this.config, ENDPOINTS.editDelayIssue, {
+      ...this.buildIssueData(parsed),
+      Tsr: options.tsr ?? parsed.orderId,
+      NotifyURL: options.notifyUrl,
+    });
+    return { relateNumber: parsed.orderId, raw: result };
+  }
+
+  /**
    * 觸發開立 (TriggerIssue): issue a held invoice now, then look up the assigned
    * number (the trigger reply itself carries no InvoiceNo). Success replies use
    * RtnCode 4000003/4000004.

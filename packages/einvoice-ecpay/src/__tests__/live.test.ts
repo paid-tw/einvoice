@@ -105,6 +105,14 @@ describe.skipIf(!live)("ECPay live (stage) — 延遲/觸發開立", LIVE_OPTS, 
     const res = await p.issuePending(carrierIssue(`${orderId}S`), { mode: "SCHEDULE", delayDay: 3 });
     expect(res.raw.RtnCode).toBe(1);
   });
+
+  it("editDelayIssue updates a still-pending invoice; unknown Tsr → NOT_FOUND", async () => {
+    const eid = `${orderId}E`;
+    await p.issuePending(carrierIssue(eid)); // TRIGGER mode → stays pending
+    const edited = await p.editDelayIssue({ ...carrierIssue(eid), items: [{ description: "改後商品", quantity: 1, unitPrice: 200, amount: 200 }], amount: { salesAmount: 200, taxAmount: 0, totalAmount: 200 } });
+    expect(edited.raw.RtnCode).toBe(1);
+    await expect(p.editDelayIssue(carrierIssue(eid), { tsr: "NONEXISTENT999" })).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
 });
 
 describe.skipIf(!live)("ECPay live (stage) — 載具驗證", LIVE_OPTS, () => {

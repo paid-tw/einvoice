@@ -5,6 +5,7 @@ describe("mapEcpayError (keyword-based, ECPay RtnMsg)", () => {
   it.each([
     [2, "查無發票資料，請重新確認", "NOT_FOUND"],
     [1600003, "無發票號碼資料", "NOT_FOUND"],
+    [4000001, "不存在此交易單號", "NOT_FOUND"], // unknown Tsr (edit/trigger/cancel)
     [1100040, "發票字軌已用完", "NUMBER_EXHAUSTED"],
     [0, "發票已作廢過", "CONFLICT"],
     [0, "自訂編號不可重複", "CONFLICT"],

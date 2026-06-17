@@ -52,6 +52,9 @@ const issued = await invoices.triggerIssue({ relateNumber }); // → real invoic
 
 // SCHEDULE (預約): auto-issues after N days (1–15), no trigger needed.
 await invoices.issuePending({ /* … */ }, { mode: "SCHEDULE", delayDay: 3 });
+
+// Edit a still-pending delayed invoice (keyed by its Tsr = orderId).
+await invoices.editDelayIssue({ /* updated IssueInvoiceInput */ });
 ```
 
 ## Carrier validation (手機條碼 / 愛心碼)

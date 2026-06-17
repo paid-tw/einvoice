@@ -51,6 +51,26 @@ describe("延遲/觸發開立 two-phase", () => {
     await expect(testProvider().issuePending(issueInput, { delayDay: 16 })).rejects.toMatchObject({ code: "VALIDATION" });
   });
 
+  it("editDelayIssue posts the full data + Tsr to EditDelayIssue", async () => {
+    let data: Record<string, unknown> | undefined;
+    server.use(
+      http.post(url(ECPAY_ENDPOINTS.editDelayIssue), async ({ request }) => {
+        data = parseRequest(await request.text()).data;
+        return HttpResponse.json(ecSuccess({ OrderNumber: "ORDER_1" }));
+      }),
+    );
+    const res = await testProvider().editDelayIssue(issueInput);
+    expect(data).toMatchObject({ Tsr: "ORDER_1", RelateNumber: "ORDER_1", SalesAmount: 100 });
+    expect(res.relateNumber).toBe("ORDER_1");
+  });
+
+  it("editDelayIssue maps an unknown Tsr (4000001) to NOT_FOUND", async () => {
+    server.use(
+      http.post(url(ECPAY_ENDPOINTS.editDelayIssue), () => HttpResponse.json(ecError(4000001, "不存在此交易單號"))),
+    );
+    await expect(testProvider().editDelayIssue(issueInput, { tsr: "NOPE" })).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
   it("triggerIssue accepts the 4000004 success code, then queries for the number", async () => {
     let triggered: Record<string, unknown> | undefined;
     server.use(
