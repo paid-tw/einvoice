@@ -149,6 +149,7 @@ describe("mapEzreceiptError (table-driven)", () => {
     [308, "AUTH"],
     [331, "AUTH"],
     [1016, "AUTH"],
+    [1026, "AUTH"],
     [10, "NOT_FOUND"],
     [11, "NOT_FOUND"],
     [12, "NOT_FOUND"],

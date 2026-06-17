@@ -92,6 +92,30 @@ describe.skipIf(!live)("ezReceipt live (test env) — variants", LIVE_OPTS, () =
     expect(res.invoiceNumber).toMatch(/^[A-Z]{2}\d{8}$/);
   });
 
+  it("issues a zero-rated invoice (zeroTaxReason + isCustom)", async () => {
+    const m = member();
+    const res = await p.issue({
+      orderId: order(),
+      buyer: { name: "零稅率", email: m },
+      items: [{ description: "外銷商品", quantity: 1, unitPrice: 100, amount: 100 }],
+      amount: { salesAmount: 100, taxAmount: 0, totalAmount: 100 },
+      taxType: "ZERO_RATED",
+      priceMode: "TAX_EXCLUSIVE",
+      carrier: { type: "MEMBER", code: m },
+      providerOptions: { zeroTaxReason: 71, clearanceMark: 1 },
+    });
+    expect(res.invoiceNumber).toMatch(/^[A-Z]{2}\d{8}$/);
+  });
+
+  it("reports each line's remaining allowance quota (extension)", async () => {
+    const m = member();
+    const inv = await p.issue({ ...base, orderId: order(), buyer: { name: "x", email: m }, items: [{ description: "商品", quantity: 3, unitPrice: 100, amount: 300 }], amount: { salesAmount: 300, taxAmount: 15, totalAmount: 315 }, carrier: { type: "MEMBER", code: m } });
+    const quota = await p.getAllowanceQuota(inv.invoiceNumber);
+    expect(quota.length).toBeGreaterThan(0);
+    expect(quota[0]!.amount).toBe(300);
+    expect(quota[0]!.tax).toBe(15);
+  });
+
   it("lists the merchant's 字軌 tracks (extension)", async () => {
     const tracks = await p.listInvoiceTracks();
     expect(Array.isArray(tracks)).toBe(true);

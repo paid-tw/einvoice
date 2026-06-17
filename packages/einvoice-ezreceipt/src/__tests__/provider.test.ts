@@ -132,6 +132,28 @@ describe("issue", () => {
     expect(twd.body?.currency).toBeUndefined();
   });
 
+  it("passes invoiceTime (from date), zero-rated fields, and self-assigned number through", async () => {
+    const cap: { body?: Record<string, unknown> } = {};
+    server.use(loginHandler(), issueCapture(cap));
+    await testProvider().issue({
+      ...b2cInput,
+      taxType: "ZERO_RATED",
+      date: new Date("2026-06-18T06:00:00Z"), // → 2026-06-18 14:00:00 Asia/Taipei
+      providerOptions: { zeroTaxReason: 71, clearanceMark: 1, invNo: "SX60721900", autoInvNo: true, winvNo: "W1", randNo: "1234" },
+    });
+    expect(cap.body).toMatchObject({
+      invoiceTime: "2026-06-18 14:00:00",
+      zeroTaxReason: 71,
+      isCustom: 1,
+      invNo: "SX60721900",
+      autoInvNo: true,
+      winvNo: "W1",
+      randNo: "1234",
+    });
+    // ZERO_RATED item → taxType 2
+    expect((cap.body?.prodList as Array<{ taxType: number }>)[0]?.taxType).toBe(2);
+  });
+
   it("rejects an invoice with no ubn / carrier / donation", async () => {
     server.use(loginHandler());
     await expect(testProvider().issue({ ...b2cInput, carrier: undefined })).rejects.toMatchObject({ code: "VALIDATION" });
@@ -279,6 +301,23 @@ describe("allowance", () => {
       providerOptions: { invID: 999, itemTax: [3] },
     });
     expect(allowBody?.prodList).toMatchObject([{ tax: 3 }]);
+  });
+});
+
+describe("getAllowanceQuota (extension)", () => {
+  it("resolves the invID and returns each line's remaining creditable quota", async () => {
+    server.use(
+      loginHandler(),
+      listResolves("SX60721900", 999),
+      http.post(url(EP.allowQuota(999)), () => ok({ itemList: [{ soiID: 236552, qty: 3, amount: 300, tax: 15 }] })),
+    );
+    const res = await testProvider().getAllowanceQuota("SX60721900");
+    expect(res).toEqual([{ soiID: 236552, qty: 3, amount: 300, tax: 15 }]);
+  });
+
+  it("maps an app without sales entitlement (1026) to AUTH", async () => {
+    server.use(loginHandler(), http.post(url(EP.allowQuota(5)), () => fail(1026, "這個應用程式並未具有銷售功能的使用資格。")));
+    await expect(testProvider().getAllowanceQuota("SX1", { invID: 5 })).rejects.toMatchObject({ code: "AUTH", rawCode: "1026" });
   });
 });
 

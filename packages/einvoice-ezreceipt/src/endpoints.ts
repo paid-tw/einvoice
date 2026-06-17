@@ -11,6 +11,8 @@ export const ENDPOINTS = {
   view: (invID: string | number) => `/eInvoice/invoice/view/${invID}`,
   /** 條列發票 (paginated). */
   list: "/eInvoice/invoice/list",
+  /** 各品項尚餘可折讓的數量/金額 (by invID). */
+  allowQuota: (invID: string | number) => `/eInvoice/invoice/allowQuota/${invID}`,
   /** 作廢發票 (by invID, in the path). Body: `{ voidReason }`. */
   void: (invID: string | number) => `/eInvoice/invoice/void/${invID}`,
   /**

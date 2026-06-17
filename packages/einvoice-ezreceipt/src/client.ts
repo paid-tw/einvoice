@@ -36,6 +36,7 @@ export function mapEzreceiptError(code: number): InvoiceErrorCode {
     case 308:
     case 331:
     case 1016:
+    case 1026:
       return InvoiceErrorCode.AUTH;
     // unknown order / store / invoice / allowance / 字軌 / item id
     case 10:

@@ -113,12 +113,44 @@ export interface ListInvoiceTracksInput {
   pageSize?: number;
 }
 
+/** One line's remaining creditable (折讓) quota from {@link EzreceiptProvider.getAllowanceQuota}. */
+export interface AllowanceQuotaItem {
+  /** 原發票品項識別碼 (soiID) — use it in an allowance's prodList. */
+  soiID: number;
+  /** 商品編號. */
+  prodNo?: string | null;
+  /** 商品名稱. */
+  title?: string | null;
+  /** 建議數量 (not strictly enforced by the tax authority). */
+  qty: number;
+  /** 尚餘可折讓金額 (未稅). */
+  amount: number;
+  /** 尚餘可折讓稅額. */
+  tax: number;
+}
+
 /** Parse an ezReceipt datetime ("YYYY-MM-DD HH:mm:ss", Asia/Taipei) → Date. */
 function parseDate(value: unknown): Date {
   const m = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/.exec(String(value ?? "").trim());
   if (!m) return new Date();
   const [, y, mo, d, hh, mi, ss] = m;
   return new Date(`${y}-${mo}-${d}T${hh}:${mi}:${ss}+08:00`);
+}
+
+/** Format a Date as `YYYY-MM-DD HH:mm:ss` in Asia/Taipei (for `invoiceTime`). */
+function taipeiDateTime(date: Date): string {
+  return new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Asia/Taipei",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  })
+    .format(date)
+    .replace("T", " ");
 }
 
 /**
@@ -251,6 +283,17 @@ export class EzreceiptProvider implements InvoiceProvider {
       })),
       raw: r,
     };
+  }
+
+  /**
+   * 各品項尚餘可折讓額度 — an invoice can be credited multiple times; this returns
+   * each line's remaining creditable quantity / amount (untaxed) / tax. Useful
+   * for validating or building a partial allowance.
+   */
+  async getAllowanceQuota(invoiceNumber: string, providerOptions?: Record<string, unknown>): Promise<AllowanceQuotaItem[]> {
+    const invID = await this.resolveInvID(invoiceNumber, providerOptions);
+    const r = await this.client.request<{ itemList?: AllowanceQuotaItem[] }>(ENDPOINTS.allowQuota(invID), {});
+    return r.itemList ?? [];
   }
 
   // --- 字軌 management (extension — beyond the unified InvoiceProvider) -------
@@ -395,12 +438,23 @@ export class EzreceiptProvider implements InvoiceProvider {
 
   private buildIssueBody(input: IssueInvoiceInput): Record<string, unknown> {
     const opts = (input.providerOptions ?? {}) as Record<string, unknown>;
+    const invoiceTime = input.date ? taipeiDateTime(input.date) : (opts.invoiceTime as string | undefined);
     const body: Record<string, unknown> = {
       prodList: input.items.map((item) => toProdItem(item, input)),
       trCode: opts.trCode ?? 0,
       msgType: opts.msgType ?? 1,
       ...(input.currency && input.currency !== "TWD" ? { currency: input.currency } : {}),
       ...(input.remark ? { remarks: input.remark } : {}),
+      // Self-assigned number / 註銷重開 (invNo + autoInvNo); else the platform picks.
+      ...(opts.invNo ? { invNo: opts.invNo } : {}),
+      ...(opts.autoInvNo != null ? { autoInvNo: opts.autoInvNo } : {}),
+      ...(invoiceTime ? { invoiceTime } : {}),
+      // Zero-rated / mixed-tax invoices REQUIRE zeroTaxReason (71–79) + isCustom (0/1).
+      ...(opts.zeroTaxReason != null ? { zeroTaxReason: opts.zeroTaxReason } : {}),
+      ...(opts.clearanceMark != null ? { isCustom: opts.clearanceMark } : {}),
+      ...(opts.winvNo ? { winvNo: opts.winvNo } : {}),
+      ...(opts.randNo ? { randNo: opts.randNo } : {}),
+      ...(opts.accCode ? { accCode: opts.accCode } : {}),
     };
     if (input.buyer.ubn) {
       body.issueTo = { nid: input.buyer.ubn, title: input.buyer.name, addr: input.buyer.address };
