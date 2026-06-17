@@ -189,6 +189,14 @@ describe.skipIf(!live)("Amego live — server rejects invalid values", () => {
     expect(err.rawCode).toBe("99");
   });
 
+  it("barcode: malformed → 9000112, well-formed-but-unregistered → 9000113 (NOT_FOUND)", async () => {
+    const fmt = await provider.raw("/json/barcode", { barCode: "ABC" }).catch((e) => e);
+    expect(fmt.rawCode).toBe("9000112");
+    const missing = await provider.raw("/json/barcode", { barCode: "/AAAAAAA" }).catch((e) => e);
+    expect(missing.rawCode).toBe("9000113");
+    expect(missing.code).toBe("NOT_FOUND");
+  });
+
   it("returns an empty name for a valid-format 統編 with no company (not an error)", async () => {
     const res = await provider.banQuery("10458575");
     expect(res.code).toBe(0);

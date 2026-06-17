@@ -6,6 +6,7 @@ import {
   deriveCategory,
   InvoiceError,
   InvoiceErrorCode,
+  isValidMobileBarcode,
   type InvoiceItem,
   type InvoiceProvider,
   InvoiceStatus,
@@ -411,8 +412,19 @@ export class AmegoProvider implements InvoiceProvider {
     return this.raw(ENDPOINTS.banQuery, bans.map((ban) => ({ ban })));
   }
 
-  /** 手機條碼查詢 — validate a mobile barcode carrier (field is `barCode`). */
-  barcodeQuery(barCode: string): Promise<AmegoResponse> {
+  /**
+   * 手機條碼查詢 — check whether a mobile barcode is valid/registered. The format
+   * is checked locally first (Amego returns 9000112 for malformed input); a
+   * well-formed but unregistered barcode comes back as 9000113 → NOT_FOUND.
+   */
+  async barcodeQuery(barCode: string): Promise<AmegoResponse> {
+    if (this.config.validatePayload !== false && !isValidMobileBarcode(barCode)) {
+      throw new InvoiceError(`Invalid 手機條碼 format: ${barCode}`, {
+        provider: "amego",
+        code: InvoiceErrorCode.VALIDATION,
+        rawMessage: "手機條碼 must be '/' followed by 7 chars [0-9A-Z.+-]",
+      });
+    }
     return this.raw(ENDPOINTS.barcode, { barCode });
   }
 

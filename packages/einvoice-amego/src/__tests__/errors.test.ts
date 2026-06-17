@@ -33,6 +33,8 @@ describe("mapAmegoErrorCode (from info_detail?mid=71)", () => {
     [3040162, "VALIDATION"], // DetailVat 0 無統編
     [3040179, "VALIDATION"], // 零稅率缺通關註記
     [99, "VALIDATION"], // f0401_custom per-record field error
+    [9000112, "VALIDATION"], // 手機條碼格式錯誤
+    [9000113, "NOT_FOUND"], // 手機條碼不存在
     [71, "NOT_FOUND"], // 查無資料
     [3050125, "NOT_FOUND"], // 發票不存在
     [999999, "PROVIDER"], // unknown

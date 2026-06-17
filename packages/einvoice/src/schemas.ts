@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isValidMobileBarcode } from "./mobile-barcode.js";
 import { isValidUbn } from "./ubn.js";
 
 /**
@@ -42,7 +43,7 @@ export const carrierSchema = z
     code: z.string().optional(),
   })
   .superRefine((c, ctx) => {
-    if (c.type === "MOBILE_BARCODE" && c.code && !/^\/[0-9A-Z.\-+]{7}$/.test(c.code)) {
+    if (c.type === "MOBILE_BARCODE" && c.code && !isValidMobileBarcode(c.code)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "手機條碼 must be '/' followed by 7 chars",

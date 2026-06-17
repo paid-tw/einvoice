@@ -181,8 +181,9 @@ export function mapAmegoErrorCode(code: number): InvoiceErrorCode {
   // 統編 missing/invalid — credential-level
   if (code === 11 || code === 12) return InvoiceErrorCode.AUTH;
 
-  // No data / invoice does not exist
-  if (code === 71 || code === 3050125) return InvoiceErrorCode.NOT_FOUND;
+  // No data / invoice does not exist / 手機條碼不存在
+  if (code === 71 || code === 3050125 || code === 9000113)
+    return InvoiceErrorCode.NOT_FOUND;
 
   // Number track (字軌) exhausted
   if (code === 3040111) return InvoiceErrorCode.NUMBER_EXHAUSTED;
