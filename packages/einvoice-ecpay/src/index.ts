@@ -2,6 +2,8 @@
 export type { EcpayConfig } from "./config.js";
 export { ECPAY_SANDBOX, ECPAY_BASE_URL } from "./config.js";
 export { ENDPOINTS as ECPAY_ENDPOINTS } from "./endpoints.js";
+export { ecpayRequest, mapEcpayError, ecpayTimestamp } from "./client.js";
+export type { EcpayResult } from "./client.js";
 export {
   aesEncrypt,
   aesDecrypt,
