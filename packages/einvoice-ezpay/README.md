@@ -1,8 +1,15 @@
 # @paid-tw/einvoice-ezpay
 
-[ezPay](https://www.ezpay.com.tw/) (簡單行動支付 / 藍新) adapter for
-[`@paid-tw/einvoice`](https://www.npmjs.com/package/@paid-tw/einvoice). Implements
-the unified `InvoiceProvider` interface over the ezPay e-invoice API.
+[![npm version](https://img.shields.io/npm/v/@paid-tw/einvoice-ezpay.svg)](https://www.npmjs.com/package/@paid-tw/einvoice-ezpay)
+[![npm downloads](https://img.shields.io/npm/dm/@paid-tw/einvoice-ezpay.svg)](https://www.npmjs.com/package/@paid-tw/einvoice-ezpay)
+[![types: TypeScript](https://img.shields.io/npm/types/@paid-tw/einvoice-ezpay.svg)](https://www.typescriptlang.org/)
+[![license: MIT](https://img.shields.io/npm/l/@paid-tw/einvoice-ezpay.svg)](https://github.com/paid-tw/einvoice/blob/main/LICENSE)
+
+[English](./README.en.md) ｜ **繁體中文**
+
+[ezPay](https://www.ezpay.com.tw/)（簡單行動支付 / 藍新）用於
+[`@paid-tw/einvoice`](https://www.npmjs.com/package/@paid-tw/einvoice) 的轉接器。
+在 ezPay 電子發票 API 之上實作統一的 `InvoiceProvider` 介面。
 
 ```bash
 pnpm add @paid-tw/einvoice @paid-tw/einvoice-ezpay
@@ -21,37 +28,35 @@ const invoices = createEzpayProvider({
 const result = await invoices.issue({ /* IssueInvoiceInput */ });
 ```
 
-Because it implements the same `InvoiceProvider` interface as the Amego adapter,
-switching providers is a one-line config change — your business logic doesn't
-move.
+由於它與 Amego 轉接器實作相同的 `InvoiceProvider` 介面，切換供應商只需修改一行設定，
+你的商業邏輯完全不需要更動。
 
-## How it differs from Amego
+## 與 Amego 的差異
 
-| Concern | ezPay |
+| 項目 | ezPay |
 | --- | --- |
-| Auth | AES-256-CBC encrypted `PostData_` (HashKey/HashIV), not MD5 signing |
-| Padding | PKCS7 to a **32-byte** multiple (ezPay convention), lowercase hex |
-| Host | test `cinv.ezpay.com.tw` vs prod `inv.ezpay.com.tw` (selected by `mode`) |
-| Response | plaintext JSON `{ Status, Message, Result }` (Result is a JSON string) |
-| Items | pipe-`\|`-joined `ItemName`/`ItemCount`/`ItemUnit`/`ItemPrice`/`ItemAmt` |
-| Verify | response `CheckCode` = SHA256 over 5 sorted fields wrapped by HashIV/HashKey |
+| 驗證 | AES-256-CBC 加密的 `PostData_`（HashKey/HashIV），而非 MD5 簽章 |
+| 補位 | PKCS7 補位至 **32 位元組** 的倍數（ezPay 慣例），小寫十六進位 |
+| 主機 | 測試 `cinv.ezpay.com.tw`，正式 `inv.ezpay.com.tw`（由 `mode` 選擇） |
+| 回應 | 純文字 JSON `{ Status, Message, Result }`（Result 為 JSON 字串） |
+| 商品項目 | 以管線符號 `\|` 串接的 `ItemName`/`ItemCount`/`ItemUnit`/`ItemPrice`/`ItemAmt` |
+| 驗證碼 | 回應的 `CheckCode` = 以 HashIV/HashKey 包夾 5 個排序欄位後的 SHA256 |
 
-## Config
+## 設定
 
-| Option | Required | Description |
+| 選項 | 必填 | 說明 |
 | --- | --- | --- |
 | `merchantId` | ✅ | 商店代號 (`MerchantID_`) |
-| `hashKey` | ✅ | 32-char AES HashKey (server-side only) |
-| `hashIV` | ✅ | 16-char AES HashIV (server-side only) |
-| `mode` | | `"TEST"` (default, cinv) or `"PRODUCTION"` (inv) |
-| `respondType` | | `"JSON"` (default) or `"String"` |
-| `validatePayload` | | validate the issue payload locally (default `true`) |
+| `hashKey` | ✅ | 32 字元的 AES HashKey（僅限伺服器端） |
+| `hashIV` | ✅ | 16 字元的 AES HashIV（僅限伺服器端） |
+| `mode` | | `"TEST"`（預設，cinv）或 `"PRODUCTION"`（inv） |
+| `respondType` | | `"JSON"`（預設）或 `"String"` |
+| `validatePayload` | | 在本地端驗證開立的資料內容（預設 `true`） |
 
-## 觸發開立 / 觸發折讓 (two-phase, ezPay-specific)
+## 觸發開立 / 觸發折讓（兩階段，ezPay 特有）
 
-Beyond immediate issue, ezPay supports holding an invoice/allowance and
-triggering it later. These don't map onto the unified interface, so they are
-extra methods on `EzpayProvider`:
+除了即時開立之外，ezPay 還支援先保留發票／折讓，之後再觸發。這些功能無法對應到統一介面，
+因此以 `EzpayProvider` 上的額外方法提供：
 
 ```ts
 // Hold an invoice (Status=0) — stored on the platform, not yet issued.
@@ -73,28 +78,26 @@ await invoices.triggerAllowance({
 });
 ```
 
-A held (`Status=3`) scheduled invoice can also be issued early with
-`triggerIssue`. A confirmed allowance uploads the next day and can no longer be
-cancelled — void an uploaded one with `voidAllowance` instead.
+保留中（`Status=3`）的預約發票也可以用 `triggerIssue` 提前開立。已確認的折讓會在隔天上傳，
+之後就無法再取消，若要作廢已上傳的折讓，請改用 `voidAllowance`。
 
-## Carrier validation (手機條碼 / 愛心碼)
+## 載具驗證（手機條碼 / 愛心碼）
 
-Check whether a mobile-barcode carrier or a donation code is registered at the
-tax authority before issuing — backed by ezPay's `/Api_inv_application/` lookups:
+在開立前先檢查手機條碼載具或捐贈碼是否已於財政部登錄，
+背後使用 ezPay 的 `/Api_inv_application/` 查詢：
 
 ```ts
 await invoices.validateMobileBarcode("/ABC1234"); // → boolean (IsExist)
 await invoices.validateLoveCode("8585"); // → boolean
 ```
 
-Format is checked locally first (barcode `/` + 7 of `[0-9A-Z.+-]`; love code 3–7
-digits). Declared as the `CARRIER_VALIDATION` capability.
+格式會先在本地端檢查（手機條碼 `/` + 7 個 `[0-9A-Z.+-]`；愛心碼 3–7 位數字）。
+宣告為 `CARRIER_VALIDATION` 能力。
 
-## Browser Form POST (build without sending)
+## 瀏覽器表單 POST（僅建立而不送出）
 
-For flows where the browser POSTs straight to ezPay — e.g. a query whose result
-page is rendered by ezPay (`DisplayFlag=1`) — build the encrypted form fields
-without performing the request:
+對於瀏覽器直接 POST 至 ezPay 的流程——例如結果頁面由 ezPay 渲染的查詢（`DisplayFlag=1`）——
+可在不實際發出請求的情況下，建立加密後的表單欄位：
 
 ```ts
 // Generic: encrypt any params for a chosen endpoint.
@@ -108,16 +111,16 @@ const fields = invoices.buildQueryPostData({
 // POST { MerchantID_, PostData_ } as a form to the matching endpoint URL.
 ```
 
-## Notes
+## 注意事項
 
-- ezPay query needs an extra key beyond the unified `invoiceNumber`/`orderId`:
-  pass `providerOptions: { randomNum }` (SearchType 0) or `{ totalAmt }`
-  (SearchType 1).
-- Live lifecycle tests run against the test environment with `EZPAY_LIVE=1` and
-  the credentials in env: immediate (issue → query → void), allowance
-  (issue → allowance → void), 觸發開立 (issuePending → triggerIssue → void),
-  and 觸發折讓 (held allowance → cancel).
+- ezPay 查詢除了統一的 `invoiceNumber`/`orderId` 之外，還需要一個額外的鍵值：
+  傳入 `providerOptions: { randomNum }`（SearchType 0）或 `{ totalAmt }`
+  （SearchType 1）。
+- 即時生命週期測試會在設定 `EZPAY_LIVE=1` 並提供環境變數憑證的情況下，於測試環境執行：
+  即時（issue → query → void）、折讓
+  （issue → allowance → void）、觸發開立（issuePending → triggerIssue → void），
+  以及觸發折讓（held allowance → cancel）。
 
-## License
+## 授權
 
 MIT

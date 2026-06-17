@@ -5,11 +5,12 @@
 [![types: TypeScript](https://img.shields.io/npm/types/@paid-tw/einvoice-ecpay.svg)](https://www.typescriptlang.org/)
 [![license: MIT](https://img.shields.io/npm/l/@paid-tw/einvoice-ecpay.svg)](https://github.com/paid-tw/einvoice/blob/main/LICENSE)
 
-[English](./README.en.md) ｜ **繁體中文**
+**English** ｜ [繁體中文](./README.md)
 
-[`@paid-tw/einvoice`](https://www.npmjs.com/package/@paid-tw/einvoice) 的
-[ECPay 綠界](https://www.ecpay.com.tw/) 轉接器，基於 ECPay **B2C 電子發票 2.0**
-API（AES JSON API，而非舊版的 CheckMacValue API）實作了 `InvoiceProvider` 介面。
+[ECPay 綠界](https://www.ecpay.com.tw/) adapter for
+[`@paid-tw/einvoice`](https://www.npmjs.com/package/@paid-tw/einvoice). Implements
+the `InvoiceProvider` interface over the ECPay **B2C 電子發票 2.0** API (the AES
+JSON API, not the legacy CheckMacValue one).
 
 ```bash
 pnpm add @paid-tw/einvoice @paid-tw/einvoice-ecpay
@@ -28,10 +29,10 @@ const invoices = createEcpayProvider({
 await invoices.issue({ /* IssueInvoiceInput */ });
 ```
 
-### 不需帳號即可試用
+### Try it without an account
 
-ECPay 提供共用的 **sandbox** 憑證。直接使用匯出的 `ECPAY_SANDBOX`
-即可對測試特店開立發票：
+ECPay publishes shared **sandbox** credentials. Use the exported `ECPAY_SANDBOX`
+to issue against the stage merchant straight away:
 
 ```ts
 import { createEcpayProvider, ECPAY_SANDBOX } from "@paid-tw/einvoice-ecpay";
@@ -39,17 +40,17 @@ import { createEcpayProvider, ECPAY_SANDBOX } from "@paid-tw/einvoice-ecpay";
 const invoices = createEcpayProvider({ ...ECPAY_SANDBOX, mode: "TEST" }); // 特店 2000132 — never use in production
 ```
 
-## 運作方式（已於測試環境實機驗證）
+## How it works (verified live on stage)
 
-| 項目 | 說明 |
+| Concern | Detail |
 | --- | --- |
-| 認證 | `Data` 欄位 = `JSON → PHP urlencode → AES-128-CBC (PKCS7) → Base64`（解碼時反向操作）。PHP url(en/de)code 語意：空白為 `+`，而非 `%20`。 |
-| 封包 | `{ MerchantID, RqHeader: { Timestamp }, Data }`；回應外層為 `{ TransCode, TransMsg, Data }`。`TransCode === 1` 代表傳輸成功。 |
-| 結果 | 解密 `Data` → `{ RtnCode, RtnMsg, … }`。`RtnCode === 1` 代表成功；否則為錯誤（這些代碼分布的範圍並不一致，因此對應關係改以 `RtnMsg` 為依據）。 |
-| 商品明細 | 為 `{ ItemSeq, ItemName, ItemCount, ItemWord, ItemPrice, ItemTaxType, ItemAmount }` 的 JSON **陣列** — 並非以管線符號串接，也沒有 `CheckMacValue`。 |
-| 載具 | `CarrierType`：空=紙本 / `1`=綠界 / `2`=自然人憑證 / `3`=手機條碼。含載具或捐贈的發票不得列印。 |
+| Auth | The `Data` field = `JSON → PHP urlencode → AES-128-CBC (PKCS7) → Base64` (decoded in reverse). PHP url(en/de)code semantics: a space is `+`, not `%20`. |
+| Envelope | `{ MerchantID, RqHeader: { Timestamp }, Data }`; the reply wraps `{ TransCode, TransMsg, Data }`. `TransCode === 1` = transport OK. |
+| Result | Decrypt `Data` → `{ RtnCode, RtnMsg, … }`. `RtnCode === 1` = success; otherwise an error (the codes span inconsistent ranges, so the mapping keys off `RtnMsg`). |
+| Items | A JSON **array** of `{ ItemSeq, ItemName, ItemCount, ItemWord, ItemPrice, ItemTaxType, ItemAmount }` — not pipe-joined, and there is no `CheckMacValue`. |
+| Carrier | `CarrierType`: 空=紙本 / `1`=綠界 / `2`=自然人憑證 / `3`=手機條碼. A carrier/donation invoice must not print. |
 
-## 延遲開立（延遲 / 預約 / 觸發開立）
+## Delayed issue (延遲 / 預約 / 觸發開立)
 
 ```ts
 // TRIGGER (待觸發, default): issues only when you trigger it.
@@ -68,7 +69,7 @@ await invoices.editDelayIssue({ /* updated IssueInvoiceInput */ });
 await invoices.cancelDelayIssue(relateNumber);
 ```
 
-## 載具驗證（手機條碼 / 愛心碼）
+## Carrier validation (手機條碼 / 愛心碼)
 
 ```ts
 await invoices.validateMobileBarcode("/ABC1234"); // → boolean (CheckBarcode)
@@ -76,30 +77,30 @@ await invoices.validateLoveCode("168001"); // → boolean (CheckLoveCode)
 await invoices.lookupLoveCodeOrganName("168001"); // → "財團法人…" | undefined (the charity name)
 ```
 
-宣告為 `CARRIER_VALIDATION` 能力。
+Declared as the `CARRIER_VALIDATION` capability.
 
-### 統一編號驗證
+### 統一編號 validation
 
 ```ts
 await invoices.lookupCompanyName("97025978"); // → "綠界科技股份有限公司" | undefined
 await invoices.validateBan("97025978"); // → boolean
 ```
 
-⚠️ 沒有公開資料的統編（政府/醫療/福委會 等）會回傳
-`undefined`/`false` — 這 **並不** 代表它無效，因此請繼續開立。
-只有當檢查碼或格式錯誤時才會拋出 `VALIDATION`（這種情況才應停止）。
+⚠️ A 統編 with no public data (政府/醫療/福委會, etc.) resolves to
+`undefined`/`false` — that does **not** mean it is invalid, so keep issuing.
+Only a bad checksum/format throws `VALIDATION` (the case where you should stop).
 
-## 設定
+## Config
 
-| 選項 | 必填 | 說明 |
+| Option | Required | Description |
 | --- | --- | --- |
 | `merchantId` | ✅ | 特店編號 |
-| `hashKey` | ✅ | 16 字元的 AES HashKey（僅限伺服器端） |
-| `hashIV` | ✅ | 16 字元的 AES HashIV（僅限伺服器端） |
-| `mode` | | `"TEST"`（預設，測試環境）或 `"PRODUCTION"` |
-| `validatePayload` | | 在本地端驗證開立的 payload（預設 `true`） |
+| `hashKey` | ✅ | 16-char AES HashKey (server-side only) |
+| `hashIV` | ✅ | 16-char AES HashIV (server-side only) |
+| `mode` | | `"TEST"` (default, stage) or `"PRODUCTION"` |
+| `validatePayload` | | validate the issue payload locally (default `true`) |
 
-## 字軌 / 編號
+## 字軌 / numbering
 
 ```ts
 // 查詢財政部配號結果 — the invoice-number ranges allocated for a 民國年.
@@ -114,7 +115,7 @@ const tracks = await invoices.getInvoiceWordSetting({ invoiceYear: "115", useSta
 await invoices.setInvoiceWordStatus(trackId, "ENABLE"); // or "PAUSE" / "DISABLE"
 ```
 
-## 發票列印
+## Printing (發票列印)
 
 ```ts
 // Get a print URL (valid for 1 hour). Defaults to single-sided, today's date.
@@ -127,11 +128,11 @@ const url = await invoices.getPrintUrl({
 });
 ```
 
-只有可列印紙本的發票才有效：含載具或捐贈的發票（`Print=0`）或
-未知的號碼會回傳 查無資料 → `NOT_FOUND`。`B2B_A4` / `B2B_A5` 樣式
-需要帶有統編的發票。
+Only paper-printable invoices work: a carrier/donation invoice (`Print=0`) or an
+unknown number returns 查無資料 → `NOT_FOUND`. The `B2B_A4` / `B2B_A5` styles
+require an invoice carrying a 統編.
 
-## 發送發票通知
+## Notifications (發送發票通知)
 
 ```ts
 // Email / SMS an invoice, void, allowance or award notification to the buyer
@@ -145,11 +146,11 @@ await invoices.sendNotification({
 });
 ```
 
-折讓相關的 tag（`ALLOWANCE` / `ALLOWANCE_VOID` / `ONLINE_ALLOWANCE`）需要帶
-`allowanceNumber`；`ONLINE_ALLOWANCE` 必須使用 `EMAIL` + `CUSTOMER`。對
-未中獎的發票以 `tag: "AWARD"` 發送通知會拋出 `NOT_FOUND`（查無發票中獎資料）。
+Allowance tags (`ALLOWANCE` / `ALLOWANCE_VOID` / `ONLINE_ALLOWANCE`) need an
+`allowanceNumber`; `ONLINE_ALLOWANCE` must use `EMAIL` + `CUSTOMER`. Notifying a
+non-winning invoice with `tag: "AWARD"` throws `NOT_FOUND` (查無發票中獎資料).
 
-## 註銷重開
+## Void & reissue (註銷重開)
 
 ```ts
 // Atomically void an invoice and reissue it. ECPay keeps the original
@@ -165,30 +166,31 @@ const res = await invoices.voidWithReissue({
 res.invoiceNumber === orig.invoiceNumber; // true — reuses the original number
 ```
 
-尚在待處理的發票（尚未上傳至財政部）還無法再次作廢；
-未知的號碼會回傳 查無發票資料 → `NOT_FOUND`。
+A still-pending invoice (not yet uploaded to the MOF) can't be re-voided yet;
+an unknown number returns 查無發票資料 → `NOT_FOUND`.
 
-## 補充說明
+## Notes
 
-- 零稅率發票（`taxType: "ZERO_RATED"` 或混合）需要通關方式註記：
-  傳入 `providerOptions: { clearanceMark: "1" | "2" }`（1=非經海關，2=經海關）。
-  這些驗證規則是依據實機 API 行為驗證，而非僅參照文件（例如
-  ECPay 的 `ZeroTaxRateReason`/`SpecialTaxType`「必填」其實並未被
-  API 強制，且 載具+捐贈 / B2B+載具 也會被接受）。
-- `void` 與 `allowance` 需要發票的日期 — 透過
-  `providerOptions: { invoiceDate: "YYYY-MM-DD" }` 傳入（開立結果中已帶有此值）。
-  省略時預設為今日（Asia/Taipei）。
-- `allowance` 使用 一般開立折讓（`/B2CInvoice/Allowance`，紙本）：會立即回傳真實的
-  折讓單號，並可立即作廢（綠界 隔日才上傳至財政部）。預設不通知買受人；傳入
+- Zero-rated invoices (`taxType: "ZERO_RATED"` or mixed) require a customs mark:
+  pass `providerOptions: { clearanceMark: "1" | "2" }` (1=非經海關, 2=經海關). The
+  validation rules are checked against live API behaviour, not just the docs (e.g.
+  ECPay's `ZeroTaxRateReason`/`SpecialTaxType` "requirements" aren't enforced by
+  the API, and carrier+donation / B2B+carrier are accepted).
+- `void` and `allowance` need the invoice's date — pass it via
+  `providerOptions: { invoiceDate: "YYYY-MM-DD" }` (the issue result carries it).
+  It defaults to today (Asia/Taipei) when omitted.
+- `allowance` uses 一般開立折讓 (`/B2CInvoice/Allowance`, 紙本): it returns a real
+  折讓單號 immediately and is voidable right away (綠界 uploads to the MOF next
+  day). It defaults to no buyer notification; pass
   `providerOptions: { allowanceNotify: "E"|"S"|"A", notifyMail, notifyPhone, reason }`
-  即可發送通知。
-- `allowanceOnline(input, { notifyMail, returnUrl?, … })` 為 線上折讓
-  （AllowanceByCollegiate）：ECPay 會以 email 寄給買受人一個確認連結（72 小時
-  `expiresAt`）；唯有買受人點選後才會開立折讓。可用
-  `cancelAllowanceOnline({ invoiceNumber, allowanceNumber })` 取消尚在待處理者；
-  已確認或紙本者則用 `voidAllowance` 作廢。
-- 實機測試以 `ECPAY_LIVE=1` 執行（預設使用 `ECPAY_SANDBOX`）。
+  to notify.
+- `allowanceOnline(input, { notifyMail, returnUrl?, … })` is the 線上折讓
+  (AllowanceByCollegiate): ECPay emails the buyer a confirmation link (72h
+  `expiresAt`); the allowance is issued only when they click it. Cancel a
+  still-pending one with `cancelAllowanceOnline({ invoiceNumber, allowanceNumber })`;
+  void a confirmed/paper one with `voidAllowance`.
+- Live tests run with `ECPAY_LIVE=1` (defaulting to `ECPAY_SANDBOX`).
 
-## 授權條款
+## License
 
 MIT

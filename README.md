@@ -1,30 +1,36 @@
 # einvoice-tw
 
-Unified **e-invoice (電子發票) SDK for Taiwan**. One provider-agnostic interface,
-many provider adapters — switch between Amego, ECPay, ezPay, or the MOF platform
-without touching your business logic.
+[![CI](https://github.com/paid-tw/einvoice/actions/workflows/ci.yml/badge.svg)](https://github.com/paid-tw/einvoice/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/@paid-tw/einvoice.svg?label=%40paid-tw%2Feinvoice)](https://www.npmjs.com/package/@paid-tw/einvoice)
+[![types: TypeScript](https://img.shields.io/npm/types/@paid-tw/einvoice.svg)](https://www.typescriptlang.org/)
+[![license: MIT](https://img.shields.io/github/license/paid-tw/einvoice.svg)](./LICENSE)
 
-All Taiwan value-added centers wrap the same 財政部 MIG 4.0 spec, so the core
-operations are identical: **開立 / 作廢 / 折讓 / 折讓作廢 / 查詢**. This SDK models
-those once and lets each provider be a thin adapter.
+[English](./README.en.md) ｜ **繁體中文**
 
-## Packages
+統一的**台灣電子發票 SDK**。一套與供應商無關的介面，搭配多個供應商轉接器 —— 在
+Amego、ECPay、ezPay 或財政部平台之間切換，完全不需要動到你的商業邏輯。
 
-| Package | npm | Role |
+台灣所有加值中心都包裝同一套財政部 MIG 4.0 規格，因此核心操作完全一致：**開立 /
+作廢 / 折讓 / 折讓作廢 / 查詢**。本 SDK 將這些操作建模一次，讓每個供應商都只是一個
+輕薄的轉接器。
+
+## 套件
+
+| 套件 | npm | 角色 |
 | --- | --- | --- |
-| [`@paid-tw/einvoice`](./packages/einvoice) | core | Unified types, `InvoiceProvider` interface, Zod validation, `MockProvider` |
-| [`@paid-tw/einvoice-amego`](./packages/einvoice-amego) | adapter | Amego (amego.tw) — MD5-signed |
-| [`@paid-tw/einvoice-ezpay`](./packages/einvoice-ezpay) | adapter | ezPay 藍新 (ezpay.com.tw) — AES-encrypted |
-| [`@paid-tw/einvoice-ecpay`](./packages/einvoice-ecpay) | adapter | ECPay 綠界 (ecpay.com.tw) — B2C 2.0, AES-encrypted |
+| [`@paid-tw/einvoice`](./packages/einvoice) | core | 統一型別、`InvoiceProvider` 介面、Zod 驗證、`MockProvider` |
+| [`@paid-tw/einvoice-amego`](./packages/einvoice-amego) | adapter | Amego (amego.tw) — MD5 簽章 |
+| [`@paid-tw/einvoice-ezpay`](./packages/einvoice-ezpay) | adapter | ezPay 藍新 (ezpay.com.tw) — AES 加密 |
+| [`@paid-tw/einvoice-ecpay`](./packages/einvoice-ecpay) | adapter | ECPay 綠界 (ecpay.com.tw) — B2C 2.0，AES 加密 |
 
-Install only the providers you use — adapters are separate packages, so an app
-that only uses Amego never pulls in another provider's dependencies.
+只需安裝你會用到的供應商 —— 轉接器是各自獨立的套件，因此一個只用 Amego 的應用程式
+永遠不會拉進其他供應商的相依套件。
 
 ```bash
 pnpm add @paid-tw/einvoice @paid-tw/einvoice-amego
 ```
 
-## Usage
+## 使用方式
 
 ```ts
 import { composeTaxExclusive } from "@paid-tw/einvoice";
@@ -45,24 +51,24 @@ const result = await invoices.issue({
   priceMode: "TAX_EXCLUSIVE",
 });
 
-console.log(result.invoiceNumber); // e.g. "AB12345678"
+console.log(result.invoiceNumber); // 例如 "AB12345678"
 ```
 
-Swap providers by changing only the constructor — the rest of your code depends
-on the `InvoiceProvider` interface, not the adapter.
+只要更換建構子即可切換供應商 —— 你其餘的程式碼相依於 `InvoiceProvider` 介面，而非
+特定轉接器。
 
-### Testing without credentials
+### 不需憑證即可測試
 
 ```ts
 import { MockProvider } from "@paid-tw/einvoice";
 
-const invoices = new MockProvider(); // same validation, no network
+const invoices = new MockProvider(); // 相同的驗證，但不發送網路請求
 ```
 
-### Feature detection
+### 功能偵測
 
-Providers differ in optional features. Each declares a `capabilities` set so you
-can branch at runtime instead of discovering a gap only when a call fails:
+各供應商支援的選用功能不盡相同。每個供應商都會宣告一組 `capabilities`，讓你能在
+執行期就先分支處理，而不是等到呼叫失敗才發現缺少某項功能：
 
 ```ts
 import { Capability, supports, assertSupports } from "@paid-tw/einvoice";
@@ -71,45 +77,45 @@ if (supports(invoices, Capability.SCHEDULED_ISSUE)) {
   // ...
 }
 
-// Or throw UnsupportedCapabilityError (an InvoiceError, code "UNSUPPORTED"):
+// 或拋出 UnsupportedCapabilityError（屬於 InvoiceError，code 為 "UNSUPPORTED"）：
 assertSupports(invoices, Capability.SCHEDULED_ISSUE);
 ```
 
-## Architecture
+## 架構
 
 ```
-@paid-tw/einvoice (core)         provider-agnostic: types, interface, schemas, MockProvider
+@paid-tw/einvoice (core)         與供應商無關：型別、介面、schemas、MockProvider
         ▲
         │ implements InvoiceProvider
         │
-@paid-tw/einvoice-amego          maps unified model ⇄ Amego wire format (sign, encrypt, fields)
+@paid-tw/einvoice-amego          將統一模型 ⇄ Amego 連線格式對應（簽章、加密、欄位）
 @paid-tw/einvoice-ecpay  …
 ```
 
-- **Money** is always integer New Taiwan Dollars.
-- **Errors** are normalized to a single `InvoiceError` with a stable `code` plus
-  the provider's raw code/message.
-- Adapters validate inputs with the shared Zod schemas before hitting the network.
+- **金額**一律為整數新台幣。
+- **錯誤**會正規化為單一的 `InvoiceError`，帶有穩定的 `code`，並保留供應商原始的
+  代碼/訊息。
+- 轉接器會先用共用的 Zod schemas 驗證輸入，才送出網路請求。
 
-## Development
+## 開發
 
 ```bash
 pnpm install
-pnpm build       # build all packages (ESM + CJS + d.ts via tsup)
+pnpm build       # 建置所有套件（透過 tsup 產生 ESM + CJS + d.ts）
 pnpm test        # vitest
 pnpm typecheck
 ```
 
-Releases use [changesets](https://github.com/changesets/changesets):
-`pnpm changeset` → `pnpm version` → `pnpm release`.
+發版使用 [changesets](https://github.com/changesets/changesets)：
+`pnpm changeset` → `pnpm version` → `pnpm release`。
 
-## Contributing a provider
+## 貢獻一個供應商
 
-1. `packages/einvoice-<provider>/`, depend on `@paid-tw/einvoice`.
-2. Implement `InvoiceProvider`; map unified ⇄ provider fields.
-3. Map the provider's error codes onto `InvoiceErrorCode`.
-4. Add fixtures + tests against the network boundary.
+1. 建立 `packages/einvoice-<provider>/`，相依於 `@paid-tw/einvoice`。
+2. 實作 `InvoiceProvider`；對應統一模型 ⇄ 供應商欄位。
+3. 將供應商的錯誤代碼對應到 `InvoiceErrorCode`。
+4. 針對網路邊界補上 fixtures 與測試。
 
-## License
+## 授權條款
 
 MIT
