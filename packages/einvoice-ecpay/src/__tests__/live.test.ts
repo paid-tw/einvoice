@@ -94,11 +94,16 @@ describe.skipIf(!live)("ECPay live (stage) — 延遲/觸發開立", LIVE_OPTS, 
   const p = provider();
   const orderId = `TP${Date.now()}`;
 
-  it("issuePending → triggerIssue assigns a real number", async () => {
+  it("issuePending (TRIGGER) → triggerIssue assigns a real number", async () => {
     const pend = await p.issuePending(carrierIssue(orderId));
     expect(pend.relateNumber).toBe(orderId);
     const issued = await p.triggerIssue({ relateNumber: orderId });
     expect(issued.invoiceNumber).toMatch(/^[A-Z]{2}\d{8}$/);
+  });
+
+  it("issuePending SCHEDULE (DelayFlag=1) stages an auto-issuing invoice", async () => {
+    const res = await p.issuePending(carrierIssue(`${orderId}S`), { mode: "SCHEDULE", delayDay: 3 });
+    expect(res.raw.RtnCode).toBe(1);
   });
 });
 

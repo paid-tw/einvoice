@@ -43,11 +43,15 @@ const invoices = createEcpayProvider({ ...ECPAY_SANDBOX, mode: "TEST" }); // 特
 | Items | A JSON **array** of `{ ItemSeq, ItemName, ItemCount, ItemWord, ItemPrice, ItemTaxType, ItemAmount }` — not pipe-joined, and there is no `CheckMacValue`. |
 | Carrier | `CarrierType`: 空=紙本 / `1`=綠界 / `2`=自然人憑證 / `3`=手機條碼. A carrier/donation invoice must not print. |
 
-## Two-phase issue (延遲 / 觸發開立)
+## Delayed issue (延遲 / 預約 / 觸發開立)
 
 ```ts
-const { relateNumber } = await invoices.issuePending({ /* IssueInvoiceInput */ }); // DelayIssue, held
-const issued = await invoices.triggerIssue({ relateNumber }); // TriggerIssue → real invoice number
+// TRIGGER (待觸發, default): issues only when you trigger it.
+const { relateNumber } = await invoices.issuePending({ /* IssueInvoiceInput */ });
+const issued = await invoices.triggerIssue({ relateNumber }); // → real invoice number
+
+// SCHEDULE (預約): auto-issues after N days (1–15), no trigger needed.
+await invoices.issuePending({ /* … */ }, { mode: "SCHEDULE", delayDay: 3 });
 ```
 
 ## Carrier validation (手機條碼 / 愛心碼)

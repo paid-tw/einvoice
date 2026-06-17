@@ -20,7 +20,7 @@ const issueInput = {
 };
 
 describe("延遲/觸發開立 two-phase", () => {
-  it("issuePending posts DelayIssue with DelayFlag=2 + Tsr", async () => {
+  it("issuePending (default TRIGGER) posts DelayFlag=2 + DelayDay 0 + Tsr", async () => {
     let data: Record<string, unknown> | undefined;
     server.use(
       http.post(url(ECPAY_ENDPOINTS.delayIssue), async ({ request }) => {
@@ -29,8 +29,26 @@ describe("延遲/觸發開立 two-phase", () => {
       }),
     );
     const res = await testProvider().issuePending(issueInput);
-    expect(data).toMatchObject({ DelayFlag: "2", Tsr: "ORDER_1", PayType: "2" });
+    expect(data).toMatchObject({ DelayFlag: "2", DelayDay: 0, Tsr: "ORDER_1", PayType: "2", PayAct: "ECPAY" });
     expect(res.relateNumber).toBe("ORDER_1");
+  });
+
+  it("issuePending SCHEDULE mode posts DelayFlag=1 + the delay days + NotifyURL", async () => {
+    let data: Record<string, unknown> | undefined;
+    server.use(
+      http.post(url(ECPAY_ENDPOINTS.delayIssue), async ({ request }) => {
+        data = parseRequest(await request.text()).data;
+        return HttpResponse.json(ecSuccess({ OrderNumber: "ORDER_1" }));
+      }),
+    );
+    await testProvider().issuePending(issueInput, { mode: "SCHEDULE", delayDay: 3, notifyUrl: "https://x.test/n" });
+    expect(data).toMatchObject({ DelayFlag: "1", DelayDay: 3, NotifyURL: "https://x.test/n" });
+  });
+
+  it("rejects an out-of-range delayDay locally (SCHEDULE 1–15, TRIGGER 0–15)", async () => {
+    await expect(testProvider().issuePending(issueInput, { mode: "SCHEDULE", delayDay: 0 })).rejects.toMatchObject({ code: "VALIDATION" });
+    await expect(testProvider().issuePending(issueInput, { mode: "SCHEDULE", delayDay: 16 })).rejects.toMatchObject({ code: "VALIDATION" });
+    await expect(testProvider().issuePending(issueInput, { delayDay: 16 })).rejects.toMatchObject({ code: "VALIDATION" });
   });
 
   it("triggerIssue accepts the 4000004 success code, then queries for the number", async () => {

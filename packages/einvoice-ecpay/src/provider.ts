@@ -110,6 +110,18 @@ export interface EcpayWordSetting {
   count: number;
 }
 
+/** Options for {@link EcpayProvider.issuePending} (延遲開立). */
+export interface IssuePendingOptions {
+  /** `"SCHEDULE"` (預約, auto-issues after delayDay) or `"TRIGGER"` (待觸發, default). */
+  mode?: "SCHEDULE" | "TRIGGER";
+  /** Delay days. SCHEDULE: 1–15 (default 1). TRIGGER: 0–15 (default 0). */
+  delayDay?: number;
+  /** Production callback URL fired when the invoice issues (no-op on stage). */
+  notifyUrl?: string;
+  /** PayAct override (default `"ECPAY"`). */
+  payAct?: string;
+}
+
 /** Unified carrier type → ECPay CarrierType (空=紙本/1=綠界/2=自然人/3=手機). */
 const CARRIER_TYPE: Record<Carrier["type"], string> = {
   MEMBER: "1",
@@ -159,20 +171,38 @@ export class EcpayProvider implements InvoiceProvider {
   }
 
   /**
-   * 延遲(待觸發)開立 (DelayIssue, DelayFlag=2): create a held invoice that is only
-   * issued when {@link EcpayProvider.triggerIssue} is called. Returns the
-   * `relateNumber` to trigger with.
+   * 延遲開立 (DelayIssue): stage an invoice for later issuance. Two modes:
+   * - `"SCHEDULE"` (DelayFlag=1, 預約): auto-issues after `delayDay` (1–15) days.
+   * - `"TRIGGER"` (DelayFlag=2, 待觸發, default): only issues when
+   *   {@link EcpayProvider.triggerIssue} is called; `delayDay` 0–15 (default 0).
+   *
+   * Returns the `relateNumber` (= the Tsr) to trigger / look up with.
    */
-  async issuePending(input: IssueInvoiceInput): Promise<{ relateNumber: string; raw: EcpayResult }> {
+  async issuePending(
+    input: IssueInvoiceInput,
+    options: IssuePendingOptions = {},
+  ): Promise<{ relateNumber: string; raw: EcpayResult }> {
     const parsed = issueInvoiceInputSchema.parse(input);
     const opts = (parsed.providerOptions ?? {}) as Record<string, unknown>;
+    const schedule = options.mode === "SCHEDULE";
+    const delayDay = options.delayDay ?? (schedule ? 1 : 0);
+    if (this.config.validatePayload !== false) {
+      const valid = schedule ? delayDay >= 1 && delayDay <= 15 : delayDay >= 0 && delayDay <= 15;
+      if (!valid)
+        throw new InvoiceError(`Invalid delayDay: ${delayDay}`, {
+          provider: "ecpay",
+          code: InvoiceErrorCode.VALIDATION,
+          rawMessage: schedule ? "SCHEDULE delayDay must be 1–15" : "TRIGGER delayDay must be 0–15",
+        });
+    }
     const result = await ecpayRequest(this.config, ENDPOINTS.delayIssue, {
       ...this.buildIssueData(parsed),
-      DelayFlag: "2", // 待觸發
-      DelayDay: "0",
+      DelayFlag: schedule ? "1" : "2",
+      DelayDay: delayDay,
       Tsr: parsed.orderId,
       PayType: "2",
-      PayAct: (opts.payAct as string) ?? "ECPAY",
+      PayAct: options.payAct ?? (opts.payAct as string) ?? "ECPAY",
+      NotifyURL: options.notifyUrl,
     });
     return { relateNumber: parsed.orderId, raw: result };
   }
