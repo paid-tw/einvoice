@@ -64,6 +64,7 @@ export class AmegoProvider implements InvoiceProvider {
     Capability.MIXED_TAX,
     Capability.QUERY_BY_ORDER_ID,
     Capability.CARRIER_VALIDATION,
+    Capability.FOREIGN_CURRENCY,
   ]);
 
   constructor(private readonly config: AmegoConfig) {}

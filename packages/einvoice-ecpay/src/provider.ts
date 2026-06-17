@@ -1087,6 +1087,15 @@ export class EcpayProvider implements InvoiceProvider {
 
   /** Map a unified issue input to the ECPay `Issue` Data payload. */
   private buildIssueData(parsed: IssueInvoiceInput): Record<string, unknown> {
+    // ECPay's B2C 2.0 API has no foreign-currency field (no FOREIGN_CURRENCY
+    // capability), so reject a non-TWD currency rather than silently dropping it.
+    if (this.config.validatePayload !== false && parsed.currency && parsed.currency !== "TWD") {
+      throw new InvoiceError(`ECPay does not support foreign-currency invoices; currency must be TWD (got ${parsed.currency})`, {
+        provider: "ecpay",
+        code: InvoiceErrorCode.UNSUPPORTED,
+        rawMessage: "FOREIGN_CURRENCY is not supported",
+      });
+    }
     const category = parsed.category ?? deriveCategory(parsed.buyer);
     const carrier = parsed.carrier;
     const donating = Boolean(parsed.donation);

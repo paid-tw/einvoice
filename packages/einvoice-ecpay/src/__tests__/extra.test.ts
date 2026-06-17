@@ -1,3 +1,4 @@
+import { Capability, supports } from "@paid-tw/einvoice";
 import { http, HttpResponse } from "msw";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { ECPAY_ENDPOINTS } from "../index.js";
@@ -18,6 +19,21 @@ const issueInput = {
   priceMode: "TAX_INCLUSIVE" as const,
   carrier: { type: "MEMBER" as const },
 };
+
+describe("foreign currency (FOREIGN_CURRENCY)", () => {
+  it("does not declare the capability and rejects a non-TWD currency", async () => {
+    expect(supports(testProvider(), Capability.FOREIGN_CURRENCY)).toBe(false);
+    await expect(
+      testProvider().issue({ ...issueInput, currency: "USD", exchangeRate: 31.5 }),
+    ).rejects.toMatchObject({ code: "UNSUPPORTED" });
+  });
+
+  it("still accepts an explicit TWD currency", async () => {
+    server.use(http.post(url(ECPAY_ENDPOINTS.issue), () => HttpResponse.json(ecSuccess({ InvoiceNo: "JU1", InvoiceDate: "2026-06-17 12:00:00", RandomNumber: "1234" }))));
+    const res = await testProvider().issue({ ...issueInput, currency: "TWD" });
+    expect(res.invoiceNumber).toBe("JU1");
+  });
+});
 
 describe("延遲/觸發開立 two-phase", () => {
   it("issuePending (default TRIGGER) posts DelayFlag=2 + DelayDay 0 + Tsr", async () => {

@@ -29,4 +29,20 @@ describe("ezPay capabilities", () => {
     expect(supports(provider, Capability.SCHEDULED_ISSUE)).toBe(true);
     expect(supports(provider, Capability.CARRIER_VALIDATION)).toBe(true);
   });
+
+  it("does not support foreign currency, and rejects a non-TWD currency", async () => {
+    expect(supports(provider, Capability.FOREIGN_CURRENCY)).toBe(false);
+    await expect(
+      provider.issue({
+        orderId: "FX1",
+        buyer: { email: "b@x.com" },
+        items: [{ description: "商品", quantity: 1, unitPrice: 100, amount: 100 }],
+        amount: { salesAmount: 100, taxAmount: 0, totalAmount: 100 },
+        taxType: "TAXABLE",
+        priceMode: "TAX_INCLUSIVE",
+        currency: "USD",
+        exchangeRate: 31.5,
+      }),
+    ).rejects.toMatchObject({ code: "UNSUPPORTED" });
+  });
 });

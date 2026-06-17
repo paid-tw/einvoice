@@ -179,6 +179,15 @@ export class EzpayProvider implements InvoiceProvider {
     parsed: IssueInvoiceInput,
     status: string,
   ): Record<string, string | number | undefined> {
+    // ezPay has no foreign-currency field (no FOREIGN_CURRENCY capability), so
+    // reject a non-TWD currency rather than silently dropping it.
+    if (this.config.validatePayload !== false && parsed.currency && parsed.currency !== "TWD") {
+      throw new InvoiceError(`ezPay does not support foreign-currency invoices; currency must be TWD (got ${parsed.currency})`, {
+        provider: "ezpay",
+        code: InvoiceErrorCode.UNSUPPORTED,
+        rawMessage: "FOREIGN_CURRENCY is not supported",
+      });
+    }
     const category = parsed.category ?? deriveCategory(parsed.buyer);
     const hasCarrierOrDonation = Boolean(parsed.carrier || parsed.donation);
 

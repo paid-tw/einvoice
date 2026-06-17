@@ -53,6 +53,7 @@ export class MockProvider implements InvoiceProvider {
     Capability.QUERY_BY_ORDER_ID,
     Capability.SCHEDULED_ISSUE,
     Capability.CARRIER_VALIDATION,
+    Capability.FOREIGN_CURRENCY,
   ]);
   private readonly track: string;
   private seq: number;

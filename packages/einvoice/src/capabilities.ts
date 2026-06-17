@@ -31,6 +31,13 @@ export const Capability = {
   SCHEDULED_ISSUE: "SCHEDULED_ISSUE",
   /** Validate a carrier (手機條碼 / 愛心碼) against the tax authority. */
   CARRIER_VALIDATION: "CARRIER_VALIDATION",
+  /**
+   * Annotate a foreign-currency sale via `currency` + `exchangeRate`. The
+   * statutory amounts are still filed in integer TWD; this only records the
+   * original transaction's currency. Providers that don't support it reject a
+   * non-TWD `currency` instead of silently dropping it.
+   */
+  FOREIGN_CURRENCY: "FOREIGN_CURRENCY",
 } as const;
 export type Capability = (typeof Capability)[keyof typeof Capability];
 

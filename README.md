@@ -81,6 +81,28 @@ if (supports(invoices, Capability.SCHEDULED_ISSUE)) {
 assertSupports(invoices, Capability.SCHEDULED_ISSUE);
 ```
 
+## 能力對照
+
+每個轉接器都會宣告一組 `capabilities`；可在執行期用
+`supports(provider, cap)` / `assertSupports(provider, cap)` 偵測。
+
+| 能力 | Amego | ECPay | ezPay |
+| --- | :---: | :---: | :---: |
+| `ISSUE` — 開立 | ✅ | ✅ | ✅ |
+| `VOID` — 作廢 | ✅ | ✅ | ✅ |
+| `ALLOWANCE` — 折讓 | ✅ | ✅ | ✅ |
+| `VOID_ALLOWANCE` — 折讓作廢 | ✅ | ✅ | ✅ |
+| `QUERY` — 查詢 | ✅ | ✅ | ✅ |
+| `B2B` — 統一編號買受人 | ✅ | ✅ | ✅ |
+| `MIXED_TAX` — 混合稅率發票 | ✅ | ✅ | ✅ |
+| `QUERY_BY_ORDER_ID` — 以訂單編號查詢 | ✅ | ✅ | ✅ |
+| `SCHEDULED_ISSUE` — 預約未來開立 | — | ✅ | ✅ |
+| `CARRIER_VALIDATION` — 手機條碼 / 愛心碼 | ✅ | ✅ | ✅ |
+| `FOREIGN_CURRENCY` — `currency` + `exchangeRate` 外幣註記 | ✅ | — | — |
+
+不具 `FOREIGN_CURRENCY` 能力的供應商，收到非 TWD 的 `currency` 會拋出
+`UNSUPPORTED` 錯誤，而非靜默丟棄該註記。
+
 ## 架構
 
 ```
@@ -92,7 +114,10 @@ assertSupports(invoices, Capability.SCHEDULED_ISSUE);
 @paid-tw/einvoice-ecpay  …
 ```
 
-- **金額**一律為整數新台幣。
+- **金額**：法定金額欄位為整數新台幣 —— 這是 MIG 不變式（連跨境發票都以 TWD 申報
+  財政部）。外幣交易可用 `currency`（ISO 4217）+ `exchangeRate` _註記_ 原始幣別；
+  具 `FOREIGN_CURRENCY` 能力的供應商會記錄該幣別，其餘供應商則會拒絕非 TWD 的
+  `currency`，而非靜默丟棄（見 [能力對照](#能力對照)）。
 - **錯誤**會正規化為單一的 `InvoiceError`，帶有穩定的 `code`，並保留供應商原始的
   代碼/訊息。
 - 轉接器會先用共用的 Zod schemas 驗證輸入，才送出網路請求。

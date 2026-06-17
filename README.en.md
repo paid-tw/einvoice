@@ -82,6 +82,28 @@ if (supports(invoices, Capability.SCHEDULED_ISSUE)) {
 assertSupports(invoices, Capability.SCHEDULED_ISSUE);
 ```
 
+## Capabilities
+
+Each adapter declares a `capabilities` set; feature-detect at runtime with
+`supports(provider, cap)` / `assertSupports(provider, cap)`.
+
+| Capability | Amego | ECPay | ezPay |
+| --- | :---: | :---: | :---: |
+| `ISSUE` — 開立 | ✅ | ✅ | ✅ |
+| `VOID` — 作廢 | ✅ | ✅ | ✅ |
+| `ALLOWANCE` — 折讓 | ✅ | ✅ | ✅ |
+| `VOID_ALLOWANCE` — 折讓作廢 | ✅ | ✅ | ✅ |
+| `QUERY` — 查詢 | ✅ | ✅ | ✅ |
+| `B2B` — 統一編號 buyer | ✅ | ✅ | ✅ |
+| `MIXED_TAX` — mixed tax-rate invoice | ✅ | ✅ | ✅ |
+| `QUERY_BY_ORDER_ID` — look up by order id | ✅ | ✅ | ✅ |
+| `SCHEDULED_ISSUE` — schedule future issuance | — | ✅ | ✅ |
+| `CARRIER_VALIDATION` — 手機條碼 / 愛心碼 | ✅ | ✅ | ✅ |
+| `FOREIGN_CURRENCY` — `currency` + `exchangeRate` annotation | ✅ | — | — |
+
+A provider that lacks `FOREIGN_CURRENCY` rejects a non-TWD `currency` with an
+`UNSUPPORTED` error rather than silently dropping the annotation.
+
 ## Architecture
 
 ```
@@ -93,7 +115,12 @@ assertSupports(invoices, Capability.SCHEDULED_ISSUE);
 @paid-tw/einvoice-ecpay  …
 ```
 
-- **Money** is always integer New Taiwan Dollars.
+- **Money**: the statutory amount fields are integers in New Taiwan Dollars — a
+  MIG invariant (even cross-border invoices are filed to the government in TWD).
+  A foreign-currency sale can be _annotated_ with `currency` (ISO 4217) +
+  `exchangeRate`; providers with the `FOREIGN_CURRENCY` capability record the
+  original currency, while the others reject a non-TWD `currency` instead of
+  silently dropping it (see [Capabilities](#capabilities)).
 - **Errors** are normalized to a single `InvoiceError` with a stable `code` plus
   the provider's raw code/message.
 - Adapters validate inputs with the shared Zod schemas before hitting the network.

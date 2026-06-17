@@ -22,6 +22,7 @@ describe("Amego capabilities", () => {
     expect(supports(provider, Capability.MIXED_TAX)).toBe(true);
     expect(supports(provider, Capability.QUERY_BY_ORDER_ID)).toBe(true);
     expect(supports(provider, Capability.CARRIER_VALIDATION)).toBe(true);
+    expect(supports(provider, Capability.FOREIGN_CURRENCY)).toBe(true);
   });
 
   it("does not support scheduled issue", () => {
