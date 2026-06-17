@@ -16,7 +16,7 @@ import {
   type VoidInvoiceInput,
   type VoidInvoiceResult,
 } from "@paid-tw/einvoice";
-import { type EzpayConfig, ezpayRequest, ezpayTimestamp } from "@paid-tw/einvoice-ezpay";
+import { type EzpayConfig, ezpayRequest, ezpayTimestamp, makeCheckCode } from "@paid-tw/einvoice-ezpay";
 import { CB_ENDPOINTS } from "./endpoints.js";
 import { assertValidCrossBorderIssue, resolveCurrency } from "./validation.js";
 
@@ -96,6 +96,7 @@ export class EzpayCrossBorderProvider implements InvoiceProvider {
     if (this.config.validatePayload !== false) assertValidCrossBorderIssue(input);
     const res = await ezpayRequest(this.config, CB_ENDPOINTS.issue.path, this.buildIssuePostData(input, "1"));
     const r = res.result;
+    this.verifyIssueCheckCode(r);
     return {
       invoiceNumber: String(r.InvoiceNumber ?? ""),
       invoiceDate: parseDate(r.CreateTime),
@@ -136,6 +137,7 @@ export class EzpayCrossBorderProvider implements InvoiceProvider {
       TotalAmt: fmtAmount(args.totalAmount, foreign),
     });
     const r = res.result;
+    this.verifyIssueCheckCode(r);
     return {
       invoiceNumber: String(r.InvoiceNumber ?? ""),
       invoiceDate: parseDate(r.CreateTime),
@@ -268,6 +270,36 @@ export class EzpayCrossBorderProvider implements InvoiceProvider {
       TotalAmt: fmtAmount(args.totalAmount, foreign),
     });
     return { allowanceNumber: String(res.result.AllowanceNo ?? args.allowanceNumber), raw: res.raw };
+  }
+
+  /**
+   * Verify an issued invoice's response `CheckCode` (附件二): SHA-256 over
+   * MerchantID / MerchantOrderNo / InvoiceTransNo / TotalAmt / RandomNum sorted
+   * A–Z and wrapped by HashIV/HashKey. Detects a tampered or mis-routed reply.
+   * Skipped when `verifyCheckCode` is `false`. `TotalAmt` must be the raw string
+   * ezPay returned (foreign currency comes back with trailing decimals).
+   */
+  private verifyIssueCheckCode(r: Record<string, unknown>): void {
+    if (this.config.verifyCheckCode === false) return;
+    const expected = makeCheckCode(
+      {
+        MerchantID: String(r.MerchantID ?? ""),
+        MerchantOrderNo: String(r.MerchantOrderNo ?? ""),
+        InvoiceTransNo: String(r.InvoiceTransNo ?? ""),
+        TotalAmt: String(r.TotalAmt ?? ""),
+        RandomNum: String(r.RandomNum ?? ""),
+      },
+      this.config.hashKey,
+      this.config.hashIV,
+    );
+    if (expected !== String(r.CheckCode ?? "")) {
+      throw new InvoiceError("ezPay cross-border response CheckCode mismatch — possible tampering", {
+        provider: "ezpay-crossborder",
+        code: InvoiceErrorCode.PROVIDER,
+        rawMessage: "CheckCode mismatch",
+        raw: r,
+      });
+    }
   }
 
   private buildIssuePostData(

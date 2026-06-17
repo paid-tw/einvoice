@@ -2,7 +2,7 @@ import type { IssueInvoiceInput } from "@paid-tw/einvoice";
 import { http, HttpResponse } from "msw";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { assertValidCrossBorderIssue, EZPAY_CB_ENDPOINTS, resolveCurrency } from "../index.js";
-import { BASE, ceSuccess, server, testProvider } from "./server.js";
+import { BASE, ceIssueSuccess, server, testProvider } from "./server.js";
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => server.resetHandlers());
@@ -70,7 +70,7 @@ describe("assertValidCrossBorderIssue — format/amount (VALIDATION)", () => {
 
 describe("validatePayload: false", () => {
   it("skips local validation and lets the request reach ezPay", async () => {
-    server.use(http.post(`${BASE}${EZPAY_CB_ENDPOINTS.issue.path}`, () => HttpResponse.json(ceSuccess({ InvoiceNumber: "CC1", RandomNum: "0001", TotalAmt: "105", CreateTime: "2026-06-17 00:00:00" }))));
+    server.use(http.post(`${BASE}${EZPAY_CB_ENDPOINTS.issue.path}`, () => HttpResponse.json(ceIssueSuccess({ MerchantID: "3500001", InvoiceNumber: "CC1", RandomNum: "0001", TotalAmt: "105", CreateTime: "2026-06-17 00:00:00" }))));
     // buyer.email missing would normally throw VALIDATION — bypassed here.
     const res = await testProvider({ validatePayload: false }).issue({ ...valid(), buyer: { name: "n" } });
     expect(res.invoiceNumber).toBe("CC1");

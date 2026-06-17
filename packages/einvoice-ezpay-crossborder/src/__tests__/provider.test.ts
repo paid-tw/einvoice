@@ -2,7 +2,7 @@ import { Capability, supports } from "@paid-tw/einvoice";
 import { http, HttpResponse } from "msw";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { EZPAY_CB_ENDPOINTS } from "../index.js";
-import { BASE, ceError, ceSuccess, parseRequest, server, testProvider } from "./server.js";
+import { BASE, ceError, ceIssueSuccess, ceSuccess, parseRequest, server, testProvider } from "./server.js";
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => server.resetHandlers());
@@ -37,7 +37,7 @@ describe("issue", () => {
     server.use(
       http.post(url(EZPAY_CB_ENDPOINTS.issue.path), async ({ request }) => {
         data = parseRequest(await request.text());
-        return HttpResponse.json(ceSuccess({ InvoiceNumber: "CC00000014", RandomNum: "0446", TotalAmt: "105", CreateTime: "2026-06-17 23:35:17", InvoiceTransNo: "26061700000001" }));
+        return HttpResponse.json(ceIssueSuccess({ MerchantID: "3500001", MerchantOrderNo: "ORDER_1", InvoiceNumber: "CC00000014", RandomNum: "0446", TotalAmt: "105", CreateTime: "2026-06-17 23:35:17", InvoiceTransNo: "26061700000001" }));
       }),
     );
     const res = await testProvider().issue(twdInput);
@@ -53,7 +53,7 @@ describe("issue", () => {
     server.use(
       http.post(url(EZPAY_CB_ENDPOINTS.issue.path), async ({ request }) => {
         data = parseRequest(await request.text());
-        return HttpResponse.json(ceSuccess({ InvoiceNumber: "CC00000015", RandomNum: "8704", TotalAmt: "21.3000000", CreateTime: "2026-06-17 23:35:18" }));
+        return HttpResponse.json(ceIssueSuccess({ MerchantID: "3500001", MerchantOrderNo: "ORDER_1", InvoiceNumber: "CC00000015", RandomNum: "8704", TotalAmt: "21.3000000", CreateTime: "2026-06-17 23:35:18" }));
       }),
     );
     const res = await testProvider().issue({
@@ -68,6 +68,35 @@ describe("issue", () => {
   });
 });
 
+describe("response CheckCode verification (附件二)", () => {
+  it("passes when the CheckCode matches the 5 issue fields", async () => {
+    server.use(
+      http.post(url(EZPAY_CB_ENDPOINTS.issue.path), () =>
+        HttpResponse.json(ceIssueSuccess({ MerchantID: "3500001", MerchantOrderNo: "ORDER_1", InvoiceNumber: "CC1", RandomNum: "0446", TotalAmt: "105", CreateTime: "2026-06-17 12:00:00" })),
+      ),
+    );
+    await expect(testProvider().issue(twdInput)).resolves.toMatchObject({ invoiceNumber: "CC1" });
+  });
+
+  it("throws PROVIDER when the CheckCode is tampered", async () => {
+    server.use(
+      http.post(url(EZPAY_CB_ENDPOINTS.issue.path), () =>
+        HttpResponse.json(ceSuccess({ MerchantID: "3500001", MerchantOrderNo: "ORDER_1", InvoiceNumber: "CC1", RandomNum: "0446", TotalAmt: "105", CreateTime: "2026-06-17 12:00:00", CheckCode: "DEADBEEF" })),
+      ),
+    );
+    await expect(testProvider().issue(twdInput)).rejects.toMatchObject({ code: "PROVIDER", rawMessage: "CheckCode mismatch" });
+  });
+
+  it("skips verification when verifyCheckCode is false", async () => {
+    server.use(
+      http.post(url(EZPAY_CB_ENDPOINTS.issue.path), () =>
+        HttpResponse.json(ceSuccess({ InvoiceNumber: "CC1", RandomNum: "0446", TotalAmt: "105", CreateTime: "2026-06-17 12:00:00" })),
+      ),
+    );
+    await expect(testProvider({ verifyCheckCode: false }).issue(twdInput)).resolves.toMatchObject({ invoiceNumber: "CC1" });
+  });
+});
+
 describe("issuePending + triggerIssue (two-phase)", () => {
   it("stages a TRIGGER invoice (Status=0) and triggers it", async () => {
     let issueData: Record<string, string> | undefined;
@@ -79,7 +108,7 @@ describe("issuePending + triggerIssue (two-phase)", () => {
       }),
       http.post(url(EZPAY_CB_ENDPOINTS.triggerIssue.path), async ({ request }) => {
         trigData = parseRequest(await request.text());
-        return HttpResponse.json(ceSuccess({ InvoiceNumber: "CC00000017", RandomNum: "1111", TotalAmt: "105", CreateTime: "2026-06-17 23:45:00" }));
+        return HttpResponse.json(ceIssueSuccess({ MerchantID: "3500001", MerchantOrderNo: "ORDER_1", InvoiceTransNo: "26061700000002", InvoiceNumber: "CC00000017", RandomNum: "1111", TotalAmt: "105", CreateTime: "2026-06-17 23:45:00" }));
       }),
     );
     const pend = await testProvider().issuePending(twdInput);
@@ -111,7 +140,7 @@ describe("issuePending + triggerIssue (two-phase)", () => {
     server.use(
       http.post(url(EZPAY_CB_ENDPOINTS.triggerIssue.path), async ({ request }) => {
         data = parseRequest(await request.text());
-        return HttpResponse.json(ceSuccess({ InvoiceNumber: "CC1", RandomNum: "2222", TotalAmt: "21.30", CreateTime: "2026-06-17 23:45:00" }));
+        return HttpResponse.json(ceIssueSuccess({ InvoiceTransNo: "t", MerchantOrderNo: "o", InvoiceNumber: "CC1", RandomNum: "2222", TotalAmt: "21.30", CreateTime: "2026-06-17 23:45:00" }));
       }),
     );
     await testProvider().triggerIssue({ invoiceTransNo: "t", orderId: "o", totalAmount: 21.3, currency: "USD" });

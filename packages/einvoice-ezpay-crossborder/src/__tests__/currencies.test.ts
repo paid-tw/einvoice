@@ -1,7 +1,7 @@
 import { http, HttpResponse } from "msw";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { EZPAY_CB_CURRENCIES, EZPAY_CB_ENDPOINTS } from "../index.js";
-import { BASE, ceError, ceSuccess, parseRequest, server, testProvider } from "./server.js";
+import { BASE, ceError, ceIssueSuccess, parseRequest, server, testProvider } from "./server.js";
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => server.resetHandlers());
@@ -40,7 +40,7 @@ describe("issue — every supported currency (附件三)", () => {
     server.use(
       http.post(url(EZPAY_CB_ENDPOINTS.issue.path), async ({ request }) => {
         data = parseRequest(await request.text());
-        return HttpResponse.json(ceSuccess({ InvoiceNumber: "CC00000099", RandomNum: "0001", TotalAmt: "21", CreateTime: "2026-06-17 12:00:00" }));
+        return HttpResponse.json(ceIssueSuccess({ MerchantID: "3500001", MerchantOrderNo: "CCY", InvoiceNumber: "CC00000099", RandomNum: "0001", TotalAmt: "21", CreateTime: "2026-06-17 12:00:00" }));
       }),
     );
     const res = await testProvider().issue(inputFor(currency));

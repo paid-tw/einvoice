@@ -1,4 +1,4 @@
-import { decryptPostData } from "@paid-tw/einvoice-ezpay";
+import { decryptPostData, makeCheckCode } from "@paid-tw/einvoice-ezpay";
 import { setupServer } from "msw/node";
 import { createEzpayCrossBorderProvider, type EzpayCrossBorderConfig } from "../provider.js";
 
@@ -35,4 +35,24 @@ export function ceSuccess(result: Record<string, unknown>, message = "發票開�
 /** An error envelope (Status is the ezPay error code, e.g. "INV20006"). */
 export function ceError(status: string, message: string) {
   return { Status: status, Message: message, Result: [] };
+}
+
+/** Compute the issue-family CheckCode over the 5 fields (附件二) for a result. */
+export function issueCheckCode(result: Record<string, unknown>): string {
+  return makeCheckCode(
+    {
+      MerchantID: String(result.MerchantID ?? ""),
+      MerchantOrderNo: String(result.MerchantOrderNo ?? ""),
+      InvoiceTransNo: String(result.InvoiceTransNo ?? ""),
+      TotalAmt: String(result.TotalAmt ?? ""),
+      RandomNum: String(result.RandomNum ?? ""),
+    },
+    TEST_KEY,
+    TEST_IV,
+  );
+}
+
+/** An issue/trigger success whose `CheckCode` is valid for the given fields. */
+export function ceIssueSuccess(result: Record<string, unknown>, message = "發票開立成功") {
+  return ceSuccess({ ...result, CheckCode: issueCheckCode(result) }, message);
 }
