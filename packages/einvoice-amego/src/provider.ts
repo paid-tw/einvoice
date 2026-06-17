@@ -349,7 +349,16 @@ export class AmegoProvider implements InvoiceProvider {
 
   /** 字軌 (number track) endpoints for self-numbering merchants. */
   readonly track = {
-    all: (data: Record<string, unknown>) => this.raw(ENDPOINTS.trackAll, data),
+    /**
+     * 所有字軌資料 — the full 3-layer track tree (1 財政部 / 2 光貿 / 3 字軌列表;
+     * leaf nodes carry category, TrackApiCode, source, status). `period` is
+     * 0:01-02 … 5:11-12; `Year` is PascalCase (lowercase yields no data).
+     */
+    all: (opts: { year: number; period?: 0 | 1 | 2 | 3 | 4 | 5 }) =>
+      this.raw(ENDPOINTS.trackAll, {
+        Year: opts.year,
+        ...(opts.period !== undefined ? { Period: opts.period } : {}),
+      }),
     /**
      * 字軌取號 — allocate a booklet of "API 配號" numbers. ⚠️ Mutating &
      * irreversible: each `book` reserves 50 invoice numbers. Returns

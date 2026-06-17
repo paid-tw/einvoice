@@ -39,7 +39,7 @@ export const ENDPOINTS = {
 
 export type EndpointKey = keyof typeof ENDPOINTS;
 
-/** 字軌狀態 codes returned by `track_status`. */
+/** 字軌狀態 codes returned by `track_status` / `track_all`. */
 export const TRACK_STATUS = {
   IN_USE: 1, // 使用
   DISABLED: 2, // 停用
@@ -47,3 +47,22 @@ export const TRACK_STATUS = {
   EXHAUSTED: 9, // 用畢
 } as const;
 export type TrackStatus = (typeof TRACK_STATUS)[keyof typeof TRACK_STATUS];
+
+/** `track_all` tree layers. */
+export const TRACK_LAYER = {
+  MOF: 1, // 財政部配給的字軌
+  AMEGO: 2, // 給光貿用的字軌
+  LIST: 3, // 發票字軌列表的內容
+} as const;
+
+/** `track_all` leaf 配號方式. */
+export const TRACK_CATEGORY = {
+  AUTO: 1, // 自動配號
+  API: 2, // API 配號
+} as const;
+
+/** `track_all` leaf 字軌來源. */
+export const TRACK_SOURCE = {
+  SYSTEM_IMPORT: 1, // 系統匯入
+  MANUAL: 2, // 人工輸入
+} as const;

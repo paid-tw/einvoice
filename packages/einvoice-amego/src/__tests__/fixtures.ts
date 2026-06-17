@@ -128,6 +128,45 @@ export const CUSTOM_ISSUE_OK = {
   ],
 };
 
+/** Real track_all response (Year 2026, Period 2) — nested 3-layer tree. */
+export const TRACK_ALL_OK = {
+  code: 0,
+  msg: "",
+  data: [
+    {
+      layer: 1,
+      code: "AA",
+      start: "00000000",
+      end: "00009999",
+      total_booklet: 200,
+      data: [
+        {
+          layer: 2,
+          code: "AA",
+          start: "00000000",
+          end: "00009999",
+          total_booklet: 200,
+          data: [
+            {
+              layer: 3,
+              category: 1,
+              code: "AA",
+              start: "00000000",
+              end: "00009999",
+              now: "00000009",
+              total_booklet: 200,
+              remark: "",
+              TrackApiCode: "FSM",
+              source: 2,
+              status: 1,
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};
+
 /** Real track_get success (allocates a 50-number booklet). data is an OBJECT. */
 export const TRACK_GET_OK = {
   code: 0,

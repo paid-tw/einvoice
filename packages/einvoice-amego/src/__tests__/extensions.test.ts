@@ -1,9 +1,15 @@
 import { http, HttpResponse } from "msw";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import type { AmegoProvider } from "../provider.js";
-import { ENDPOINTS, TRACK_STATUS } from "../endpoints.js";
+import {
+  ENDPOINTS,
+  TRACK_CATEGORY,
+  TRACK_LAYER,
+  TRACK_SOURCE,
+  TRACK_STATUS,
+} from "../endpoints.js";
 import { BASE, parseBody, server, testProvider } from "./server.js";
-import { TIME_OK, TRACK_GET_OK, TRACK_STATUS_OK } from "./fixtures.js";
+import { TIME_OK, TRACK_ALL_OK, TRACK_GET_OK, TRACK_STATUS_OK } from "./fixtures.js";
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => server.resetHandlers());
@@ -106,10 +112,10 @@ const CASES: Array<{
     expectData: {},
   },
   {
-    name: "track.all (pass-through)",
+    name: "track.all (Year/Period PascalCase)",
     path: ENDPOINTS.trackAll,
-    invoke: (p) => p.track.all({ level: 1 }),
-    expectData: { level: 1 },
+    invoke: (p) => p.track.all({ year: 2026, period: 2 }),
+    expectData: { Year: 2026, Period: 2 },
   },
   {
     name: "track.get (Year/Period/Book PascalCase)",
@@ -160,6 +166,26 @@ describe("Amego endpoint contracts (verified live shapes)", () => {
   it("raw() can call any endpoint directly", async () => {
     server.use(http.post(`${BASE}/json/anything`, () => HttpResponse.json({ code: 0, ok: true })));
     expect(await testProvider().raw("/json/anything", { foo: "bar" })).toMatchObject({ ok: true });
+  });
+
+  it("track.all returns the nested 3-layer tree (financial → amego → list leaf)", async () => {
+    let data: unknown;
+    server.use(
+      http.post(`${BASE}${ENDPOINTS.trackAll}`, async ({ request }) => {
+        data = parseBody(await request.text()).data;
+        return HttpResponse.json(TRACK_ALL_OK);
+      }),
+    );
+    const res = await testProvider().track.all({ year: 2026, period: 2 });
+    expect(data).toEqual({ Year: 2026, Period: 2 });
+    const l1 = (res.data as Array<Record<string, unknown>>)[0]!;
+    expect(l1.layer).toBe(TRACK_LAYER.MOF);
+    const l2 = (l1.data as Array<Record<string, unknown>>)[0]!;
+    const leaf = (l2.data as Array<Record<string, unknown>>)[0]!;
+    expect(leaf.layer).toBe(TRACK_LAYER.LIST);
+    expect(leaf.category).toBe(TRACK_CATEGORY.AUTO);
+    expect(leaf.source).toBe(TRACK_SOURCE.MANUAL);
+    expect(leaf.TrackApiCode).toBe("FSM");
   });
 
   it("track.get allocates a booklet and returns the { code, start, end } range", async () => {

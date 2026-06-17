@@ -52,6 +52,14 @@ describe.skipIf(!live)("Amego live lifecycle", () => {
     expect(res).not.toHaveProperty("code");
   });
 
+  it("reads the full track tree (track_all, nested layers)", async () => {
+    const res = await provider.track.all({ year: 2026, period: 2 });
+    expect(res.code).toBe(0);
+    const l1 = (res.data as Array<Record<string, unknown>>)[0];
+    expect(l1?.layer).toBe(1);
+    expect(Array.isArray(l1?.data)).toBe(true);
+  });
+
   it("reads API-numbering track status (Year/Period)", async () => {
     const res = await provider.track.status({ year: 2026, period: 2 });
     expect(res.code).toBe(0);
