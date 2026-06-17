@@ -28,6 +28,7 @@ import {
 import { type EcpayResult, ecpayRequest } from "./client.js";
 import type { EcpayConfig } from "./config.js";
 import { ENDPOINTS } from "./endpoints.js";
+import { assertValidIssuePayload } from "./validation.js";
 
 /** Unified carrier type → ECPay CarrierType (空=紙本/1=綠界/2=自然人/3=手機). */
 const CARRIER_TYPE: Record<Carrier["type"], string> = {
@@ -248,7 +249,7 @@ export class EcpayProvider implements InvoiceProvider {
     // Carrier/donation invoices are electronic; everything else prints.
     const print = carrier || donating ? "0" : "1";
 
-    return {
+    const data: Record<string, unknown> = {
       RelateNumber: parsed.orderId,
       CustomerID: (parsed.providerOptions?.customerId as string) ?? "",
       CustomerIdentifier: category === "B2B" ? parsed.buyer.ubn : "",
@@ -269,6 +270,8 @@ export class EcpayProvider implements InvoiceProvider {
       vat: parsed.priceMode === "TAX_EXCLUSIVE" ? "0" : "1",
       ...(parsed.providerOptions?.data as Record<string, unknown> | undefined),
     };
+    if (this.config.validatePayload !== false) assertValidIssuePayload(data);
+    return data;
   }
 }
 

@@ -5,6 +5,8 @@ export { ENDPOINTS as ECPAY_ENDPOINTS } from "./endpoints.js";
 export { ecpayRequest, mapEcpayError, ecpayTimestamp } from "./client.js";
 export type { EcpayResult } from "./client.js";
 export { createEcpayProvider, EcpayProvider, ecpayTaxType } from "./provider.js";
+export { ecpayIssuePayloadSchema, assertValidIssuePayload } from "./validation.js";
+export type { EcpayIssuePayload } from "./validation.js";
 export {
   aesEncrypt,
   aesDecrypt,
