@@ -4,9 +4,12 @@ import {
   Capability,
   type Carrier,
   deriveCategory,
+  InvoiceError,
+  InvoiceErrorCode,
   type InvoiceItem,
   type InvoiceProvider,
   InvoiceStatus,
+  isValidMobileBarcode,
   type IssueInvoiceInput,
   type IssueInvoiceResult,
   type QueryInvoiceInput,
@@ -156,6 +159,38 @@ export class EcpayProvider implements InvoiceProvider {
       })),
       raw: result,
     };
+  }
+
+  /**
+   * 手機條碼驗證 (CheckBarcode): resolves `true` when a mobile barcode is
+   * registered at the tax authority. The `/XXXXXXX` format is checked first.
+   */
+  async validateMobileBarcode(barcode: string): Promise<boolean> {
+    if (this.config.validatePayload !== false && !isValidMobileBarcode(barcode)) {
+      throw new InvoiceError(`Invalid mobile barcode format: ${barcode}`, {
+        provider: "ecpay",
+        code: InvoiceErrorCode.VALIDATION,
+        rawMessage: "BarCode must be '/' followed by 7 of [0-9A-Z.+-]",
+      });
+    }
+    const result = await ecpayRequest(this.config, ENDPOINTS.checkBarcode, { BarCode: barcode });
+    return result.IsExist === "Y";
+  }
+
+  /**
+   * 愛心碼/捐贈碼驗證 (CheckLoveCode): resolves `true` when the donation code is
+   * registered. The 3–7 digit format is checked first.
+   */
+  async validateLoveCode(loveCode: string): Promise<boolean> {
+    if (this.config.validatePayload !== false && !/^\d{3,7}$/.test(loveCode)) {
+      throw new InvoiceError(`Invalid love code format: ${loveCode}`, {
+        provider: "ecpay",
+        code: InvoiceErrorCode.VALIDATION,
+        rawMessage: "LoveCode must be 3–7 digits",
+      });
+    }
+    const result = await ecpayRequest(this.config, ENDPOINTS.checkLoveCode, { LoveCode: loveCode });
+    return result.IsExist === "Y";
   }
 
   // -------------------------------------------------------------------------
