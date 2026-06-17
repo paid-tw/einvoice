@@ -15,6 +15,7 @@ export type {
   GetAllowanceListInput,
   AllowanceDetail,
   InvalidDetail,
+  InvalidAllowanceDetail,
   ListInvoicesInput,
   InvoiceListItem,
   InvoiceListPage,

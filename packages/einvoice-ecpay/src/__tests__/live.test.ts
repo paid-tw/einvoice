@@ -93,6 +93,9 @@ describe.skipIf(!live)("ECPay live (stage) — issue → query → void", LIVE_O
     expect(details[0]?.totalAmount).toBe(100);
     const va = await p.voidAllowance({ invoiceNumber, allowanceNumber: al.allowanceNumber, reason: "測試作廢" });
     expect(va.raw.RtnCode).toBe(1);
+    // The voided allowance is queryable (GetAllowanceInvalid).
+    const inval = await p.getAllowanceInvalid({ invoiceNumber, allowanceNumber: al.allowanceNumber });
+    expect(inval.reason).toBe("測試作廢");
     // Voiding it again → 2000063 該折讓單已作廢過 → CONFLICT.
     await expect(
       p.voidAllowance({ invoiceNumber, allowanceNumber: al.allowanceNumber }),

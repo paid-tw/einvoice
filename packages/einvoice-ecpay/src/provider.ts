@@ -137,6 +137,22 @@ export interface InvalidDetail {
   raw: Record<string, unknown>;
 }
 
+/** Detail of a voided allowance from {@link EcpayProvider.getAllowanceInvalid} (查詢作廢折讓明細). */
+export interface InvalidAllowanceDetail {
+  allowanceNumber: string; // AI_Allow_No
+  invoiceNumber: string; // AI_Invoice_No
+  /** 折讓單日期 (AI_Allow_Date). */
+  allowanceDate: Date;
+  /** 作廢時間 (AI_Date). */
+  voidedAt: Date;
+  reason: string; // Reason
+  uploaded: boolean; // AI_Upload_Status
+  uploadedAt?: Date; // AI_Upload_Date
+  sellerUbn?: string; // AI_Seller_Identifier
+  buyerUbn?: string; // AI_Buyer_Identifier
+  raw: Record<string, unknown>;
+}
+
 /** Lookup for {@link EcpayProvider.getAllowanceList} (查詢折讓明細). */
 export interface GetAllowanceListInput {
   /** 折讓編號 — SearchType 0. */
@@ -562,6 +578,40 @@ export class EcpayProvider implements InvoiceProvider {
         unit: stringOrUndef(it.ItemWord),
         remark: stringOrUndef(it.ItemRemark),
       })),
+      raw: result,
+    };
+  }
+
+  /**
+   * 查詢作廢折讓明細 (GetAllowanceInvalid): look up a voided allowance's detail
+   * (allowance date, void time, reason, upload status, seller/buyer 統編). Keyed
+   * by InvoiceNo + AllowanceNo (both required).
+   */
+  async getAllowanceInvalid(input: {
+    invoiceNumber: string;
+    allowanceNumber: string;
+  }): Promise<InvalidAllowanceDetail> {
+    if (this.config.validatePayload !== false && (!input.invoiceNumber || !input.allowanceNumber)) {
+      throw new InvoiceError("invoiceNumber and allowanceNumber are both required", {
+        provider: "ecpay",
+        code: InvoiceErrorCode.VALIDATION,
+        rawMessage: "GetAllowanceInvalid needs InvoiceNo + AllowanceNo",
+      });
+    }
+    const result = await ecpayRequest(this.config, ENDPOINTS.getAllowanceInvalid, {
+      InvoiceNo: input.invoiceNumber,
+      AllowanceNo: input.allowanceNumber,
+    });
+    return {
+      allowanceNumber: String(result.AI_Allow_No ?? input.allowanceNumber),
+      invoiceNumber: String(result.AI_Invoice_No ?? input.invoiceNumber),
+      allowanceDate: parseEcpayDate(result.AI_Allow_Date),
+      voidedAt: parseEcpayDate(result.AI_Date),
+      reason: String(result.Reason ?? ""),
+      uploaded: result.AI_Upload_Status === "1" || result.AI_Upload_Status === 1,
+      uploadedAt: result.AI_Upload_Date ? parseEcpayDate(result.AI_Upload_Date) : undefined,
+      sellerUbn: stringOrUndef(result.AI_Seller_Identifier, "0000000000"),
+      buyerUbn: stringOrUndef(result.AI_Buyer_Identifier, "0000000000"),
       raw: result,
     };
   }

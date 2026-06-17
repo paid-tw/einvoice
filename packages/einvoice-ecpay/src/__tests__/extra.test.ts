@@ -420,6 +420,42 @@ describe("線上開立折讓 (allowanceOnline)", () => {
   });
 });
 
+describe("查詢作廢折讓明細 (getAllowanceInvalid / GetAllowanceInvalid)", () => {
+  it("posts InvoiceNo+AllowanceNo, parses the voided-allowance detail", async () => {
+    let data: Record<string, unknown> | undefined;
+    server.use(
+      http.post(url(ECPAY_ENDPOINTS.getAllowanceInvalid), async ({ request }) => {
+        data = parseRequest(await request.text()).data;
+        return HttpResponse.json(
+          ecSuccess({
+            AI_Allow_No: "2026061722338885",
+            AI_Invoice_No: "JU11084023",
+            AI_Allow_Date: "2026-06-17 22:33:00",
+            AI_Date: "2026-06-17 22:34:00",
+            Reason: "測試作廢折讓原因",
+            AI_Upload_Status: "0",
+            AI_Upload_Date: "",
+            AI_Seller_Identifier: "53538851",
+            AI_Buyer_Identifier: "0000000000",
+          }),
+        );
+      }),
+    );
+    const res = await testProvider().getAllowanceInvalid({ invoiceNumber: "JU11084023", allowanceNumber: "2026061722338885" });
+    expect(data).toMatchObject({ InvoiceNo: "JU11084023", AllowanceNo: "2026061722338885" });
+    expect(res).toMatchObject({ allowanceNumber: "2026061722338885", invoiceNumber: "JU11084023", reason: "測試作廢折讓原因", uploaded: false, sellerUbn: "53538851" });
+    expect(res.buyerUbn).toBeUndefined();
+    expect(res.allowanceDate.getFullYear()).toBe(2026);
+    expect(res.voidedAt.getFullYear()).toBe(2026);
+  });
+
+  it("rejects a missing key locally", async () => {
+    await expect(
+      testProvider().getAllowanceInvalid({ invoiceNumber: "JU1", allowanceNumber: "" }),
+    ).rejects.toMatchObject({ code: "VALIDATION" });
+  });
+});
+
 describe("查詢作廢發票明細 (getInvalid / GetInvalid)", () => {
   it("posts RelateNumber+InvoiceNo+InvoiceDate, parses the void detail", async () => {
     let data: Record<string, unknown> | undefined;
