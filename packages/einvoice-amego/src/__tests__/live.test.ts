@@ -252,6 +252,18 @@ describe.skipIf(!live)("Amego live — server rejects invalid values", () => {
     expect(alwNew.rawCode).not.toBe("33");
   });
 
+  it("f0501 (void invoice): object → 3050112, nonexistent → 3050125 NOT_FOUND, empty → 3050111", async () => {
+    const wrong = await provider.raw("/json/f0501", { CancelInvoiceNumber: "ZZ00000000" }).catch((e) => e);
+    expect(wrong.rawCode).toBe("3050112");
+    expect(wrong.code).toBe("VALIDATION");
+    const missing = await provider.raw("/json/f0501", [{ CancelInvoiceNumber: "ZZ00000000" }]).catch((e) => e);
+    expect(missing.rawCode).toBe("3050125");
+    expect(missing.code).toBe("NOT_FOUND");
+    const empty = await provider.raw("/json/f0501", [{ CancelInvoiceNumber: "" }]).catch((e) => e);
+    expect(empty.rawCode).toBe("3050111");
+    expect(empty.code).toBe("VALIDATION");
+  });
+
   it("g0401 (open allowance) rejects bad fields with 4040xxx (string codes)", async () => {
     const item = { OriginalInvoiceNumber: "AA26513024", OriginalInvoiceDate: 20260617, OriginalDescription: "商品", Quantity: 1, UnitPrice: "100", Amount: "100", Tax: 5, TaxType: 1 };
     const rec = (o: Record<string, unknown> = {}) => ({ AllowanceNumber: `GA${Date.now()}`, AllowanceDate: "20260617", AllowanceType: "2", BuyerIdentifier: "0000000000", BuyerName: "消費者", ProductItem: [item], TaxAmount: "5", TotalAmount: "100", ...o });

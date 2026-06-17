@@ -24,7 +24,11 @@ describe("mapAmegoErrorCode (from info_detail?mid=71)", () => {
     [3040123, "VALIDATION"], // BuyerName 不可為空
     [3040111, "NUMBER_EXHAUSTED"], // 字軌不足
     [3040171, "CONFLICT"], // OrderId 重複
+    [3050111, "VALIDATION"], // f0501 CancelInvoiceNumber 錯誤
+    [3050124, "VALIDATION"], // 發票類型錯誤
     [3050122, "CONFLICT"], // 發票已作廢
+    [3050126, "CONFLICT"], // 已超過修改期限
+    [3050131, "CONFLICT"], // 等待 開立/作廢/註銷
     [3050141, "CONFLICT"], // 已存在折讓單
     [3040121, "VALIDATION"], // BuyerIdentifier 字數錯誤
     [3040122, "VALIDATION"], // BuyerIdentifier 格式錯誤

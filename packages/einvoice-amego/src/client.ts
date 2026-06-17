@@ -199,7 +199,8 @@ export function mapAmegoErrorCode(rawCode: number | string): InvoiceErrorCode {
   // Duplicate OrderId / invoice state conflict / already has an allowance
   if (code === 3040171) return InvoiceErrorCode.CONFLICT;
   if (code === 3050141) return InvoiceErrorCode.CONFLICT; // 已存在折讓單
-  if (code >= 3050121 && code <= 3050123) return InvoiceErrorCode.CONFLICT;
+  if (code >= 3050121 && code <= 3050123) return InvoiceErrorCode.CONFLICT; // 開立中/已作廢/已註銷
+  if (code === 3050126 || code === 3050131) return InvoiceErrorCode.CONFLICT; // 超過修改期限 / 等待排程
   // g0401 original-invoice / allowance-number state conflicts (開立中 / 已作廢 / 已註銷 / 已存在折讓)
   if (code >= 4040152 && code <= 4040154) return InvoiceErrorCode.CONFLICT;
   if (code >= 4040161 && code <= 4040163) return InvoiceErrorCode.CONFLICT;
@@ -209,7 +210,9 @@ export function mapAmegoErrorCode(rawCode: number | string): InvoiceErrorCode {
   if (
     code === 23 ||
     (code >= 31 && code <= 36) ||
+    code === 3050111 || // f0501 CancelInvoiceNumber 錯誤
     code === 3050112 ||
+    code === 3050124 || // 發票類型錯誤
     code === 4050112
   )
     return InvoiceErrorCode.VALIDATION;
