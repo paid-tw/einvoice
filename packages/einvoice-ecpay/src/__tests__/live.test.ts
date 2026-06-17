@@ -153,6 +153,47 @@ describe.skipIf(!live)("ECPay live (stage) — Issue field-rule audit", LIVE_OPT
   });
 });
 
+describe.skipIf(!live)("ECPay live (stage) — 註銷重開", LIVE_OPTS, () => {
+  const p = provider();
+
+  it("voids and reissues an invoice, keeping its number/date with a new random code", async () => {
+    const orderId = `RI${Date.now()}`;
+    const orig = await p.issue(carrierIssue(orderId));
+    const fmt = (d: Date) =>
+      new Intl.DateTimeFormat("sv-SE", {
+        timeZone: "Asia/Taipei",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false,
+      })
+        .format(orig.invoiceDate)
+        .replace("T", " ");
+    const res = await p.voidWithReissue({
+      invoiceNumber: orig.invoiceNumber,
+      voidReason: "測試註銷重開",
+      invoiceDate: fmt(orig.invoiceDate),
+      reissue: { ...carrierIssue(orderId), orderId },
+    });
+    // ECPay keeps the original number + open time; only the random code changes.
+    expect(res.invoiceNumber).toBe(orig.invoiceNumber);
+    expect(res.randomCode).toMatch(/^\d{4}$/);
+
+    // The just-reissued invoice isn't uploaded to the MOF yet → can't re-void.
+    await expect(
+      p.voidWithReissue({
+        invoiceNumber: orig.invoiceNumber,
+        voidReason: "再次",
+        invoiceDate: fmt(orig.invoiceDate),
+        reissue: { ...carrierIssue(orderId), orderId },
+      }),
+    ).rejects.toMatchObject({ provider: "ecpay" });
+  });
+});
+
 describe.skipIf(!live)("ECPay live (stage) — 發票列印", LIVE_OPTS, () => {
   const p = provider();
 

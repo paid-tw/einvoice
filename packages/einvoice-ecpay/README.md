@@ -143,6 +143,25 @@ Allowance tags (`ALLOWANCE` / `ALLOWANCE_VOID` / `ONLINE_ALLOWANCE`) need an
 `allowanceNumber`; `ONLINE_ALLOWANCE` must use `EMAIL` + `CUSTOMER`. Notifying a
 non-winning invoice with `tag: "AWARD"` throws `NOT_FOUND` (查無發票中獎資料).
 
+## Void & reissue (註銷重開)
+
+```ts
+// Atomically void an invoice and reissue it. ECPay keeps the original
+// 發票號碼 / 自訂編號 / 開立時間 — only the random code changes — so the reissue
+// must carry the original orderId and issue time. Do it before the 13th of the
+// month after the invoice's period.
+const res = await invoices.voidWithReissue({
+  invoiceNumber: orig.invoiceNumber,
+  voidReason: "客戶要求重開",      // ≤ 20 chars
+  invoiceDate: orig.invoiceDate,  // the original issue time (Date or yyyy-MM-dd HH:mm:ss)
+  reissue: { ...issueInput, orderId: orig.orderId }, // same shape as issue()
+});
+res.invoiceNumber === orig.invoiceNumber; // true — reuses the original number
+```
+
+A still-pending invoice (not yet uploaded to the MOF) can't be re-voided yet;
+an unknown number returns 查無發票資料 → `NOT_FOUND`.
+
 ## Notes
 
 - Zero-rated invoices (`taxType: "ZERO_RATED"` or mixed) require a customs mark:

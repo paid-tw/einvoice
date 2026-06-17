@@ -624,6 +624,71 @@ describe("查詢多筆發票 (listInvoices / GetIssueList)", () => {
   });
 });
 
+describe("voidWithReissue (VoidWithReIssue / 註銷重開)", () => {
+  const reissue = {
+    orderId: "ORDER_1",
+    buyer: { email: "b@x.com" },
+    items: [{ description: "商品", quantity: 1, unitPrice: 100, amount: 100 }],
+    amount: { salesAmount: 100, taxAmount: 0, totalAmount: 100 },
+    taxType: "TAXABLE" as const,
+    priceMode: "TAX_INCLUSIVE" as const,
+    carrier: { type: "MEMBER" as const },
+  };
+
+  it("nests VoidModel + IssueModel and returns the reissued number/date", async () => {
+    let data: Record<string, unknown> | undefined;
+    server.use(
+      http.post(url(ECPAY_ENDPOINTS.voidWithReIssue), async ({ request }) => {
+        data = parseRequest(await request.text()).data;
+        return HttpResponse.json(
+          ecSuccess({ RtnCode: 1, RtnMsg: "開立發票成功", InvoiceNo: "JU11084050", InvoiceDate: "2026-06-17 22:48:54", RandomNumber: "1936" }),
+        );
+      }),
+    );
+    const res = await testProvider().voidWithReissue({
+      invoiceNumber: "JU11084050",
+      voidReason: "測試重開",
+      invoiceDate: "2026-06-17 22:48:54",
+      reissue,
+    });
+    expect(res).toMatchObject({ invoiceNumber: "JU11084050", randomCode: "1936" });
+    expect(res.invoiceDate.getFullYear()).toBe(2026);
+    expect(data?.VoidModel).toMatchObject({ InvoiceNo: "JU11084050", VoidReason: "測試重開" });
+    expect(data?.IssueModel).toMatchObject({ RelateNumber: "ORDER_1", InvoiceDate: "2026-06-17 22:48:54", CarrierType: "1", SalesAmount: 100 });
+  });
+
+  it("formats a Date invoiceDate to Asia/Taipei yyyy-MM-dd HH:mm:ss", async () => {
+    let data: Record<string, unknown> | undefined;
+    server.use(
+      http.post(url(ECPAY_ENDPOINTS.voidWithReIssue), async ({ request }) => {
+        data = parseRequest(await request.text()).data;
+        return HttpResponse.json(ecSuccess({ RtnCode: 1, RtnMsg: "開立發票成功", InvoiceNo: "JU1", InvoiceDate: "2026-06-17 14:48:54", RandomNumber: "0001" }));
+      }),
+    );
+    // 2026-06-17T06:48:54Z == 2026-06-17 14:48:54 Asia/Taipei (+08:00)
+    await testProvider().voidWithReissue({
+      invoiceNumber: "JU1",
+      voidReason: "x",
+      invoiceDate: new Date("2026-06-17T06:48:54Z"),
+      reissue,
+    });
+    expect((data?.IssueModel as Record<string, unknown>).InvoiceDate).toBe("2026-06-17 14:48:54");
+  });
+
+  it("rejects a VoidReason longer than 20 chars locally", async () => {
+    await expect(
+      testProvider().voidWithReissue({ invoiceNumber: "JU1", voidReason: "超過二十個字".repeat(5), invoiceDate: "2026-06-17 00:00:00", reissue }),
+    ).rejects.toMatchObject({ code: "VALIDATION" });
+  });
+
+  it("maps 查無發票資料 (unknown invoice) to NOT_FOUND", async () => {
+    server.use(http.post(url(ECPAY_ENDPOINTS.voidWithReIssue), () => HttpResponse.json(ecError(2, "查無發票資料，請重新確認"))));
+    await expect(
+      testProvider().voidWithReissue({ invoiceNumber: "JU00000000", voidReason: "x", invoiceDate: "2026-06-17 00:00:00", reissue }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+});
+
 describe("getPrintUrl (InvoicePrint / 發票列印)", () => {
   it("posts the minimal payload and returns the InvoiceHtml URL", async () => {
     let data: Record<string, unknown> | undefined;

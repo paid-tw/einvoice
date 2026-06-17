@@ -181,6 +181,26 @@ export interface PrintInvoiceInput {
   reprint?: boolean;
 }
 
+/** Input for {@link EcpayProvider.voidWithReissue} (註銷重開). */
+export interface VoidReissueInput {
+  /** Original invoice number to void. */
+  invoiceNumber: string;
+  /** Reason for voiding (≤20 chars). */
+  voidReason: string;
+  /** Original issue time (`yyyy-MM-dd HH:mm:ss`, or a Date) — must match the original. */
+  invoiceDate: string | Date;
+  /** The reissue payload — same shape as `issue()`; `orderId` must be the original RelateNumber. */
+  reissue: IssueInvoiceInput;
+}
+
+/** Result of {@link EcpayProvider.voidWithReissue} — keeps the original number/date. */
+export interface VoidReissueResult {
+  invoiceNumber: string;
+  invoiceDate: Date;
+  randomCode: string;
+  raw: EcpayResult;
+}
+
 /** Detail of a voided invoice from {@link EcpayProvider.getInvalid} (查詢作廢發票明細). */
 export interface InvalidDetail {
   invoiceNumber: string; // II_Invoice_No
@@ -477,6 +497,39 @@ export class EcpayProvider implements InvoiceProvider {
       Reason: parsed.reason,
     });
     return { invoiceNumber: parsed.invoiceNumber, status: InvoiceStatus.VOIDED, raw: result };
+  }
+
+  /**
+   * 註銷重開 (VoidWithReIssue): atomically void an invoice and reissue it. ECPay
+   * keeps the original 發票號碼 / 自訂編號 / 開立時間 (only the RandomNumber
+   * changes), so `reissue.orderId` must be the original RelateNumber and
+   * `invoiceDate` the original issue time. Must be done before the 13th of the
+   * month after the invoice's period. The reissued invoice's number/date are
+   * returned (equal to the original); a still-pending (not-yet-uploaded) invoice
+   * can't be re-voided yet.
+   */
+  async voidWithReissue(input: VoidReissueInput): Promise<VoidReissueResult> {
+    const parsed = issueInvoiceInputSchema.parse(input.reissue);
+    if (this.config.validatePayload !== false && (input.voidReason ?? "").length > 20) {
+      throw new InvoiceError("VoidReason must be ≤20 chars", {
+        provider: "ecpay",
+        code: InvoiceErrorCode.VALIDATION,
+        rawMessage: "註銷原因 (VoidReason) must be ≤20 chars",
+      });
+    }
+    const result = await ecpayRequest(this.config, ENDPOINTS.voidWithReIssue, {
+      VoidModel: { InvoiceNo: input.invoiceNumber, VoidReason: input.voidReason },
+      IssueModel: {
+        ...this.buildIssueData(parsed),
+        InvoiceDate: typeof input.invoiceDate === "string" ? input.invoiceDate : taipeiDateTime(input.invoiceDate),
+      },
+    });
+    return {
+      invoiceNumber: String(result.InvoiceNo ?? ""),
+      invoiceDate: parseEcpayDate(result.InvoiceDate),
+      randomCode: String(result.RandomNumber ?? ""),
+      raw: result,
+    };
   }
 
   /**
@@ -1128,6 +1181,22 @@ function taipeiDate(date?: Date): string {
     month: "2-digit",
     day: "2-digit",
   }).format(date ?? new Date());
+}
+
+/** Format a Date as `YYYY-MM-DD HH:mm:ss` in Asia/Taipei (24-hour). */
+function taipeiDateTime(date: Date): string {
+  return new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Asia/Taipei",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  })
+    .format(date)
+    .replace("T", " ");
 }
 
 function stringOrUndef(value: unknown, placeholder?: string): string | undefined {

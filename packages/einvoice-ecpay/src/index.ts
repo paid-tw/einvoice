@@ -17,6 +17,8 @@ export type {
   SendNotifyInput,
   PrintStyle,
   PrintInvoiceInput,
+  VoidReissueInput,
+  VoidReissueResult,
   AllowanceDetail,
   InvalidDetail,
   InvalidAllowanceDetail,
