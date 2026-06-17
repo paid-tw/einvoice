@@ -108,6 +108,24 @@ const tracks = await invoices.getInvoiceWordSetting({ invoiceYear: "115", useSta
 await invoices.setInvoiceWordStatus(trackId, "ENABLE"); // or "PAUSE" / "DISABLE"
 ```
 
+## Notifications (發送發票通知)
+
+```ts
+// Email / SMS an invoice, void, allowance or award notification to the buyer
+// and/or merchant. ECPay's stage env validates the request but does not deliver.
+await invoices.sendNotification({
+  invoiceNumber: "JU11084029",
+  tag: "ISSUE",        // ISSUE | VOID | ALLOWANCE | ALLOWANCE_VOID | AWARD | ONLINE_ALLOWANCE
+  method: "EMAIL",     // EMAIL | SMS | BOTH
+  recipient: "CUSTOMER", // CUSTOMER | MERCHANT | BOTH
+  email: "buyer@example.com", // and/or phone — at least one is required
+});
+```
+
+Allowance tags (`ALLOWANCE` / `ALLOWANCE_VOID` / `ONLINE_ALLOWANCE`) need an
+`allowanceNumber`; `ONLINE_ALLOWANCE` must use `EMAIL` + `CUSTOMER`. Notifying a
+non-winning invoice with `tag: "AWARD"` throws `NOT_FOUND` (查無發票中獎資料).
+
 ## Notes
 
 - Zero-rated invoices (`taxType: "ZERO_RATED"` or mixed) require a customs mark:

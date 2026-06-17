@@ -124,6 +124,40 @@ export interface OnlineAllowanceResult {
   raw: EcpayResult;
 }
 
+/** What to notify about (→ ECPay `InvoiceTag`). */
+export type NotifyTag =
+  | "ISSUE" // I 發票開立
+  | "VOID" // II 發票作廢
+  | "ALLOWANCE" // A 折讓開立
+  | "ALLOWANCE_VOID" // AI 折讓作廢
+  | "AWARD" // AW 發票中獎
+  | "ONLINE_ALLOWANCE"; // OA 線上折讓
+const NOTIFY_TAG: Record<NotifyTag, string> = {
+  ISSUE: "I",
+  VOID: "II",
+  ALLOWANCE: "A",
+  ALLOWANCE_VOID: "AI",
+  AWARD: "AW",
+  ONLINE_ALLOWANCE: "OA",
+};
+const NOTIFY_METHOD = { SMS: "S", EMAIL: "E", BOTH: "A" } as const;
+const NOTIFY_RECIPIENT = { CUSTOMER: "C", MERCHANT: "M", BOTH: "A" } as const;
+
+/** Input for {@link EcpayProvider.sendNotification} (發送發票通知). */
+export interface SendNotifyInput {
+  invoiceNumber: string;
+  /** Required when `tag` is ALLOWANCE / ALLOWANCE_VOID / ONLINE_ALLOWANCE. */
+  allowanceNumber?: string;
+  tag: NotifyTag;
+  /** Channel. `ONLINE_ALLOWANCE` must use `"EMAIL"`. */
+  method: keyof typeof NOTIFY_METHOD;
+  /** Recipient. `ONLINE_ALLOWANCE` must use `"CUSTOMER"`. */
+  recipient: keyof typeof NOTIFY_RECIPIENT;
+  /** At least one of email / phone is required. */
+  email?: string;
+  phone?: string;
+}
+
 /** Detail of a voided invoice from {@link EcpayProvider.getInvalid} (查詢作廢發票明細). */
 export interface InvalidDetail {
   invoiceNumber: string; // II_Invoice_No
@@ -580,6 +614,34 @@ export class EcpayProvider implements InvoiceProvider {
       })),
       raw: result,
     };
+  }
+
+  /**
+   * 發送發票通知 (InvoiceNotify): email/SMS an invoice, void, allowance or award
+   * notification to the customer and/or merchant. (Stage doesn't actually send —
+   * it only validates the rules.) Allowance tags need an `allowanceNumber`;
+   * `ONLINE_ALLOWANCE` must be EMAIL + CUSTOMER; email or phone is required.
+   */
+  async sendNotification(input: SendNotifyInput): Promise<void> {
+    const tag = NOTIFY_TAG[input.tag];
+    if (this.config.validatePayload !== false) {
+      const fail = (msg: string) =>
+        new InvoiceError(msg, { provider: "ecpay", code: InvoiceErrorCode.VALIDATION, rawMessage: msg });
+      if (!input.email && !input.phone) throw fail("email or phone is required");
+      if (["A", "AI", "OA"].includes(tag) && !input.allowanceNumber)
+        throw fail("allowanceNumber is required for allowance notifications");
+      if (input.tag === "ONLINE_ALLOWANCE" && (input.method !== "EMAIL" || input.recipient !== "CUSTOMER"))
+        throw fail("ONLINE_ALLOWANCE must use EMAIL + CUSTOMER");
+    }
+    await ecpayRequest(this.config, ENDPOINTS.invoiceNotify, {
+      InvoiceNo: input.invoiceNumber,
+      AllowanceNo: input.allowanceNumber,
+      Phone: input.phone,
+      NotifyMail: input.email,
+      Notify: NOTIFY_METHOD[input.method],
+      InvoiceTag: tag,
+      Notified: NOTIFY_RECIPIENT[input.recipient],
+    });
   }
 
   /**

@@ -624,6 +624,141 @@ describe("查詢多筆發票 (listInvoices / GetIssueList)", () => {
   });
 });
 
+describe("sendNotification (InvoiceNotify / 發送發票通知)", () => {
+  it("maps tag/method/recipient and posts the notification payload", async () => {
+    let data: Record<string, unknown> | undefined;
+    server.use(
+      http.post(url(ECPAY_ENDPOINTS.invoiceNotify), async ({ request }) => {
+        data = parseRequest(await request.text()).data;
+        return HttpResponse.json(ecSuccess({ RtnCode: 1, RtnMsg: "發送通知成功", MerchantID: "2000132" }));
+      }),
+    );
+    await expect(
+      testProvider().sendNotification({
+        invoiceNumber: "JU11084029",
+        tag: "ISSUE",
+        method: "EMAIL",
+        recipient: "CUSTOMER",
+        email: "b@x.com",
+      }),
+    ).resolves.toBeUndefined();
+    expect(data).toMatchObject({
+      InvoiceNo: "JU11084029",
+      NotifyMail: "b@x.com",
+      Notify: "E",
+      InvoiceTag: "I",
+      Notified: "C",
+    });
+    expect(data?.AllowanceNo).toBeUndefined();
+    expect(data?.Phone).toBeUndefined();
+  });
+
+  it("maps SMS/MERCHANT and allowance tags to S/M + AllowanceNo", async () => {
+    let data: Record<string, unknown> | undefined;
+    server.use(
+      http.post(url(ECPAY_ENDPOINTS.invoiceNotify), async ({ request }) => {
+        data = parseRequest(await request.text()).data;
+        return HttpResponse.json(ecSuccess({ RtnCode: 1, RtnMsg: "發送通知成功", MerchantID: "2000132" }));
+      }),
+    );
+    await testProvider().sendNotification({
+      invoiceNumber: "JU11084030",
+      allowanceNumber: "2026061722395975",
+      tag: "ALLOWANCE_VOID",
+      method: "SMS",
+      recipient: "MERCHANT",
+      phone: "0912345678",
+    });
+    expect(data).toMatchObject({
+      InvoiceNo: "JU11084030",
+      AllowanceNo: "2026061722395975",
+      Phone: "0912345678",
+      Notify: "S",
+      InvoiceTag: "AI",
+      Notified: "M",
+    });
+  });
+
+  it("maps the remaining tag/method/recipient codes (II/AW · BOTH/BOTH)", async () => {
+    let data: Record<string, unknown> | undefined;
+    server.use(
+      http.post(url(ECPAY_ENDPOINTS.invoiceNotify), async ({ request }) => {
+        data = parseRequest(await request.text()).data;
+        return HttpResponse.json(ecSuccess({ RtnCode: 1, RtnMsg: "發送通知成功", MerchantID: "2000132" }));
+      }),
+    );
+    await testProvider().sendNotification({
+      invoiceNumber: "JU11084031",
+      tag: "VOID",
+      method: "BOTH",
+      recipient: "BOTH",
+      email: "b@x.com",
+    });
+    expect(data).toMatchObject({ InvoiceTag: "II", Notify: "A", Notified: "A" });
+    await testProvider().sendNotification({ invoiceNumber: "JU1", tag: "AWARD", method: "EMAIL", recipient: "CUSTOMER", email: "b@x.com" });
+    expect(data).toMatchObject({ InvoiceTag: "AW" });
+  });
+
+  it("rejects with NOT_FOUND when notifying a non-winning invoice (AW)", async () => {
+    server.use(http.post(url(ECPAY_ENDPOINTS.invoiceNotify), () => HttpResponse.json(ecError(2, "查無發票中獎資料，請確認!"))));
+    await expect(
+      testProvider().sendNotification({ invoiceNumber: "JU1", tag: "AWARD", method: "EMAIL", recipient: "CUSTOMER", email: "b@x.com" }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("requires email or phone (local validation)", async () => {
+    await expect(
+      testProvider().sendNotification({ invoiceNumber: "JU1", tag: "ISSUE", method: "EMAIL", recipient: "CUSTOMER" }),
+    ).rejects.toMatchObject({ code: "VALIDATION" });
+  });
+
+  it("requires allowanceNumber for allowance tags (local validation)", async () => {
+    await expect(
+      testProvider().sendNotification({ invoiceNumber: "JU1", tag: "ALLOWANCE", method: "EMAIL", recipient: "CUSTOMER", email: "b@x.com" }),
+    ).rejects.toMatchObject({ code: "VALIDATION" });
+  });
+
+  it("forces ONLINE_ALLOWANCE to EMAIL + CUSTOMER (local validation)", async () => {
+    await expect(
+      testProvider().sendNotification({
+        invoiceNumber: "JU1",
+        allowanceNumber: "1",
+        tag: "ONLINE_ALLOWANCE",
+        method: "SMS",
+        recipient: "CUSTOMER",
+        phone: "0912345678",
+      }),
+    ).rejects.toMatchObject({ code: "VALIDATION" });
+  });
+
+  it("posts an ONLINE_ALLOWANCE notification when rules are satisfied", async () => {
+    let data: Record<string, unknown> | undefined;
+    server.use(
+      http.post(url(ECPAY_ENDPOINTS.invoiceNotify), async ({ request }) => {
+        data = parseRequest(await request.text()).data;
+        return HttpResponse.json(ecSuccess({ RtnCode: 1, RtnMsg: "發送通知成功", MerchantID: "2000132" }));
+      }),
+    );
+    await testProvider().sendNotification({
+      invoiceNumber: "JU1",
+      allowanceNumber: "1",
+      tag: "ONLINE_ALLOWANCE",
+      method: "EMAIL",
+      recipient: "CUSTOMER",
+      email: "b@x.com",
+    });
+    expect(data).toMatchObject({ InvoiceTag: "OA", Notify: "E", Notified: "C", AllowanceNo: "1" });
+  });
+
+  it("skips local validation when validatePayload is false", async () => {
+    server.use(http.post(url(ECPAY_ENDPOINTS.invoiceNotify), () => HttpResponse.json(ecError(2, "查無發票中獎資料，請確認!"))));
+    // No email/phone, no AllowanceNo — local guards are bypassed, the request reaches ECPay.
+    await expect(
+      testProvider({ validatePayload: false }).sendNotification({ invoiceNumber: "JU1", tag: "ALLOWANCE", method: "EMAIL", recipient: "CUSTOMER" }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+});
+
 describe("raw() escape hatch", () => {
   it("posts an arbitrary Data payload and returns the decrypted result", async () => {
     let data: Record<string, unknown> | undefined;

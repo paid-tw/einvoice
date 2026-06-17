@@ -13,6 +13,8 @@ export type {
   GetWordSettingInput,
   IssuePendingOptions,
   GetAllowanceListInput,
+  NotifyTag,
+  SendNotifyInput,
   AllowanceDetail,
   InvalidDetail,
   InvalidAllowanceDetail,

@@ -45,6 +45,16 @@ describe.skipIf(!live)("ECPay live (stage) — issue → query → void", LIVE_O
     invoiceDate = res.invoiceDate.toISOString().slice(0, 10);
   });
 
+  it("sends an issue notification (InvoiceNotify, stage validates but won't deliver)", async () => {
+    await expect(
+      p.sendNotification({ invoiceNumber, tag: "ISSUE", method: "EMAIL", recipient: "CUSTOMER", email: "test@example.com" }),
+    ).resolves.toBeUndefined();
+    // A non-winning invoice has no award data → NOT_FOUND, proving the AW tag is processed.
+    await expect(
+      p.sendNotification({ invoiceNumber, tag: "AWARD", method: "EMAIL", recipient: "CUSTOMER", email: "test@example.com" }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
   it("queries it by orderId (情境一) and by InvoiceNo+Date (情境二)", async () => {
     const byOrder = await p.query({ orderId });
     expect(byOrder.invoiceNumber).toBe(invoiceNumber);
