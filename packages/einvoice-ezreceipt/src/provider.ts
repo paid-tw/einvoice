@@ -64,6 +64,10 @@ function parseDate(value: unknown): Date {
 export class EzreceiptProvider implements InvoiceProvider {
   readonly name = "ezreceipt";
 
+  // Verified live: B2B (issueTo 統編), mixed per-item tax, and carrier issuance
+  // all work. FOREIGN_CURRENCY is NOT declared — true 境外電商 (carrierType 20)
+  // requires a 境外電商-type account (a normal account returns 1052); the
+  // `currency` param is tolerated but doesn't make a domestic invoice foreign.
   readonly capabilities: ReadonlySet<Capability> = new Set([
     Capability.ISSUE,
     Capability.VOID,
@@ -72,7 +76,6 @@ export class EzreceiptProvider implements InvoiceProvider {
     Capability.QUERY,
     Capability.B2B,
     Capability.MIXED_TAX,
-    Capability.FOREIGN_CURRENCY,
   ]);
 
   private readonly client: EzreceiptClient;
