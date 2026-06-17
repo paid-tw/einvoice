@@ -1,3 +1,4 @@
+import { Capability } from "./capabilities.js";
 import { InvoiceError, InvoiceErrorCode } from "./errors.js";
 import type { InvoiceProvider } from "./provider.js";
 import {
@@ -41,6 +42,17 @@ export interface MockProviderOptions {
  */
 export class MockProvider implements InvoiceProvider {
   readonly name = "mock";
+  readonly capabilities: ReadonlySet<Capability> = new Set([
+    Capability.ISSUE,
+    Capability.VOID,
+    Capability.ALLOWANCE,
+    Capability.VOID_ALLOWANCE,
+    Capability.QUERY,
+    Capability.B2B,
+    Capability.MIXED_TAX,
+    Capability.QUERY_BY_ORDER_ID,
+    Capability.SCHEDULED_ISSUE,
+  ]);
   private readonly track: string;
   private seq: number;
   private readonly invoices = new Map<string, StoredInvoice>();

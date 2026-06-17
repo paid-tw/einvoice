@@ -10,6 +10,7 @@ import type {
   VoidInvoiceInput,
   VoidInvoiceResult,
 } from "./types.js";
+import type { Capability } from "./capabilities.js";
 
 /**
  * The contract every provider adapter implements. Application code depends on
@@ -20,6 +21,9 @@ import type {
 export interface InvoiceProvider {
   /** A stable identifier, e.g. `"amego"`, `"ecpay"`. */
   readonly name: string;
+
+  /** The set of optional features this adapter supports. */
+  readonly capabilities: ReadonlySet<Capability>;
 
   /** 開立發票. */
   issue(input: IssueInvoiceInput): Promise<IssueInvoiceResult>;

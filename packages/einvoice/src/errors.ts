@@ -17,6 +17,8 @@ export const InvoiceErrorCode = {
   NETWORK: "NETWORK",
   /** Provider returned an error we could not map. */
   PROVIDER: "PROVIDER",
+  /** The provider does not support the requested operation/feature. */
+  UNSUPPORTED: "UNSUPPORTED",
   /** Anything else. */
   UNKNOWN: "UNKNOWN",
 } as const;

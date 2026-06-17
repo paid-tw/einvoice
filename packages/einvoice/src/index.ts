@@ -1,6 +1,7 @@
 export * from "./types.js";
 export * from "./provider.js";
 export * from "./errors.js";
+export * from "./capabilities.js";
 export * from "./schemas.js";
 export * from "./utils.js";
 export { isValidUbn } from "./ubn.js";

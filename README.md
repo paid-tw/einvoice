@@ -59,6 +59,22 @@ import { MockProvider } from "@paid-tw/einvoice";
 const invoices = new MockProvider(); // same validation, no network
 ```
 
+### Feature detection
+
+Providers differ in optional features. Each declares a `capabilities` set so you
+can branch at runtime instead of discovering a gap only when a call fails:
+
+```ts
+import { Capability, supports, assertSupports } from "@paid-tw/einvoice";
+
+if (supports(invoices, Capability.SCHEDULED_ISSUE)) {
+  // ...
+}
+
+// Or throw UnsupportedCapabilityError (an InvoiceError, code "UNSUPPORTED"):
+assertSupports(invoices, Capability.SCHEDULED_ISSUE);
+```
+
 ## Architecture
 
 ```

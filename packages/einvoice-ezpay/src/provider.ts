@@ -1,6 +1,7 @@
 import {
   type AllowanceInput,
   type AllowanceResult,
+  Capability,
   type Carrier,
   deriveCategory,
   type InvoiceProvider,
@@ -34,6 +35,17 @@ const CARRIER_TYPE: Record<Carrier["type"], string> = {
 
 export class EzpayProvider implements InvoiceProvider {
   readonly name = "ezpay";
+  readonly capabilities: ReadonlySet<Capability> = new Set([
+    Capability.ISSUE,
+    Capability.VOID,
+    Capability.ALLOWANCE,
+    Capability.VOID_ALLOWANCE,
+    Capability.QUERY,
+    Capability.B2B,
+    Capability.MIXED_TAX,
+    Capability.QUERY_BY_ORDER_ID,
+    Capability.SCHEDULED_ISSUE,
+  ]);
 
   constructor(private readonly config: EzpayConfig) {}
 

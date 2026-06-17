@@ -2,6 +2,7 @@ import {
   type AllowanceInput,
   type AllowanceResult,
   type Buyer,
+  Capability,
   type Carrier,
   deriveCategory,
   InvoiceError,
@@ -53,6 +54,16 @@ const CARRIER_TYPE: Record<Carrier["type"], string> = {
 
 export class AmegoProvider implements InvoiceProvider {
   readonly name = "amego";
+  readonly capabilities: ReadonlySet<Capability> = new Set([
+    Capability.ISSUE,
+    Capability.VOID,
+    Capability.ALLOWANCE,
+    Capability.VOID_ALLOWANCE,
+    Capability.QUERY,
+    Capability.B2B,
+    Capability.MIXED_TAX,
+    Capability.QUERY_BY_ORDER_ID,
+  ]);
 
   constructor(private readonly config: AmegoConfig) {}
 
