@@ -190,6 +190,11 @@ export function mapAmegoErrorCode(rawCode: number | string): InvoiceErrorCode {
   // Transient provider-side (通用錯誤): 10 維護中, 18 無法建立資料庫連線, 21 人數過多.
   if (code === 10 || code === 18 || code === 21) return InvoiceErrorCode.PROVIDER;
 
+  // print/file/query operation not allowed for the invoice's state/condition:
+  // 51 超過查詢期限, 52 等待異動排程, 53 載具/類型不可, 55 不符合條件, 56 0元發票.
+  if (code === 51 || code === 52 || code === 53 || code === 55 || code === 56)
+    return InvoiceErrorCode.CONFLICT;
+
   // No data / does not exist (invoice 3050125, g0401 原發票 4040156, allowance
   // 4050134, 手機條碼 9000113)
   if (code === 71 || code === 3050125 || code === 4040156 || code === 4050134 || code === 9000113)

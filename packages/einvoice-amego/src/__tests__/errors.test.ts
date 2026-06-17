@@ -98,6 +98,13 @@ describe("mapAmegoErrorCode (from info_detail?mid=71)", () => {
     expect(mapAmegoErrorCode("4040123")).toBe("VALIDATION");
   });
 
+  // Audit: print/file/query operation-state codes (51-56) and system codes.
+  it("categorizes the print/file/query state + system codes", () => {
+    for (const c of [51, 52, 53, 55, 56]) expect(mapAmegoErrorCode(c)).toBe("CONFLICT");
+    for (const c of [10, 18, 21, 72]) expect(mapAmegoErrorCode(c)).toBe("PROVIDER"); // transient/system
+    expect(mapAmegoErrorCode(71)).toBe("NOT_FOUND"); // 查無資料
+  });
+
   // Audit: every documented g0501 (作廢折讓) error code is categorized (string codes).
   it("categorizes the full g0501 error-code family", () => {
     const expected: Record<number, string> = {
