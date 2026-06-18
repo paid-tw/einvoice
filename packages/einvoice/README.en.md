@@ -24,9 +24,16 @@ pnpm add @paid-tw/einvoice
   `TaxType`, `PriceMode`, `InvoiceCategory`, `AmountSummary`, … and their results.
 - **`InvoiceProvider`** — the contract: `issue`, `void`, `allowance`,
   `voidAllowance`, `query`.
-- **`InvoiceError` / `InvoiceErrorCode`** — normalized error model.
+- **`InvoiceError` / `InvoiceErrorCode`** — normalized error model. `isInvoiceError(value)`
+  is its type guard — it checks a globally-registered `Symbol.for` brand (not
+  `instanceof`), so it still works when two copies of the package are loaded (dual
+  ESM/CJS, version skew).
 - **Schemas** — Zod schemas (`issueInvoiceInputSchema`, …) for runtime validation.
+  Pair with `parseInput(schema, input, provider)`: it validates a unified input
+  against a shared schema and throws a normalized `InvoiceError` (code `VALIDATION`)
+  instead of a raw `ZodError`. Adapters use it.
 - **Utils** — `composeTaxExclusive`, `splitTaxInclusive`, `deriveCategory`.
+- **Debug logger** — `tracedFetch`, plus the types `InvoiceDebugEvent` / `InvoiceDebugLogger`.
 - **`MockProvider`** — a working `InvoiceProvider` for tests.
 
 ## Money & amounts
@@ -39,6 +46,39 @@ import { composeTaxExclusive, splitTaxInclusive } from "@paid-tw/einvoice";
 
 composeTaxExclusive(1000); // { salesAmount: 1000, taxAmount: 50, totalAmount: 1050 }
 splitTaxInclusive(1050);   // { salesAmount: 1000, taxAmount: 50, totalAmount: 1050 }
+```
+
+## Debug tracing
+
+Set `debug` on any provider config (it's a field on `BaseProviderConfig`) to receive
+metadata-only trace events (provider/method/url/status/durationMs/error) for each HTTP
+call — **bodies are not logged**.
+
+```ts
+import type { InvoiceDebugEvent } from "@paid-tw/einvoice";
+
+const debug = (e: InvoiceDebugEvent) => console.log(e.provider, e.method, e.status);
+const provider = createAmegoProvider({ /* …credentials… */, debug });
+```
+
+## MockProvider
+
+An in-memory `InvoiceProvider` for tests. Use `capabilities` to restrict the declared
+capabilities (with `FOREIGN_CURRENCY` omitted, `issue` rejects a non-TWD currency with
+`UNSUPPORTED`), and `failNext(error)` to inject a one-shot failure for exercising error
+paths.
+
+```ts
+import { Capability, InvoiceError, InvoiceErrorCode, MockProvider } from "@paid-tw/einvoice";
+
+const provider = new MockProvider({
+  capabilities: [Capability.ISSUE, Capability.QUERY], // no FOREIGN_CURRENCY
+});
+
+// Inject a one-shot failure
+provider.failNext(
+  new InvoiceError("network down", { provider: "mock", code: InvoiceErrorCode.NETWORK }),
+);
 ```
 
 ## License

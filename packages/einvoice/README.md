@@ -24,9 +24,14 @@ pnpm add @paid-tw/einvoice
   `TaxType`、`PriceMode`、`InvoiceCategory`、`AmountSummary`，… 以及它們的結果型別。
 - **`InvoiceProvider`** — 介面契約：`issue`、`void`、`allowance`、
   `voidAllowance`、`query`。
-- **`InvoiceError` / `InvoiceErrorCode`** — 正規化的錯誤模型。
+- **`InvoiceError` / `InvoiceErrorCode`** — 正規化的錯誤模型。`isInvoiceError(value)`
+  是它的型別守衛 — 比對的是以 `Symbol.for` 全域註冊的標記（而非 `instanceof`），
+  因此即使載入了兩份套件（ESM/CJS 雙模組、版本不一致）仍可正確運作。
 - **Schemas** — 用於執行階段驗證的 Zod schema（`issueInvoiceInputSchema`，…）。
+  搭配 `parseInput(schema, input, provider)`：依共用 schema 驗證統一輸入，
+  並丟出正規化的 `InvoiceError`（code 為 `VALIDATION`），而非原始的 `ZodError`。轉接器會使用它。
 - **工具函式** — `composeTaxExclusive`、`splitTaxInclusive`、`deriveCategory`。
+- **除錯記錄器** — `tracedFetch`，以及型別 `InvoiceDebugEvent` / `InvoiceDebugLogger`。
 - **`MockProvider`** — 可實際運作、供測試使用的 `InvoiceProvider`。
 
 ## 金額計算
@@ -38,6 +43,38 @@ import { composeTaxExclusive, splitTaxInclusive } from "@paid-tw/einvoice";
 
 composeTaxExclusive(1000); // { salesAmount: 1000, taxAmount: 50, totalAmount: 1050 }
 splitTaxInclusive(1050);   // { salesAmount: 1000, taxAmount: 50, totalAmount: 1050 }
+```
+
+## 除錯追蹤
+
+在任一供應商 config 上設定 `debug`（這是 `BaseProviderConfig` 的欄位），即可在每次
+HTTP 呼叫時收到「僅含中繼資料」的追蹤事件（provider／method／url／status／durationMs／error）
+— **不會記錄請求／回應內容**。
+
+```ts
+import type { InvoiceDebugEvent } from "@paid-tw/einvoice";
+
+const debug = (e: InvoiceDebugEvent) => console.log(e.provider, e.method, e.status);
+const provider = createAmegoProvider({ /* …credentials… */, debug });
+```
+
+## MockProvider
+
+供測試使用的記憶體內 `InvoiceProvider`。可用 `capabilities` 限制宣告的功能
+（省略 `FOREIGN_CURRENCY` 時，`issue` 會以 `UNSUPPORTED` 拒絕非 TWD 幣別），
+並可用 `failNext(error)` 注入一次性失敗以演練錯誤處理路徑。
+
+```ts
+import { Capability, InvoiceError, InvoiceErrorCode, MockProvider } from "@paid-tw/einvoice";
+
+const provider = new MockProvider({
+  capabilities: [Capability.ISSUE, Capability.QUERY], // 未含 FOREIGN_CURRENCY
+});
+
+// 注入一次性失敗
+provider.failNext(
+  new InvoiceError("network down", { provider: "mock", code: InvoiceErrorCode.NETWORK }),
+);
 ```
 
 ## 授權

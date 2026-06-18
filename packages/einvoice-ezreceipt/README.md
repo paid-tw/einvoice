@@ -82,6 +82,8 @@ await invoices.voidAllowance({
 - **捐贈**：傳入 `donation.npoban` → carrierType 5。
 - **混合稅率**：設定逐項 `taxType`（應稅 / 零稅率 / 免稅）。
 
+> **驗證策略**：`issue` 刻意不套用共用 schema —— ezReceipt 允許用 `buyer.email` 帶會員 id（schema 的 `.email()` 會誤擋）；`void` / `allowance` / `voidAllowance` / `query` 則使用共用 schema，失敗丟出 `InvoiceError`（code `VALIDATION`）。
+
 ## 能力
 
 `ISSUE` · `VOID` · `ALLOWANCE` · `VOID_ALLOWANCE` · `QUERY` · `B2B` · `MIXED_TAX` ·
@@ -89,6 +91,47 @@ await invoices.voidAllowance({
 
 未宣告：`FOREIGN_CURRENCY`（真正的境外電商 / carrierType 20 需要境外電商類型帳號 ——
 一般帳號會回 `1052`）、`SCHEDULED_ISSUE`、`QUERY_BY_ORDER_ID`。
+
+## 擴充方法
+
+統一介面只涵蓋 5 個操作；`createEzreceiptProvider` 回傳的型別化 provider 另外直接暴露以下方法：
+
+**對帳 / 生命週期**
+
+- `listInvoices` —— 條列已開立發票（對帳 / 報表）。
+- `revokeInvoice` —— 註銷發票（有別於 `void` 作廢）。
+- `replyInvoice` —— 回覆交換型（msgType=2）發票。
+
+**折讓輔助**
+
+- `getAllowanceQuota` —— 查詢各品項尚餘可折讓額度。
+- `notifyAllowance` —— 排程折讓事件 email 通知。
+- `notifyInvoice` —— 排程發票事件 email 通知。
+
+**證明聯 / 列印**
+
+- `getInvoicePrintInfo` —— 取得列印發票所需資料（JSON）。
+- `printInvoice` —— 取得發票列印檔（PDF bytes）。
+- `printAllowance` —— 取得折讓單列印檔（PDF bytes）。
+
+**財政部查詢**
+
+- `checkMobileCode` —— 向財政部平台驗證手機條碼。
+- `checkCharity` —— 向財政部平台驗證捐贈碼。
+- `lookupBusiness` —— 以統編查詢機關資訊。
+
+**字軌管理**
+
+- `listInvoiceTracks` —— 條列字軌分段。
+- `adjustInvoiceTrack` —— 調整字軌分段起訖號。
+- `setDefaultTrack` —— 設為預設字軌（有 / 無統編）。
+- `setInvoiceTrackStatus` —— 開啟 / 關閉字軌分段。
+- `splitInvoiceTrack` —— 字軌分段切分。
+- `updateInvoiceTrack` —— 異動分段字軌（bizType / platform / memo）。
+- `listLogos` —— 列出已上傳商標識別碼。
+- `uploadLogo` —— 上傳商標圖檔。
+- `viewLogo` —— 讀取商標圖檔（bytes）。
+- `setInvoiceTrackLogo` —— 設定字軌印製發票的商標。
 
 ## 設定
 
@@ -102,6 +145,7 @@ await invoices.voidAllowance({
 | `stID` | | 合作廠商用的店家代號（`x-deva-stid`） |
 | `mode` | | `"TEST"`（預設，`tryapi`）或 `"PRODUCTION"`（`api`） |
 | `validatePayload` | | 在本地端驗證開立 payload（預設 `true`） |
+| `debug` | | 選用的請求追蹤 logger（metadata：method/url/status/耗時/error，不含請求內容），預設 `undefined` |
 
 補充：字軌「配號」（取得發票號碼區段）**只能在後台操作** —— API 僅能管理既有字軌。
 實機測試以 `EZRECEIPT_LIVE=1` 對專用 API 帳號執行。

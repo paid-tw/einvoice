@@ -53,6 +53,10 @@ move.
 | `mode` | | `"TEST"` (default, cinv) or `"PRODUCTION"` (inv) |
 | `respondType` | | `"JSON"` (default) or `"String"` |
 | `validatePayload` | | validate the issue payload locally (default `true`) |
+| `verifyCheckCode` | | verify the `CheckCode` on issue-family responses (expert knob) |
+| `debug` | | optional request-tracing logger (metadata only: method / url / status / duration / error; no bodies). Default `undefined` |
+
+Inputs are validated against the shared schema first; failures throw `InvoiceError` (code `VALIDATION`). ezPay only supports TWD — a non-TWD `currency` is rejected before sending (`UNSUPPORTED`).
 
 ## Trigger-issue / trigger-allowance (觸發開立 / 觸發折讓) — two-phase, ezPay-specific
 

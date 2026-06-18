@@ -86,6 +86,14 @@ provider 可互換使用；`barcodeQuery()` / `banQuery()` 則保留以取得完
 | `baseUrl` | | 覆寫 API 主機 |
 | `timeoutMs` | | 請求逾時 |
 | `fetch` | | 注入自訂的 `fetch` |
+| `debug` | | 選用的請求追蹤 logger（metadata：method/url/status/耗時/error，不含請求內容） |
+| `syncTime` | | 與 `/json/time` 校時以避免錯誤 15（參見上方韌性範例） |
+| `retry` | | 僅針對暫時性網路錯誤重試（參見上方韌性範例） |
+
+`mode` / `baseUrl` / `timeoutMs` / `fetch` / `debug` 為 `@paid-tw/einvoice` 的
+`BaseProviderConfig` 共用欄位。
+
+輸入會先經共用 schema 驗證，失敗丟出 `InvoiceError`（code `VALIDATION`）。
 
 ## 授權
 

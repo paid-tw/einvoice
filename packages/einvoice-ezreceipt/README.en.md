@@ -84,6 +84,8 @@ await invoices.voidAllowance({
 - **Donation**: pass `donation.npoban` → carrierType 5.
 - **Mixed tax**: set per-item `taxType` (taxable 應稅 / zero-rated 零稅率 / tax-free 免稅).
 
+> **Validation**: `issue` intentionally skips the shared schema — ezReceipt accepts a member id via `buyer.email`, which the schema's `.email()` check would reject; `void` / `allowance` / `voidAllowance` / `query` DO use the shared schema and throw `InvoiceError` (code `VALIDATION`) on failure.
+
 ## Capabilities
 
 `ISSUE` · `VOID` · `ALLOWANCE` · `VOID_ALLOWANCE` · `QUERY` · `B2B` · `MIXED_TAX` ·
@@ -93,6 +95,48 @@ platform via `checkMobileCode` / `checkCharity`).
 Not declared: `FOREIGN_CURRENCY` (a true cross-border 境外電商 / carrierType 20
 needs a cross-border-type account — a normal account returns `1052`),
 `SCHEDULED_ISSUE`, `QUERY_BY_ORDER_ID`.
+
+## Extension methods
+
+The unified interface only covers the 5 operations; the typed provider returned by
+`createEzreceiptProvider` also exposes these directly:
+
+**Reconciliation / lifecycle**
+
+- `listInvoices` — list issued invoices (reconciliation / reporting).
+- `revokeInvoice` — 註銷 an invoice (distinct from `void` 作廢).
+- `replyInvoice` — reply to an exchange-type (msgType=2) invoice.
+
+**Allowance helpers**
+
+- `getAllowanceQuota` — each line's remaining creditable quota.
+- `notifyAllowance` — queue allowance-event email notifications.
+- `notifyInvoice` — queue invoice-event email notifications.
+
+**Proof / print**
+
+- `getInvoicePrintInfo` — data needed to render an invoice proof (JSON).
+- `printInvoice` — invoice proof print file (PDF bytes).
+- `printAllowance` — allowance print file (PDF bytes).
+
+**MOF (財政部) lookups**
+
+- `checkMobileCode` — validate a mobile barcode against the MOF platform.
+- `checkCharity` — validate a charity code against the MOF platform.
+- `lookupBusiness` — look up business/organisation info by 統編.
+
+**Invoice-track (字軌) management**
+
+- `listInvoiceTracks` — list invoice-number track segments.
+- `adjustInvoiceTrack` — adjust a track segment's start/end number.
+- `setDefaultTrack` — set the default track (with / without 統編).
+- `setInvoiceTrackStatus` — open / close a track segment.
+- `splitInvoiceTrack` — split a track segment in two.
+- `updateInvoiceTrack` — update a track (bizType / platform / memo).
+- `listLogos` — list uploaded logo ids.
+- `uploadLogo` — upload a logo image.
+- `viewLogo` — read a logo image (bytes).
+- `setInvoiceTrackLogo` — set the logo a track prints on invoices.
 
 ## Config
 
@@ -106,6 +150,7 @@ needs a cross-border-type account — a normal account returns `1052`),
 | `stID` | | partner store id (`x-deva-stid`) for partner (合作廠商) access |
 | `mode` | | `"TEST"` (default, `tryapi`) or `"PRODUCTION"` (`api`) |
 | `validatePayload` | | validate the issue payload locally (default `true`) |
+| `debug` | | optional request-tracing logger (metadata only: method / url / status / duration / error; no bodies), default `undefined` |
 
 Notes: invoice-number-track (字軌) allocation (配號) is **backend-only** — the API
 can only manage existing tracks. Live tests run with `EZRECEIPT_LIVE=1` against a

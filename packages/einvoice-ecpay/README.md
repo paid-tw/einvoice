@@ -98,6 +98,11 @@ await invoices.validateBan("97025978"); // → boolean
 | `hashIV` | ✅ | 16 字元的 AES HashIV（僅限伺服器端） |
 | `mode` | | `"TEST"`（預設，測試環境）或 `"PRODUCTION"` |
 | `validatePayload` | | 在本地端驗證開立的 payload（預設 `true`） |
+| `debug` | | 選用的請求追蹤 logger（metadata：method/url/status/耗時/error，不含請求內容）（預設 `undefined`） |
+
+此外也接受由 `@paid-tw/einvoice` 的 `BaseProviderConfig` 繼承而來的共用欄位：`baseUrl` / `timeoutMs` / `fetch` / `debug`（適用於 sandbox / 自訂 agent / edge runtime 等情境）。
+
+輸入會先經共用 schema 驗證，失敗丟出 `InvoiceError`（code `VALIDATION`）；可用 `validatePayload: false` 關閉本地驗證。
 
 ## 字軌 / 編號
 

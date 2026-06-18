@@ -51,6 +51,12 @@ await invoices.issue({
 });
 ```
 
+`EZPAY_CB_CURRENCIES` exports the 20 currency codes the API accepts (appendix 3).
+Verified live: every currency in the list issues successfully (including the
+zero-decimal currencies JPY/KRW/VND/IDR, which are still sent with 2 decimals);
+currencies outside the list are rejected by ezPay with
+`INV10002 欄位資料格式錯誤-Currency` (mapped to `VALIDATION`).
+
 ## How it works (verified live on the test env)
 
 | Aspect | Detail |
@@ -105,6 +111,11 @@ per-item tax types throws `UNSUPPORTED`.
 | `hashIV` | ✅ | 16-char AES HashIV (server-side only) |
 | `mode` | | `"TEST"` (default, cinv) or `"PRODUCTION"` (inv) |
 | `validatePayload` | | validate the issue payload locally (default `true`) |
+| `debug` | | optional request-tracing logger (metadata only: method / url / status / duration / error; no bodies) (default `undefined`) |
+
+`issue` / `allowance` use a custom validator (foreign-currency 2-decimal amounts),
+while `void` / `voidAllowance` / `query` use the shared schema; failures throw
+`InvoiceError` (code `VALIDATION`, or `UNSUPPORTED` for capability limits).
 
 Live tests run with `EZPAY_CB_LIVE=1` against a cross-border (境外電商) test merchant.
 

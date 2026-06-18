@@ -52,6 +52,10 @@ const result = await invoices.issue({ /* IssueInvoiceInput */ });
 | `mode` | | `"TEST"`（預設，cinv）或 `"PRODUCTION"`（inv） |
 | `respondType` | | `"JSON"`（預設）或 `"String"` |
 | `validatePayload` | | 在本地端驗證開立的資料內容（預設 `true`） |
+| `verifyCheckCode` | | 驗證開立系列回應的 `CheckCode`（進階選項） |
+| `debug` | | 選用的請求追蹤 logger（metadata：method/url/status/耗時/error，不含請求內容）。預設 `undefined` |
+
+輸入會先經共用 schema 驗證，失敗丟出 `InvoiceError`（code `VALIDATION`）。ezPay 僅支援 TWD —— 非 TWD 的 `currency` 在送出前即被拒（`UNSUPPORTED`）。
 
 ## 觸發開立 / 觸發折讓（兩階段，ezPay 特有）
 

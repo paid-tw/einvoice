@@ -88,6 +88,15 @@ capability) so the two providers are interchangeable; `barcodeQuery()` /
 | `baseUrl` | | Override the API host |
 | `timeoutMs` | | Request timeout |
 | `fetch` | | Inject a custom `fetch` |
+| `debug` | | optional request-tracing logger (metadata only: method / url / status / duration / error; no bodies) |
+| `syncTime` | | sync clock vs `/json/time` to avoid error 15 (see Resilience example above) |
+| `retry` | | retry transient network failures only (see Resilience example above) |
+
+`mode` / `baseUrl` / `timeoutMs` / `fetch` / `debug` are shared fields inherited
+from `@paid-tw/einvoice`'s `BaseProviderConfig`.
+
+Inputs are validated against the shared schema first; failures throw
+`InvoiceError` (code `VALIDATION`).
 
 ## License
 

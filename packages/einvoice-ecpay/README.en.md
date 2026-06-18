@@ -99,6 +99,11 @@ Only a bad checksum/format throws `VALIDATION` (the case where you should stop).
 | `hashIV` | ✅ | 16-char AES HashIV (server-side only) |
 | `mode` | | `"TEST"` (default, stage) or `"PRODUCTION"` |
 | `validatePayload` | | validate the issue payload locally (default `true`) |
+| `debug` | | optional request-tracing logger (metadata only: method / url / status / duration / error; no bodies) (default `undefined`) |
+
+The config also accepts the shared fields inherited from `@paid-tw/einvoice`'s `BaseProviderConfig`: `baseUrl` / `timeoutMs` / `fetch` / `debug` (useful for sandboxes / custom agents / edge runtimes).
+
+Inputs are validated against the shared schema first; failures throw `InvoiceError` (code `VALIDATION`). Local validation can be disabled with `validatePayload: false`.
 
 ## Number tracks (字軌) / numbering
 

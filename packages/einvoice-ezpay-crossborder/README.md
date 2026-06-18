@@ -107,6 +107,10 @@ await invoices.query({ orderId: "ORDER_1", providerOptions: { totalAmount: 105, 
 | `hashIV` | ✅ | 16 字元 AES HashIV（僅限伺服器端） |
 | `mode` | | `"TEST"`（預設，cinv）或 `"PRODUCTION"`（inv） |
 | `validatePayload` | | 在本地端驗證開立的 payload（預設 `true`） |
+| `debug` | | 選用的請求追蹤 logger（metadata：method/url/status/耗時/error，不含請求內容）（預設 `undefined`） |
+
+`issue` / `allowance` 使用自訂驗證器（支援外幣 2 位小數金額），`void` / `voidAllowance` / `query`
+使用共用 schema；失敗丟出 `InvoiceError`（code `VALIDATION`，或能力限制時 `UNSUPPORTED`）。
 
 實機測試以 `EZPAY_CB_LIVE=1` 對境外電商測試商店執行。
 
