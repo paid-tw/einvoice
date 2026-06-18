@@ -52,6 +52,23 @@ export class InvoiceError extends Error {
     this.rawMessage = options.rawMessage;
     this.raw = options.raw;
   }
+
+  /**
+   * Structured-logging shape. By default `JSON.stringify(error)` only keeps an
+   * Error's enumerable own properties (dropping `message`, `code`, …); this keeps
+   * the normalized fields. `raw` is intentionally omitted (it can be large or
+   * carry sensitive payloads — read it off the instance when you need it).
+   */
+  toJSON(): Record<string, unknown> {
+    return {
+      name: this.name,
+      provider: this.provider,
+      code: this.code,
+      message: this.message,
+      rawCode: this.rawCode,
+      rawMessage: this.rawMessage,
+    };
+  }
 }
 
 export function isInvoiceError(value: unknown): value is InvoiceError {
