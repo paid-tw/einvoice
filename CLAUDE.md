@@ -17,6 +17,8 @@ pnpm typecheck      # tsc --noEmit across packages
 pnpm lint           # tsc -b --noEmit (|| true — non-blocking)
 ```
 
+**Before pushing, run what CI runs:** `pnpm build && pnpm typecheck && pnpm test`. CI (`.github/workflows/ci.yml`) runs `pnpm -r build` → `pnpm typecheck` → `pnpm test` on every push. `pnpm build` includes the **`.d.ts` declaration build** (tsup → rollup-plugin-dts), which is a distinct type check and can fail even when `pnpm test` is fully green (e.g. a public-API/arity issue surfaces only in the declaration build). Don't infer a green CI from `pnpm test` alone — and don't mask the build's exit status (a silenced `pnpm build` that falls through to a later `|| echo OK` hides a real failure).
+
 Run a single package's tests / a single file / a single test:
 ```bash
 pnpm --filter @paid-tw/einvoice-amego exec vitest run
@@ -48,7 +50,7 @@ Adapters depend on core via `workspace:*` and list it as a tsup `external` — t
 
 ### Key invariants when working on adapters
 
-- **Money is integer TWD.** Statutory amount fields (`salesAmount`/`taxAmount`/`totalAmount`) are integers in New Taiwan Dollars — a MIG invariant, even for cross-border invoices filed to the government in TWD. `currency` (ISO 4217) + `exchangeRate` only *annotate* a foreign-currency sale; they never change the TWD amounts.
+- **Money is integer TWD — except cross-border foreign currency.** For TWD (the default, and every domestic provider) the statutory amount fields (`salesAmount`/`taxAmount`/`totalAmount`) are integers in New Taiwan Dollars — a MIG invariant. **Exception:** the cross-border adapter (`@paid-tw/einvoice-ezpay-crossborder`) accepts *2-decimal foreign amounts* in the unified input when `currency` ≠ TWD (see `fmtAmount` in its `provider.ts`: `foreign ? value.toFixed(2) : Math.round(value)`); the government filing is still in TWD, derived server-side from `exchangeRate`. So `currency` (ISO 4217) + `exchangeRate` *annotate* the sale, and on cross-border they also imply the wire amounts are decimal foreign-currency values, not integer TWD.
 - **Capabilities are declared, not discovered.** Each provider exposes a `capabilities: ReadonlySet<Capability>` (`packages/einvoice/src/capabilities.ts`). Callers feature-detect with `supports()` / `assertSupports()`. A provider lacking `FOREIGN_CURRENCY` must **reject** a non-TWD `currency` (throw `UNSUPPORTED`), not silently drop it.
 - **Errors normalize to one type.** Adapters map provider/MOF error codes onto `InvoiceError` with a stable `InvoiceErrorCode` (`AUTH`/`VALIDATION`/`NOT_FOUND`/`CONFLICT`/`NUMBER_EXHAUSTED`/`NETWORK`/`PROVIDER`/`UNSUPPORTED`/`UNKNOWN`), preserving the provider's `rawCode`/`rawMessage`/`raw`. All five operations reject with `InvoiceError` on failure.
 - **Validate before the network.** Each operation parses input through the shared Zod schemas (`issueInvoiceInputSchema` etc. from core) at the top of the method, then maps to wire fields. Adapter-specific payload validation can be toggled off with `config.validatePayload === false`.
@@ -61,4 +63,10 @@ Offline adapter tests mock the provider HTTP boundary with **MSW** (`msw/node`).
 
 ## Releasing
 
-Uses [changesets](https://github.com/changesets/changesets). Flow: `pnpm changeset` → `pnpm version` (applies version bumps) → push a `vX.Y.Z` git tag. The Publish workflow triggers on `v*` tags and publishes every workspace package whose version isn't already on npm, via npm OIDC trusted publishing (no token).
+Uses [changesets](https://github.com/changesets/changesets). Flow:
+
+1. `pnpm changeset` — describe the change + pick the bump (patch/minor/major) per package.
+2. `pnpm exec changeset version` — apply the bumps and update CHANGELOGs. **Use `pnpm exec changeset version` (or `pnpm run version`), not bare `pnpm version`** — the latter can invoke pnpm's built-in `version` command instead of the `"version": "changeset version"` script.
+3. Commit the version bump, then push a **`vX.Y.Z` git tag**.
+
+The Publish workflow (`.github/workflows/publish.yml`) triggers on `v*` tags and publishes via **npm OIDC trusted publishing (no token, with provenance)**. The tag is a **repo-level trigger that is monotonic across the whole repo — it is not tied to any single package's version**; pick the next unused `v*`. The workflow iterates every non-private package and publishes only those whose `name@version` isn't already on npm (others are skipped), so an already-published version is safe to re-tag past.
