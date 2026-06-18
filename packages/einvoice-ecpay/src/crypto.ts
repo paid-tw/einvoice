@@ -19,14 +19,24 @@ export function phpUrlDecode(value: string): string {
   return decodeURIComponent(value.replace(/\+/g, " "));
 }
 
+/** Fail fast with a clear message if the AES-128 key/IV aren't 16 bytes. */
+function assertKeyIv(hashKey: string, hashIV: string): void {
+  const k = Buffer.byteLength(hashKey, "utf8");
+  const v = Buffer.byteLength(hashIV, "utf8");
+  if (k !== 16) throw new Error(`ECPay hashKey must be 16 bytes (AES-128-CBC), got ${k}`);
+  if (v !== 16) throw new Error(`ECPay hashIV must be 16 bytes, got ${v}`);
+}
+
 /** AES-128-CBC encrypt (PKCS7) → Base64. Key + IV are 16-byte ASCII strings. */
 export function aesEncrypt(plaintext: string, hashKey: string, hashIV: string): string {
+  assertKeyIv(hashKey, hashIV);
   const cipher = createCipheriv("aes-128-cbc", hashKey, hashIV);
   return Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]).toString("base64");
 }
 
 /** AES-128-CBC decrypt (PKCS7) from Base64. */
 export function aesDecrypt(base64: string, hashKey: string, hashIV: string): string {
+  assertKeyIv(hashKey, hashIV);
   const decipher = createDecipheriv("aes-128-cbc", hashKey, hashIV);
   return Buffer.concat([
     decipher.update(Buffer.from(base64, "base64")),

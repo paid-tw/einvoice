@@ -55,3 +55,13 @@ describe("encryptPostData", () => {
     expect(buildQuery({ a: "1", skip: undefined })).toBe("a=1");
   });
 });
+
+describe("key/IV length guards", () => {
+  it("rejects a wrong-length key with a clear message", () => {
+    expect(() => encryptPostData({ a: "1" }, "tooshort", IV)).toThrow(/ezPay HashKey must be 32 bytes.*got 8/);
+  });
+
+  it("rejects a wrong-length IV with a clear message", () => {
+    expect(() => encryptPostData({ a: "1" }, KEY, "x")).toThrow(/ezPay HashIV must be 16 bytes.*got 1/);
+  });
+});

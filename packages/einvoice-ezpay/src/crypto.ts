@@ -26,12 +26,21 @@ function pkcs7Pad(data: Buffer): Buffer {
   return Buffer.concat([data, Buffer.alloc(pad, pad)]);
 }
 
+/** Fail fast with a clear message if the AES-256 key/IV aren't 32/16 bytes. */
+function assertKeyIv(hashKey: string, hashIV: string): void {
+  const k = Buffer.byteLength(hashKey, "utf8");
+  const v = Buffer.byteLength(hashIV, "utf8");
+  if (k !== 32) throw new Error(`ezPay HashKey must be 32 bytes (AES-256-CBC), got ${k}`);
+  if (v !== 16) throw new Error(`ezPay HashIV must be 16 bytes, got ${v}`);
+}
+
 /** Encrypt a params object into the `PostData_` hex string. */
 export function encryptPostData(
   params: Record<string, string | number | undefined>,
   hashKey: string,
   hashIV: string,
 ): string {
+  assertKeyIv(hashKey, hashIV);
   const padded = pkcs7Pad(Buffer.from(buildQuery(params), "utf8"));
   const cipher = createCipheriv("aes-256-cbc", Buffer.from(hashKey, "utf8"), Buffer.from(hashIV, "utf8"));
   cipher.setAutoPadding(false);
@@ -40,6 +49,7 @@ export function encryptPostData(
 
 /** Decrypt a `PostData_` hex string (mainly for tests / debugging). */
 export function decryptPostData(hex: string, hashKey: string, hashIV: string): string {
+  assertKeyIv(hashKey, hashIV);
   const decipher = createDecipheriv("aes-256-cbc", Buffer.from(hashKey, "utf8"), Buffer.from(hashIV, "utf8"));
   decipher.setAutoPadding(false);
   const out = Buffer.concat([decipher.update(Buffer.from(hex, "hex")), decipher.final()]);

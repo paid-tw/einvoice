@@ -73,3 +73,13 @@ describe("official ECPay test vectors", () => {
     expect(decryptData(CIPHER_LOWERHEX, KEY, IV)).toEqual(PAYLOAD);
   });
 });
+
+describe("key/IV length guards", () => {
+  it("rejects a wrong-length key with a clear message", () => {
+    expect(() => aesEncrypt("x", "short", IV)).toThrow(/ECPay hashKey must be 16 bytes.*got 5/);
+  });
+
+  it("rejects a wrong-length IV with a clear message", () => {
+    expect(() => aesEncrypt("x", KEY, "short")).toThrow(/ECPay hashIV must be 16 bytes.*got 5/);
+  });
+});
