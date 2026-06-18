@@ -84,10 +84,11 @@ await invoices.voidAllowance({
 
 ## 能力
 
-`ISSUE` · `VOID` · `ALLOWANCE` · `VOID_ALLOWANCE` · `QUERY` · `B2B` · `MIXED_TAX`。
+`ISSUE` · `VOID` · `ALLOWANCE` · `VOID_ALLOWANCE` · `QUERY` · `B2B` · `MIXED_TAX` ·
+`CARRIER_VALIDATION`（以 `checkMobileCode` / `checkCharity` 向財政部平台驗證手機條碼 / 愛心碼）。
 
 未宣告：`FOREIGN_CURRENCY`（真正的境外電商 / carrierType 20 需要境外電商類型帳號 ——
-一般帳號會回 `1052`）、`SCHEDULED_ISSUE`、`CARRIER_VALIDATION`。
+一般帳號會回 `1052`）、`SCHEDULED_ISSUE`、`QUERY_BY_ORDER_ID`。
 
 ## 設定
 

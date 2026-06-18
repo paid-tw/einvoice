@@ -11,9 +11,10 @@ Unified **e-invoice (電子發票) SDK for Taiwan**. One provider-agnostic inter
 many provider adapters — switch between Amego, ECPay, ezPay, or the MOF platform
 without touching your business logic.
 
-All Taiwan value-added centers wrap the same 財政部 MIG 4.0 spec, so the core
-operations are identical: **開立 / 作廢 / 折讓 / 折讓作廢 / 查詢**. This SDK models
-those once and lets each provider be a thin adapter.
+All Taiwan value-added centers wrap the same MOF (財政部) MIG 4.0 spec, so the core
+operations are identical: **issue / void / allowance / void-allowance / query**
+(開立 / 作廢 / 折讓 / 折讓作廢 / 查詢). This SDK models those once and lets each
+provider be a thin adapter.
 
 ## Packages
 
@@ -21,10 +22,10 @@ those once and lets each provider be a thin adapter.
 | --- | --- | --- |
 | [`@paid-tw/einvoice`](./packages/einvoice) | core | Unified types, `InvoiceProvider` interface, Zod validation, `MockProvider` |
 | [`@paid-tw/einvoice-amego`](./packages/einvoice-amego) | adapter | Amego (amego.tw) — MD5-signed |
-| [`@paid-tw/einvoice-ezpay`](./packages/einvoice-ezpay) | adapter | ezPay 藍新 (ezpay.com.tw) — AES-encrypted |
-| [`@paid-tw/einvoice-ecpay`](./packages/einvoice-ecpay) | adapter | ECPay 綠界 (ecpay.com.tw) — B2C 2.0, AES-encrypted |
-| [`@paid-tw/einvoice-ezpay-crossborder`](./packages/einvoice-ezpay-crossborder) | adapter | ezPay 境外電商 — cross-border B2C, foreign-currency-native |
-| [`@paid-tw/einvoice-ezreceipt`](./packages/einvoice-ezreceipt) | adapter | ezReceipt 易發票 (COIMOTION) — order-centric REST, token auth |
+| [`@paid-tw/einvoice-ezpay`](./packages/einvoice-ezpay) | adapter | ezPay (藍新, ezpay.com.tw) — AES-encrypted |
+| [`@paid-tw/einvoice-ecpay`](./packages/einvoice-ecpay) | adapter | ECPay (綠界, ecpay.com.tw) — B2C 2.0, AES-encrypted |
+| [`@paid-tw/einvoice-ezpay-crossborder`](./packages/einvoice-ezpay-crossborder) | adapter | ezPay cross-border (境外電商) — B2C, foreign-currency-native |
+| [`@paid-tw/einvoice-ezreceipt`](./packages/einvoice-ezreceipt) | adapter | ezReceipt (易發票, COIMOTION) — order-centric REST, token auth |
 
 Install only the providers you use — adapters are separate packages, so an app
 that only uses Amego never pulls in another provider's dependencies.
@@ -48,7 +49,7 @@ const invoices = createAmegoProvider({
 const result = await invoices.issue({
   orderId: "order-1001",
   buyer: { email: "buyer@example.com" },
-  items: [{ description: "訂閱方案", quantity: 1, unitPrice: 1000, amount: 1000 }],
+  items: [{ description: "Subscription plan", quantity: 1, unitPrice: 1000, amount: 1000 }],
   amount: composeTaxExclusive(1000), // → { salesAmount: 1000, taxAmount: 50, totalAmount: 1050 }
   taxType: "TAXABLE",
   priceMode: "TAX_EXCLUSIVE",
@@ -91,16 +92,16 @@ Each adapter declares a `capabilities` set; feature-detect at runtime with
 
 | Capability | Amego | ECPay | ezPay | ezPay X-border | ezReceipt |
 | --- | :---: | :---: | :---: | :---: | :---: |
-| `ISSUE` — 開立 | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `VOID` — 作廢 | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `ALLOWANCE` — 折讓 | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `VOID_ALLOWANCE` — 折讓作廢 | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `QUERY` — 查詢 | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `B2B` — 統一編號 buyer | ✅ | ✅ | ✅ | — | ✅ |
+| `ISSUE` — issue (開立) | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `VOID` — void (作廢) | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `ALLOWANCE` — allowance (折讓) | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `VOID_ALLOWANCE` — void allowance (折讓作廢) | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `QUERY` — query (查詢) | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `B2B` — buyer with tax ID (統一編號) | ✅ | ✅ | ✅ | — | ✅ |
 | `MIXED_TAX` — mixed tax-rate invoice | ✅ | ✅ | ✅ | — | ✅ |
 | `QUERY_BY_ORDER_ID` — look up by order id | ✅ | ✅ | ✅ | ✅ | — |
 | `SCHEDULED_ISSUE` — schedule future issuance | — | ✅ | ✅ | ✅ | — |
-| `CARRIER_VALIDATION` — 手機條碼 / 愛心碼 | ✅ | ✅ | ✅ | — | ✅ |
+| `CARRIER_VALIDATION` — mobile barcode / charity code (手機條碼 / 愛心碼) | ✅ | ✅ | ✅ | — | ✅ |
 | `FOREIGN_CURRENCY` — `currency` + `exchangeRate` annotation | ✅ | — | — | ✅ | — |
 
 A provider that lacks `FOREIGN_CURRENCY` rejects a non-TWD `currency` with an
