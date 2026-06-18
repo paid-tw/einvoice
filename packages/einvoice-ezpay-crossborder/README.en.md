@@ -7,7 +7,7 @@
 
 **English** ｜ [繁體中文](./README.md)
 
-[ezPay 境外電商](https://www.ezpay.com.tw/) (cross-border e-commerce supplier)
+[ezPay cross-border (境外電商)](https://www.ezpay.com.tw/) (cross-border e-commerce supplier)
 adapter for [`@paid-tw/einvoice`](https://www.npmjs.com/package/@paid-tw/einvoice).
 This is a **separate ezPay service** from the standard one — a distinct API for
 foreign sellers issuing B2C e-invoices to Taiwan consumers, with native
@@ -21,7 +21,7 @@ pnpm add @paid-tw/einvoice @paid-tw/einvoice-ezpay-crossborder
 import { createEzpayCrossBorderProvider } from "@paid-tw/einvoice-ezpay-crossborder";
 
 const invoices = createEzpayCrossBorderProvider({
-  merchantId: process.env.EZPAY_MERCHANT_ID!, // a 境外電商-type merchant
+  merchantId: process.env.EZPAY_MERCHANT_ID!, // a cross-border (境外電商) type merchant
   hashKey: process.env.EZPAY_HASH_KEY!, // 32 chars
   hashIV: process.env.EZPAY_HASH_IV!, // 16 chars
   mode: "TEST", // cinv host; "PRODUCTION" → inv host
@@ -29,7 +29,7 @@ const invoices = createEzpayCrossBorderProvider({
 ```
 
 > Needs a **cross-border (境外電商) merchant**. A standard ezPay merchant returns
-> `INV10023 企業類型不符`. For the standard service use
+> `INV10023 企業類型不符` (merchant-type mismatch). For the standard service use
 > [`@paid-tw/einvoice-ezpay`](https://www.npmjs.com/package/@paid-tw/einvoice-ezpay).
 
 ## Foreign currency
@@ -68,13 +68,13 @@ const pend = await invoices.issuePending(input);                 // or { mode: "
 await invoices.triggerIssue({ invoiceTransNo: pend.invoiceTransNo, orderId: pend.orderId, totalAmount: 105 });
 
 // Void.
-await invoices.void({ invoiceNumber: "CC00000014", reason: "客戶取消" });
+await invoices.void({ invoiceNumber: "CC00000014", reason: "Customer canceled" });
 
 // Allowance — defaults to pending (Status=0); confirm/cancel later, or confirm now.
 const al = await invoices.allowance({
   invoiceNumber: "CC00000014",
   allowanceId: "ORDER_1",
-  items: [{ description: "商品", quantity: 1, unitPrice: 105, amount: 105 }],
+  items: [{ description: "Item", quantity: 1, unitPrice: 105, amount: 105 }],
   amount: { salesAmount: 100, taxAmount: 5, totalAmount: 105 },
   providerOptions: { currency: "TWD", buyerEmail: "buyer@example.com", merchantOrderNo: "ORDER_1", confirm: true },
 });
@@ -100,13 +100,13 @@ per-item tax types throws `UNSUPPORTED`.
 
 | Option | Required | Description |
 | --- | --- | --- |
-| `merchantId` | ✅ | 境外電商 merchant id |
+| `merchantId` | ✅ | cross-border (境外電商) merchant id |
 | `hashKey` | ✅ | 32-char AES HashKey (server-side only) |
 | `hashIV` | ✅ | 16-char AES HashIV (server-side only) |
 | `mode` | | `"TEST"` (default, cinv) or `"PRODUCTION"` (inv) |
 | `validatePayload` | | validate the issue payload locally (default `true`) |
 
-Live tests run with `EZPAY_CB_LIVE=1` against a 境外電商 test merchant.
+Live tests run with `EZPAY_CB_LIVE=1` against a cross-border (境外電商) test merchant.
 
 ## License
 

@@ -7,7 +7,7 @@
 
 **English** ｜ [繁體中文](./README.md)
 
-Provider-agnostic **core** for Taiwan e-invoices (財政部 MIG 4.0). Defines the
+Provider-agnostic **core** for Taiwan e-invoices (MOF 財政部 MIG 4.0). Defines the
 unified domain model, the `InvoiceProvider` interface every adapter implements,
 shared Zod validation, and an in-memory `MockProvider` for tests.
 

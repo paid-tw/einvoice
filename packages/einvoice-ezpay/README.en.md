@@ -7,7 +7,7 @@
 
 **English** ｜ [繁體中文](./README.md)
 
-[ezPay](https://www.ezpay.com.tw/) (簡單行動支付 / 藍新) adapter for
+[ezPay](https://www.ezpay.com.tw/) (藍新, formerly 簡單行動支付) adapter for
 [`@paid-tw/einvoice`](https://www.npmjs.com/package/@paid-tw/einvoice). Implements
 the unified `InvoiceProvider` interface over the ezPay e-invoice API.
 
@@ -47,14 +47,14 @@ move.
 
 | Option | Required | Description |
 | --- | --- | --- |
-| `merchantId` | ✅ | 商店代號 (`MerchantID_`) |
+| `merchantId` | ✅ | store id (商店代號), `MerchantID_` |
 | `hashKey` | ✅ | 32-char AES HashKey (server-side only) |
 | `hashIV` | ✅ | 16-char AES HashIV (server-side only) |
 | `mode` | | `"TEST"` (default, cinv) or `"PRODUCTION"` (inv) |
 | `respondType` | | `"JSON"` (default) or `"String"` |
 | `validatePayload` | | validate the issue payload locally (default `true`) |
 
-## 觸發開立 / 觸發折讓 (two-phase, ezPay-specific)
+## Trigger-issue / trigger-allowance (觸發開立 / 觸發折讓) — two-phase, ezPay-specific
 
 Beyond immediate issue, ezPay supports holding an invoice/allowance and
 triggering it later. These don't map onto the unified interface, so they are
@@ -84,7 +84,7 @@ A held (`Status=3`) scheduled invoice can also be issued early with
 `triggerIssue`. A confirmed allowance uploads the next day and can no longer be
 cancelled — void an uploaded one with `voidAllowance` instead.
 
-## Carrier validation (手機條碼 / 愛心碼)
+## Carrier validation (mobile barcode 手機條碼 / charity code 愛心碼)
 
 Check whether a mobile-barcode carrier or a donation code is registered at the
 tax authority before issuing — backed by ezPay's `/Api_inv_application/` lookups:
@@ -122,8 +122,8 @@ const fields = invoices.buildQueryPostData({
   (SearchType 1).
 - Live lifecycle tests run against the test environment with `EZPAY_LIVE=1` and
   the credentials in env: immediate (issue → query → void), allowance
-  (issue → allowance → void), 觸發開立 (issuePending → triggerIssue → void),
-  and 觸發折讓 (held allowance → cancel).
+  (issue → allowance → void), trigger-issue (觸發開立) (issuePending →
+  triggerIssue → void), and trigger-allowance (觸發折讓) (held allowance → cancel).
 
 ## License
 
