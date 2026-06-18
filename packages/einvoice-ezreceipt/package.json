@@ -1,6 +1,6 @@
 {
   "name": "@paid-tw/einvoice-ezreceipt",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "ezReceipt 易發票 (COIMOTION API) adapter for @paid-tw/einvoice — order-centric REST e-invoices with token auth.",
   "license": "MIT",
   "repository": {

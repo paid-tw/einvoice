@@ -1,5 +1,18 @@
 # @paid-tw/einvoice-ecpay
 
+## 0.3.1
+
+### Patch Changes
+
+- Fix CJS type resolution. Each package's `exports["."]` had a single `types`
+  pointing at the ESM `index.d.ts`, so `require()` consumers resolved ESM-shaped
+  declarations. Split the map into per-condition `import` / `require` blocks, each
+  with its own `types` (`index.d.ts` for ESM, `index.d.cts` for CJS — both already
+  emitted by tsup). No API or runtime change. Verified with publint + attw
+  (node10 / node16 CJS / node16 ESM / bundler all green).
+- Updated dependencies
+  - @paid-tw/einvoice@0.3.1
+
 ## 0.3.0
 
 ### Minor Changes

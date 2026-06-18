@@ -1,6 +1,6 @@
 {
   "name": "@paid-tw/einvoice",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Provider-agnostic core for Taiwan e-invoice: unified types, InvoiceProvider interface, validation schemas, and a MockProvider.",
   "license": "MIT",
   "repository": {
