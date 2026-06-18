@@ -121,20 +121,29 @@ assertSupports(invoices, Capability.SCHEDULED_ISSUE);
   具 `FOREIGN_CURRENCY` 能力的供應商會記錄該幣別，其餘供應商則會拒絕非 TWD 的
   `currency`，而非靜默丟棄（見 [能力對照](#能力對照)）。
 - **錯誤**會正規化為單一的 `InvoiceError`，帶有穩定的 `code`，並保留供應商原始的
-  代碼/訊息。
-- 轉接器會先用共用的 Zod schemas 驗證輸入，才送出網路請求。
+  代碼/訊息。請用 `isInvoiceError(e)` 型別守衛（檢查全域 `Symbol.for` brand，即使
+  載入了兩份套件副本也能正確判斷），而非 `instanceof`。
+- 轉接器會先用共用的 Zod schemas（透過 `parseInput`）驗證輸入，才送出網路請求；
+  驗證失敗一律丟出 `InvoiceError`（`code` 為 `VALIDATION`）。兩個刻意的例外維持
+  各自的驗證器：ezReceipt 的 `issue`（`buyer.email` 可放會員 id）與跨境的
+  `issue` / `allowance`（外幣 2 位小數金額）。
+- 設定 config 上的 **`debug`** 即可追蹤每次 HTTP 請求 —— 收到 provider / method /
+  url / status / 耗時 / 錯誤的 metadata 事件（不含請求內容），適合除錯與可觀察性。
 
 ## 開發
 
 ```bash
 pnpm install
-pnpm build       # 建置所有套件（透過 tsup 產生 ESM + CJS + d.ts）
-pnpm test        # vitest
+pnpm build         # 建置所有套件（透過 tsdown／rolldown 產生 ESM + CJS + d.ts）
+pnpm test          # vitest（離線，使用 MSW mocks）
 pnpm typecheck
+pnpm lint          # oxlint（oxc linter，含 type-aware 規則）
+pnpm format        # oxfmt（oxc formatter，printWidth 100）
 ```
 
-發版使用 [changesets](https://github.com/changesets/changesets)：
-`pnpm changeset` → `pnpm version` → `pnpm release`。
+發版使用 [changesets](https://github.com/changesets/changesets)：`pnpm changeset` →
+`pnpm exec changeset version` → 推送 `vX.Y.Z` git tag（Publish workflow 以 OIDC
+trusted publishing 自動發布）。
 
 ## 貢獻一個供應商
 

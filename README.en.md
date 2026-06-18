@@ -125,20 +125,31 @@ A provider that lacks `FOREIGN_CURRENCY` rejects a non-TWD `currency` with an
   original currency, while the others reject a non-TWD `currency` instead of
   silently dropping it (see [Capabilities](#capabilities)).
 - **Errors** are normalized to a single `InvoiceError` with a stable `code` plus
-  the provider's raw code/message.
-- Adapters validate inputs with the shared Zod schemas before hitting the network.
+  the provider's raw code/message. Use the `isInvoiceError(e)` guard rather than
+  `instanceof` — it checks a globally-registered `Symbol.for` brand, so it still
+  works when two copies of the package are loaded (dual ESM/CJS, version skew).
+- Adapters validate inputs with the shared Zod schemas (via `parseInput`) before
+  hitting the network; a failure rejects with `InvoiceError` (code `VALIDATION`).
+  Two intentional exceptions keep their own validators: ezReceipt's `issue`
+  (accepts a member id via `buyer.email`) and the cross-border `issue`/`allowance`
+  (2-decimal foreign amounts).
+- Set `debug` on a config to trace every HTTP call — metadata-only events
+  (provider / method / url / status / duration / error), not bodies.
 
 ## Development
 
 ```bash
 pnpm install
-pnpm build       # build all packages (ESM + CJS + d.ts via tsup)
-pnpm test        # vitest
+pnpm build         # build all packages (ESM + CJS + d.ts via tsdown / rolldown)
+pnpm test          # vitest (offline; uses MSW mocks)
 pnpm typecheck
+pnpm lint          # oxlint (oxc linter, with type-aware rules)
+pnpm format        # oxfmt (oxc formatter, printWidth 100)
 ```
 
-Releases use [changesets](https://github.com/changesets/changesets):
-`pnpm changeset` → `pnpm version` → `pnpm release`.
+Releases use [changesets](https://github.com/changesets/changesets): `pnpm changeset`
+→ `pnpm exec changeset version` → push a `vX.Y.Z` git tag (auto-published by the
+Publish workflow via npm OIDC trusted publishing).
 
 ## Contributing a provider
 
