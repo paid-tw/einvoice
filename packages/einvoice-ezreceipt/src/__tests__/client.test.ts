@@ -180,6 +180,8 @@ describe("mapEzreceiptError (table-driven)", () => {
     [1216, "CONFLICT"],
     [1218, "CONFLICT"],
     [1222, "CONFLICT"],
+    [1310, "CONFLICT"],
+    [1311, "CONFLICT"],
     [1017, "CONFLICT"],
     [1020, "CONFLICT"],
     [1039, "CONFLICT"],

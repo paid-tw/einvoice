@@ -238,7 +238,12 @@ export class EzreceiptProvider implements InvoiceProvider {
       throw fail("作廢原因 (voidReason) must be ≤20 chars");
     }
     const invID = await this.resolveInvID(input.invoiceNumber, input.providerOptions);
-    const r = await this.client.request(ENDPOINTS.void(invID), { voidReason: input.reason });
+    // voidReason is REQUIRED (126) — the unified type already mandates it.
+    // providerOptions.voidOrder also voids the underlying order.
+    const r = await this.client.request(ENDPOINTS.void(invID), {
+      voidReason: input.reason,
+      ...((input.providerOptions as { voidOrder?: boolean } | undefined)?.voidOrder ? { voidOrder: true } : {}),
+    });
     return { invoiceNumber: input.invoiceNumber, status: InvoiceStatus.VOIDED, raw: r };
   }
 
@@ -391,6 +396,45 @@ export class EzreceiptProvider implements InvoiceProvider {
     const invID = await this.resolveInvID(invoiceNumber, providerOptions);
     const r = await this.client.request<{ itemList?: AllowanceQuotaItem[] }>(ENDPOINTS.allowQuota(invID), {});
     return r.itemList ?? [];
+  }
+
+  /**
+   * 排程折讓事件 email 通知 — queue notifications for the given allowance ids on a
+   * 折讓 event: CREATE(6) / CONFIRM(7, 交換 only) / VOID(8) / VOID_CONFIRM(9, 交換
+   * only). `forceToBuyer` ignores the user's per-event "notify buyer" setting.
+   */
+  async notifyAllowance(
+    awIDs: Array<string | number>,
+    event: "CREATE" | "CONFIRM" | "VOID" | "VOID_CONFIRM",
+    opts: { forceToBuyer?: boolean } = {},
+  ): Promise<void> {
+    const eventType = { CREATE: 6, CONFIRM: 7, VOID: 8, VOID_CONFIRM: 9 }[event];
+    await this.client.request(ENDPOINTS.notificationAllowance, {
+      awList: awIDs,
+      eventType,
+      ...(opts.forceToBuyer ? { forceToBuyer: true } : {}),
+    });
+  }
+
+  /**
+   * 排程發票事件 email 通知 — queue notifications for the given invoice ids on an
+   * invoice event: ISSUE(1) / CONFIRM(2, 交換) / VOID(4) / VOID_CONFIRM(5, 交換) /
+   * WON(20 中獎) / REQUEST(30 索取). `format` (print style) and `action` (1 single /
+   * 2 packed) apply only when a proof is attached (ISSUE/CONFIRM).
+   */
+  async notifyInvoice(
+    invIDs: Array<string | number>,
+    event: "ISSUE" | "CONFIRM" | "VOID" | "VOID_CONFIRM" | "WON" | "REQUEST",
+    opts: { forceToBuyer?: boolean; format?: number; action?: 1 | 2 } = {},
+  ): Promise<void> {
+    const eventType = { ISSUE: 1, CONFIRM: 2, VOID: 4, VOID_CONFIRM: 5, WON: 20, REQUEST: 30 }[event];
+    await this.client.request(ENDPOINTS.notificationInvoice, {
+      invList: invIDs,
+      eventType,
+      ...(opts.forceToBuyer ? { forceToBuyer: true } : {}),
+      ...(opts.format != null ? { format: opts.format } : {}),
+      ...(opts.action != null ? { action: opts.action } : {}),
+    });
   }
 
   // --- 字軌 management (extension — beyond the unified InvoiceProvider) -------

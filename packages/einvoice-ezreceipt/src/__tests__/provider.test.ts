@@ -248,6 +248,19 @@ describe("void", () => {
     server.use(loginHandler());
     await expect(testProvider().void({ invoiceNumber: "SX1", reason: "x".repeat(21), providerOptions: { invID: 1 } })).rejects.toMatchObject({ code: "VALIDATION" });
   });
+
+  it("forwards voidOrder to also void the underlying order", async () => {
+    let body: Record<string, unknown> | undefined;
+    server.use(
+      loginHandler(),
+      http.post(url(EP.void(7)), async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>;
+        return ok({ invID: "7" });
+      }),
+    );
+    await testProvider().void({ invoiceNumber: "SX1", reason: "退貨", providerOptions: { invID: 7, voidOrder: true } });
+    expect(body).toEqual({ voidReason: "退貨", voidOrder: true });
+  });
 });
 
 describe("query", () => {
@@ -441,6 +454,67 @@ describe("listInvoices (extension)", () => {
     );
     await testProvider().listInvoices({ fromTime: "2026-01-01 00:00:00", toTime: "2026-06-30 23:59:59", voided: true });
     expect(body).toEqual({ fromTime: "2026-01-01 00:00:00", toTime: "2026-06-30 23:59:59", isVoid: 1 });
+  });
+});
+
+describe("notifyAllowance (extension)", () => {
+  it("maps the event to eventType and forwards awList / forceToBuyer", async () => {
+    let body: Record<string, unknown> | undefined;
+    server.use(
+      loginHandler(),
+      http.post(url(EP.notificationAllowance), async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>;
+        return ok({});
+      }),
+    );
+    await testProvider().notifyAllowance([888, 889], "VOID", { forceToBuyer: true });
+    expect(body).toEqual({ awList: [888, 889], eventType: 8, forceToBuyer: true });
+  });
+
+  it("maps the four events to 6/7/8/9", async () => {
+    const seen: number[] = [];
+    server.use(
+      loginHandler(),
+      http.post(url(EP.notificationAllowance), async ({ request }) => {
+        seen.push(((await request.json()) as { eventType: number }).eventType);
+        return ok({});
+      }),
+    );
+    const p = testProvider();
+    await p.notifyAllowance([1], "CREATE");
+    await p.notifyAllowance([1], "CONFIRM");
+    await p.notifyAllowance([1], "VOID");
+    await p.notifyAllowance([1], "VOID_CONFIRM");
+    expect(seen).toEqual([6, 7, 8, 9]);
+  });
+});
+
+describe("notifyInvoice (extension)", () => {
+  it("maps the event + forwards invList / format / action", async () => {
+    let body: Record<string, unknown> | undefined;
+    server.use(
+      loginHandler(),
+      http.post(url(EP.notificationInvoice), async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>;
+        return ok({});
+      }),
+    );
+    await testProvider().notifyInvoice([999], "ISSUE", { format: 25, action: 1, forceToBuyer: true });
+    expect(body).toEqual({ invList: [999], eventType: 1, forceToBuyer: true, format: 25, action: 1 });
+  });
+
+  it("maps the six events to 1/2/4/5/20/30", async () => {
+    const seen: number[] = [];
+    server.use(
+      loginHandler(),
+      http.post(url(EP.notificationInvoice), async ({ request }) => {
+        seen.push(((await request.json()) as { eventType: number }).eventType);
+        return ok({});
+      }),
+    );
+    const p = testProvider();
+    for (const e of ["ISSUE", "CONFIRM", "VOID", "VOID_CONFIRM", "WON", "REQUEST"] as const) await p.notifyInvoice([1], e);
+    expect(seen).toEqual([1, 2, 4, 5, 20, 30]);
   });
 });
 

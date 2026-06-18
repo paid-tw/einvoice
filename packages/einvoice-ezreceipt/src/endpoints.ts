@@ -41,6 +41,10 @@ export const ENDPOINTS = {
   allowanceList: "/eInvoice/allowance/list",
   /** 修改折讓單品項 (by awID; replaces all items). 交換 allowances only, before confirm. */
   allowanceUpdateItems: (awID: string | number) => `/eInvoice/allowance/updateItems/${awID}`,
+  /** 排程折讓事件的 email 通知. Body: `{ awList, eventType, forceToBuyer? }`. */
+  notificationAllowance: "/eInvoice/notification/allowance",
+  /** 排程發票事件的 email 通知. Body: `{ invList, eventType, forceToBuyer?, format?, action? }`. */
+  notificationInvoice: "/eInvoice/notification/invoice",
   /** 字軌分段清單 (一般用戶不帶 stID；合作廠商帶 stID 查指定店家). */
   invNumberList: (stID?: string | number) => `/eInvoice/invNumber/list${stID != null ? `/${stID}` : ""}`,
   /** 調整字軌分段的起始/結束號碼 (by inID). Body: `{ startNo?, endNo? }`. */
