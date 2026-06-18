@@ -60,6 +60,12 @@ export function mapEzreceiptError(code: number): InvoiceErrorCode {
     case 1012:
     case 1014:
     case 1023:
+    case 1018:
+    case 1019:
+    case 1031:
+    case 1032:
+    case 1033:
+    case 1070:
     case 1201:
     case 1202:
     case 1203:

@@ -273,10 +273,12 @@ describe("query", () => {
     expect(res.items[0]).toMatchObject({ description: "商品", quantity: 1, unitPrice: 100, unit: "件" });
   });
 
-  it("maps procState 13 to VOIDED", async () => {
-    server.use(loginHandler(), http.post(url(EP.view(999)), () => ok({ ...viewResult, procState: 13 })));
-    const res = await testProvider().query({ invoiceNumber: "SX60721900", providerOptions: { invID: 999 } });
-    expect(res.status).toBe("VOIDED");
+  it("maps procState 13 (作廢) and 30 (註銷) to VOIDED", async () => {
+    for (const procState of [13, 30]) {
+      server.use(loginHandler(), http.post(url(EP.view(999)), () => ok({ ...viewResult, procState })));
+      const res = await testProvider().query({ invoiceNumber: "SX60721900", providerOptions: { invID: 999 } });
+      expect(res.status).toBe("VOIDED");
+    }
   });
 
   it("throws VALIDATION when neither invoiceNumber nor invID is given", async () => {
@@ -345,6 +347,71 @@ describe("allowance", () => {
       providerOptions: { invID: 999, itemTax: [3] },
     });
     expect(allowBody?.prodList).toMatchObject([{ tax: 3 }]);
+  });
+});
+
+describe("revokeInvoice (extension)", () => {
+  it("resolves the invID and revokes with a reason", async () => {
+    let body: Record<string, unknown> | undefined;
+    server.use(
+      loginHandler(),
+      listResolves("SX60721900", 999),
+      http.post(url(EP.invoiceRevoke(999)), async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>;
+        return ok({ invID: 999, revokeReason: "打錯", revokeTime: "2026-06-18 09:00:00" });
+      }),
+    );
+    const res = await testProvider().revokeInvoice("SX60721900", "打錯", { revokeTime: "2026-06-18 09:00:00" });
+    expect(res.invID).toBe(999);
+    expect(body).toEqual({ revokeReason: "打錯", revokeTime: "2026-06-18 09:00:00" });
+  });
+
+  it("rejects a reason longer than 20 chars", async () => {
+    server.use(loginHandler());
+    await expect(testProvider().revokeInvoice("SX1", "x".repeat(21), { providerOptions: { invID: 1 } })).rejects.toMatchObject({ code: "VALIDATION" });
+  });
+
+  it("maps a state-disallowed revoke (1018) to CONFLICT", async () => {
+    server.use(loginHandler(), http.post(url(EP.invoiceRevoke(1)), () => fail(1018, "發票目前的狀態無法執行作廢、註銷或退回。")));
+    await expect(testProvider().revokeInvoice("SX1", "x", { providerOptions: { invID: 1 } })).rejects.toMatchObject({ code: "CONFLICT", rawCode: "1018" });
+  });
+});
+
+describe("replyInvoice (extension)", () => {
+  it("confirms a 交換 invoice issue with a buyerRemark", async () => {
+    let body: Record<string, unknown> | undefined;
+    server.use(
+      loginHandler(),
+      listResolves("SX60721900", 999),
+      http.post(url(EP.invoiceReply(999)), async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>;
+        return ok({ invID: 999, action: 1 });
+      }),
+    );
+    const res = await testProvider().replyInvoice("SX60721900", "ISSUE", { buyerRemark: 1 });
+    expect(res).toMatchObject({ invID: 999, action: 1 });
+    expect(body).toEqual({ action: 1, buyerRemark: 1 });
+  });
+
+  it("maps ISSUE/VOID/RETURN to action 1/2/3", async () => {
+    const seen: number[] = [];
+    server.use(
+      loginHandler(),
+      http.post(url(EP.invoiceReply(5)), async ({ request }) => {
+        seen.push(((await request.json()) as { action: number }).action);
+        return ok({ invID: 5, action: 0 });
+      }),
+    );
+    const p = testProvider();
+    await p.replyInvoice("SX1", "ISSUE", { providerOptions: { invID: 5 } });
+    await p.replyInvoice("SX1", "VOID", { providerOptions: { invID: 5 } });
+    await p.replyInvoice("SX1", "RETURN", { providerOptions: { invID: 5 } });
+    expect(seen).toEqual([1, 2, 3]);
+  });
+
+  it("maps a state-disallowed confirm (1031) to CONFLICT", async () => {
+    server.use(loginHandler(), http.post(url(EP.invoiceReply(5)), () => fail(1031, "現有狀態不能執行確認開立")));
+    await expect(testProvider().replyInvoice("SX1", "ISSUE", { providerOptions: { invID: 5 } })).rejects.toMatchObject({ code: "CONFLICT", rawCode: "1031" });
   });
 });
 

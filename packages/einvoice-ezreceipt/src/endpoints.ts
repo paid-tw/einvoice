@@ -15,6 +15,10 @@ export const ENDPOINTS = {
   allowQuota: (invID: string | number) => `/eInvoice/invoice/allowQuota/${invID}`,
   /** 作廢發票 (by invID, in the path). Body: `{ voidReason }`. */
   void: (invID: string | number) => `/eInvoice/invoice/void/${invID}`,
+  /** 確認交換(msgType=2)發票 (by invID). Body: `{ action, buyerRemark? }`. */
+  invoiceReply: (invID: string | number) => `/eInvoice/invoice/reply/${invID}`,
+  /** 註銷發票 (by invID) — distinct from 作廢/void. Body: `{ revokeReason, revokeTime? }`. */
+  invoiceRevoke: (invID: string | number) => `/eInvoice/invoice/revoke/${invID}`,
   /**
    * 開立折讓證明單. The credited invoice is determined PER prodList item (its
    * `soiID`, or `invID`+`title`+`taxType` for a custom line) — NOT a path id.

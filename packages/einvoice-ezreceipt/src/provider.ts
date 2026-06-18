@@ -299,7 +299,8 @@ export class EzreceiptProvider implements InvoiceProvider {
       invoiceDate: parseDate(r.invoiceTime),
       randomCode: String(r.randNo ?? ""),
       orderId: r.orderNo ? String(r.orderNo) : undefined,
-      status: String(r.procState) === "13" ? InvoiceStatus.VOIDED : InvoiceStatus.ISSUED,
+      // procState: 11 已開立, 13 已作廢, 30 已註銷 — both 13 and 30 are cancelled.
+      status: ["13", "30"].includes(String(r.procState)) ? InvoiceStatus.VOIDED : InvoiceStatus.ISSUED,
       amount: { salesAmount: sales, taxAmount: tax, totalAmount: sales + tax },
       buyer: {
         name: buyer.name ? String(buyer.name) : undefined,
@@ -339,6 +340,46 @@ export class EzreceiptProvider implements InvoiceProvider {
       ...(input.pageSize ? { _ps: input.pageSize } : {}),
     });
     return { entries: Number(r.entries ?? 0), list: r.list ?? [] };
+  }
+
+  /**
+   * 註銷發票 — distinct from {@link EzreceiptProvider.void} (作廢): a 註銷 can run
+   * when the invoice is 已開立 / 已作廢 / 已折讓作廢 and is what "void + reissue"
+   * builds on. B2B invoices CANNOT be revoked via the value-added centre (a 財政部
+   * limitation) — do those on the 財政部 platform.
+   */
+  async revokeInvoice(
+    invoiceNumber: string,
+    reason: string,
+    opts: { revokeTime?: string; providerOptions?: Record<string, unknown> } = {},
+  ): Promise<{ invID: number; revokeReason: string; revokeTime: string }> {
+    if (this.config.validatePayload !== false && reason.length > 20) {
+      throw fail("註銷原因 (revokeReason) must be ≤20 chars");
+    }
+    const invID = await this.resolveInvID(invoiceNumber, opts.providerOptions);
+    return this.client.request(ENDPOINTS.invoiceRevoke(invID), {
+      revokeReason: reason,
+      ...(opts.revokeTime ? { revokeTime: opts.revokeTime } : {}),
+    });
+  }
+
+  /**
+   * 確認交換發票 — for 交換 (msgType=2) invoices only: the buyer confirms an issue
+   * (`"ISSUE"`, with an optional buyerRemark 1-4) or a void (`"VOID"`), or the
+   * seller confirms a return (`"RETURN"`, which auto-voids the invoice). Requires
+   * the account's B2B-exchange feature; resolves invID from the invoice number.
+   */
+  async replyInvoice(
+    invoiceNumber: string,
+    action: "ISSUE" | "VOID" | "RETURN",
+    opts: { buyerRemark?: 1 | 2 | 3 | 4; providerOptions?: Record<string, unknown> } = {},
+  ): Promise<{ invID: number; action: number }> {
+    const invID = await this.resolveInvID(invoiceNumber, opts.providerOptions);
+    const code = action === "ISSUE" ? 1 : action === "VOID" ? 2 : 3;
+    return this.client.request(ENDPOINTS.invoiceReply(invID), {
+      action: code,
+      ...(opts.buyerRemark != null ? { buyerRemark: opts.buyerRemark } : {}),
+    });
   }
 
   /**
