@@ -143,6 +143,18 @@ export interface ListInvoicesInput {
   pageSize?: number;
 }
 
+/** A public business/organisation record from {@link EzreceiptProvider.lookupBusiness}. */
+export interface BusinessInfo {
+  /** 1 稅籍登記 / 2 非營利事業團體 / 3 全國各級學校. */
+  compType: number;
+  nid: string;
+  name: string;
+  /** 登記地址 — only for 稅籍登記 (compType 1). */
+  addr?: string;
+  /** 所在地區 — only for 非營利團體 / 學校 (compType 2/3). */
+  district?: string;
+}
+
 /** Everything needed to print a paper proof, from {@link EzreceiptProvider.getInvoicePrintInfo}. */
 export interface InvoicePrintInfo {
   invNo: string;
@@ -243,6 +255,7 @@ export class EzreceiptProvider implements InvoiceProvider {
     Capability.QUERY,
     Capability.B2B,
     Capability.MIXED_TAX,
+    Capability.CARRIER_VALIDATION,
   ]);
 
   private readonly client: EzreceiptClient;
@@ -456,6 +469,32 @@ export class EzreceiptProvider implements InvoiceProvider {
   async getInvoicePrintInfo(invoiceNumber: string, providerOptions?: Record<string, unknown>): Promise<InvoicePrintInfo> {
     const invID = await this.resolveInvID(invoiceNumber, providerOptions);
     return this.client.request<InvoicePrintInfo>(ENDPOINTS.proofInvInfo(invID), {});
+  }
+
+  /**
+   * 檢查手機條碼 — validate a mobile-barcode carrier against the 財政部 platform
+   * (format `/` + 7 alphanumerics). Returns whether it exists/is registered.
+   */
+  async checkMobileCode(mobileCode: string): Promise<boolean> {
+    const r = await this.client.request<{ isExist: number }>(ENDPOINTS.openTaxCheckMobileCode, { mobileCode });
+    return r.isExist === 1;
+  }
+
+  /** 檢查捐贈碼 — validate a 捐贈碼 (3–7 digits) against the 財政部 platform. */
+  async checkCharity(donate: string): Promise<boolean> {
+    const r = await this.client.request<{ isExist: number }>(ENDPOINTS.openTaxCheckCharity, { donate });
+    return r.isExist === 1;
+  }
+
+  /**
+   * 以統編查詢機關 — look up public business/organisation info by 統編. Optionally
+   * filter by `compType` (1 稅籍登記 / 2 非營利團體 / 3 學校).
+   */
+  async lookupBusiness(nid: string, opts: { compType?: 1 | 2 | 3 } = {}): Promise<BusinessInfo[]> {
+    const r = await this.client.request<{ list?: BusinessInfo[] }>(ENDPOINTS.openTaxGuidList(nid), {
+      ...(opts.compType != null ? { compType: opts.compType } : {}),
+    });
+    return r.list ?? [];
   }
 
   /**

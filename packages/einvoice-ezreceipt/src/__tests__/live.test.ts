@@ -163,6 +163,14 @@ describe.skipIf(!live)("ezReceipt live (test env) — variants", LIVE_OPTS, () =
     expect(Array.from(pdf.data.slice(0, 4))).toEqual([0x25, 0x50, 0x44, 0x46]); // %PDF
   }, 30_000);
 
+  it("validates carriers and looks up a 統編 against 財政部 (extension)", async () => {
+    expect(await p.lookupBusiness("53538851")).toEqual(
+      expect.arrayContaining([expect.objectContaining({ nid: "53538851", name: expect.stringContaining("歐付寶") })]),
+    );
+    expect(typeof (await p.checkMobileCode("/ABC1234"))).toBe("boolean");
+    expect(typeof (await p.checkCharity("25885"))).toBe("boolean");
+  }, 15_000);
+
   it("lists the store's logo ids (extension)", async () => {
     const logos = await p.listLogos();
     expect(Array.isArray(logos)).toBe(true);

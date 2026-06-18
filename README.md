@@ -99,7 +99,7 @@ assertSupports(invoices, Capability.SCHEDULED_ISSUE);
 | `MIXED_TAX` — 混合稅率發票 | ✅ | ✅ | ✅ | — | ✅ |
 | `QUERY_BY_ORDER_ID` — 以訂單編號查詢 | ✅ | ✅ | ✅ | ✅ | — |
 | `SCHEDULED_ISSUE` — 預約未來開立 | — | ✅ | ✅ | ✅ | — |
-| `CARRIER_VALIDATION` — 手機條碼 / 愛心碼 | ✅ | ✅ | ✅ | — | — |
+| `CARRIER_VALIDATION` — 手機條碼 / 愛心碼 | ✅ | ✅ | ✅ | — | ✅ |
 | `FOREIGN_CURRENCY` — `currency` + `exchangeRate` 外幣註記 | ✅ | — | — | ✅ | — |
 
 不具 `FOREIGN_CURRENCY` 能力的供應商，收到非 TWD 的 `currency` 會拋出

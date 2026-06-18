@@ -100,7 +100,7 @@ Each adapter declares a `capabilities` set; feature-detect at runtime with
 | `MIXED_TAX` — mixed tax-rate invoice | ✅ | ✅ | ✅ | — | ✅ |
 | `QUERY_BY_ORDER_ID` — look up by order id | ✅ | ✅ | ✅ | ✅ | — |
 | `SCHEDULED_ISSUE` — schedule future issuance | — | ✅ | ✅ | ✅ | — |
-| `CARRIER_VALIDATION` — 手機條碼 / 愛心碼 | ✅ | ✅ | ✅ | — | — |
+| `CARRIER_VALIDATION` — 手機條碼 / 愛心碼 | ✅ | ✅ | ✅ | — | ✅ |
 | `FOREIGN_CURRENCY` — `currency` + `exchangeRate` annotation | ✅ | — | — | ✅ | — |
 
 A provider that lacks `FOREIGN_CURRENCY` rejects a non-TWD `currency` with an

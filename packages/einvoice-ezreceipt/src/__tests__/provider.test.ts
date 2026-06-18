@@ -53,12 +53,12 @@ describe("ezreceiptTaxType + endpoints", () => {
 });
 
 describe("capabilities", () => {
-  it("declares issue/void/allowance/query + B2B + mixed tax, not foreign currency", () => {
+  it("declares issue/void/allowance/query + B2B + mixed tax + carrier validation, not foreign currency", () => {
     const p = testProvider();
-    for (const c of [Capability.ISSUE, Capability.VOID, Capability.ALLOWANCE, Capability.VOID_ALLOWANCE, Capability.QUERY, Capability.B2B, Capability.MIXED_TAX]) {
+    for (const c of [Capability.ISSUE, Capability.VOID, Capability.ALLOWANCE, Capability.VOID_ALLOWANCE, Capability.QUERY, Capability.B2B, Capability.MIXED_TAX, Capability.CARRIER_VALIDATION]) {
       expect(supports(p, c)).toBe(true);
     }
-    for (const c of [Capability.FOREIGN_CURRENCY, Capability.CARRIER_VALIDATION, Capability.SCHEDULED_ISSUE]) {
+    for (const c of [Capability.FOREIGN_CURRENCY, Capability.SCHEDULED_ISSUE]) {
       expect(supports(p, c)).toBe(false);
     }
   });
@@ -454,6 +454,33 @@ describe("listInvoices (extension)", () => {
     );
     await testProvider().listInvoices({ fromTime: "2026-01-01 00:00:00", toTime: "2026-06-30 23:59:59", voided: true });
     expect(body).toEqual({ fromTime: "2026-01-01 00:00:00", toTime: "2026-06-30 23:59:59", isVoid: 1 });
+  });
+});
+
+describe("財政部 lookups (extension)", () => {
+  it("checkMobileCode / checkCharity return isExist as a boolean", async () => {
+    server.use(
+      loginHandler(),
+      http.post(url(EP.openTaxCheckMobileCode), () => ok({ isExist: 1 })),
+      http.post(url(EP.openTaxCheckCharity), () => ok({ isExist: 0 })),
+    );
+    const p = testProvider();
+    await expect(p.checkMobileCode("/ABC1234")).resolves.toBe(true);
+    await expect(p.checkCharity("001")).resolves.toBe(false);
+  });
+
+  it("lookupBusiness forwards compType and returns the org list", async () => {
+    let body: Record<string, unknown> | undefined;
+    server.use(
+      loginHandler(),
+      http.post(url(EP.openTaxGuidList("53538851")), async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>;
+        return ok({ list: [{ compType: 1, nid: "53538851", name: "歐付寶", addr: "台北市" }] });
+      }),
+    );
+    const res = await testProvider().lookupBusiness("53538851", { compType: 1 });
+    expect(body).toEqual({ compType: 1 });
+    expect(res[0]).toMatchObject({ nid: "53538851", name: "歐付寶" });
   });
 });
 

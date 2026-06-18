@@ -71,4 +71,11 @@ export const ENDPOINTS = {
   settingsViewLogo: (sgoID: string | number) => `/eInvoice/settings/viewLogo/${sgoID}`,
   /** 上傳商標圖檔 (MULTIPART `files`; sgoID in path = replace, omit = new). */
   settingsUploadLogo: (sgoID?: string | number) => `/eInvoice/settings/uploadLogo${sgoID != null ? `/${sgoID}` : ""}`,
+  // 財政部 lookups (openTax/* — the maintained versions; twOpen/* are deprecated).
+  /** 檢查捐贈碼是否存在於財政部平台. Body: `{ donate }` → `{ isExist }`. */
+  openTaxCheckCharity: "/openTax/carrier/checkCharity",
+  /** 檢查手機條碼是否存在於財政部平台. Body: `{ mobileCode }` → `{ isExist }`. */
+  openTaxCheckMobileCode: "/openTax/carrier/checkMobileCode",
+  /** 以統編查詢公開機關資訊 (by nid). Body: `{ compType? }` → `{ list }`. */
+  openTaxGuidList: (nid: string | number) => `/openTax/GUID/list/${nid}`,
 } as const;
