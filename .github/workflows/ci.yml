@@ -24,6 +24,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm -r build
       - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm format:check
       # Validate each package's published exports/types (catches a CJS/ESM types
       # condition mismatch that builds + tests don't — runs against dist/).
       - run: pnpm check:exports
