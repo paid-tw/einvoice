@@ -160,8 +160,56 @@ export class EzreceiptClient {
     return (env.value ?? {}) as T;
   }
 
+  /**
+   * Authenticated FILE request — for proof/print endpoints that stream a PDF/ZIP
+   * instead of a JSON envelope. On success returns the bytes + content-type; on
+   * an error the API still replies with a JSON envelope, which is thrown. Re-logs
+   * in once on `-3` like {@link request}.
+   */
+  async requestFile(path: string, body?: Record<string, unknown>): Promise<{ contentType: string; data: Uint8Array }> {
+    await this.ensureToken();
+    let res = await this.postRaw(path, body);
+    if (isJson(res)) {
+      const env = (await res.json()) as EzreceiptEnvelope;
+      if (env.code !== -3) throw this.envError(env);
+      await this.login();
+      res = await this.postRaw(path, body);
+      if (isJson(res)) throw this.envError((await res.json()) as EzreceiptEnvelope);
+    }
+    return {
+      contentType: res.headers.get("content-type") ?? "application/octet-stream",
+      data: new Uint8Array(await res.arrayBuffer()),
+    };
+  }
+
+  /** Build an {@link InvoiceError} from a non-success envelope. */
+  private envError(env: EzreceiptEnvelope): InvoiceError {
+    return new InvoiceError(env.message || `ezReceipt error ${env.code}`, {
+      provider: "ezreceipt",
+      code: mapEzreceiptError(env.code),
+      rawCode: String(env.code),
+      rawMessage: env.message,
+      raw: env,
+    });
+  }
+
   /** Low-level POST returning the raw envelope (no error throwing). */
   private async post(path: string, body?: Record<string, unknown>): Promise<EzreceiptEnvelope> {
+    const res = await this.postRaw(path, body);
+    try {
+      return (await res.json()) as EzreceiptEnvelope;
+    } catch (cause) {
+      throw new InvoiceError("ezReceipt returned a non-JSON response", {
+        provider: "ezreceipt",
+        code: InvoiceErrorCode.PROVIDER,
+        rawCode: String(res.status),
+        cause,
+      });
+    }
+  }
+
+  /** Low-level POST returning the raw {@link Response} (NETWORK error on transport failure). */
+  private async postRaw(path: string, body?: Record<string, unknown>): Promise<Response> {
     const doFetch = this.config.fetch ?? fetch;
     const headers: Record<string, string> = {
       "content-type": "application/json",
@@ -172,9 +220,8 @@ export class EzreceiptClient {
     if (this.token && path !== ENDPOINTS.login) headers["x-deva-token"] = this.token;
     if (this.config.stID != null) headers["x-deva-stid"] = String(this.config.stID);
 
-    let res: Response;
     try {
-      res = await doFetch(`${resolveBaseUrl(this.config)}${path}`, {
+      return await doFetch(`${resolveBaseUrl(this.config)}${path}`, {
         method: "POST",
         headers,
         body: JSON.stringify(body ?? {}),
@@ -187,15 +234,10 @@ export class EzreceiptClient {
         cause,
       });
     }
-    try {
-      return (await res.json()) as EzreceiptEnvelope;
-    } catch (cause) {
-      throw new InvoiceError("ezReceipt returned a non-JSON response", {
-        provider: "ezreceipt",
-        code: InvoiceErrorCode.PROVIDER,
-        rawCode: String(res.status),
-        cause,
-      });
-    }
   }
+}
+
+/** Does the response carry a JSON body (an error envelope) rather than a file? */
+function isJson(res: Response): boolean {
+  return (res.headers.get("content-type") ?? "").includes("application/json");
 }

@@ -45,6 +45,8 @@ export const ENDPOINTS = {
   notificationAllowance: "/eInvoice/notification/allowance",
   /** 排程發票事件的 email 通知. Body: `{ invList, eventType, forceToBuyer?, format?, action? }`. */
   notificationInvoice: "/eInvoice/notification/invoice",
+  /** 取得折讓單列印檔 (PDF/ZIP — binary, not JSON). Body: `{ awList, isZipped?, format? }`. */
+  proofAwPrint: "/eInvoice/proof/awPrint",
   /** 字軌分段清單 (一般用戶不帶 stID；合作廠商帶 stID 查指定店家). */
   invNumberList: (stID?: string | number) => `/eInvoice/invNumber/list${stID != null ? `/${stID}` : ""}`,
   /** 調整字軌分段的起始/結束號碼 (by inID). Body: `{ startNo?, endNo? }`. */

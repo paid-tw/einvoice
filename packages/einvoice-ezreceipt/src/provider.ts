@@ -417,6 +417,22 @@ export class EzreceiptProvider implements InvoiceProvider {
   }
 
   /**
+   * 取得折讓單列印檔 — returns the allowance PDF bytes (or a ZIP when `zipped`).
+   * `format`: 1 熱感紙 / 2 A4. The response is binary, so this returns the raw
+   * bytes + content-type rather than a parsed object.
+   */
+  async printAllowance(
+    awIDs: Array<string | number>,
+    opts: { zipped?: boolean; format?: 1 | 2 } = {},
+  ): Promise<{ contentType: string; data: Uint8Array }> {
+    return this.client.requestFile(ENDPOINTS.proofAwPrint, {
+      awList: awIDs,
+      ...(opts.zipped ? { isZipped: true } : {}),
+      ...(opts.format != null ? { format: opts.format } : {}),
+    });
+  }
+
+  /**
    * 排程發票事件 email 通知 — queue notifications for the given invoice ids on an
    * invoice event: ISSUE(1) / CONFIRM(2, 交換) / VOID(4) / VOID_CONFIRM(5, 交換) /
    * WON(20 中獎) / REQUEST(30 索取). `format` (print style) and `action` (1 single /

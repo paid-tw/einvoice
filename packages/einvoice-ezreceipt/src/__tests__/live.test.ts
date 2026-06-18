@@ -135,6 +135,15 @@ describe.skipIf(!live)("ezReceipt live (test env) — variants", LIVE_OPTS, () =
     expect(one.list.some((r) => r.invNo === inv.invoiceNumber)).toBe(true);
   });
 
+  it("downloads an allowance print PDF (binary proof endpoint, extension)", async () => {
+    const m = member();
+    const inv = await p.issue({ ...base, orderId: order(), buyer: { name: "x", email: m }, carrier: { type: "MEMBER", code: m } });
+    const al = await p.allowance({ invoiceNumber: inv.invoiceNumber, allowanceId: order(), items: [{ description: "商品", quantity: 1, unitPrice: 100, amount: 100 }], amount: { salesAmount: 100, taxAmount: 5, totalAmount: 105 } });
+    const pdf = await p.printAllowance([(al.raw as { awID: number }).awID], { format: 2 });
+    expect(pdf.contentType.toLowerCase()).toContain("pdf");
+    expect(Array.from(pdf.data.slice(0, 4))).toEqual([0x25, 0x50, 0x44, 0x46]); // %PDF
+  }, 30_000);
+
   it("lists the merchant's 字軌 tracks (extension)", async () => {
     const tracks = await p.listInvoiceTracks();
     expect(Array.isArray(tracks)).toBe(true);

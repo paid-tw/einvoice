@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { http, HttpResponse } from "msw";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { EZRECEIPT_ENDPOINTS, EzreceiptClient, hashPassword, mapEzreceiptError } from "../index.js";
-import { fail, ok, okToken, server, url } from "./server.js";
+import { fail, file, ok, okToken, server, url } from "./server.js";
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => server.resetHandlers());
@@ -134,6 +134,39 @@ describe("token auth", () => {
     );
     await client({ stID: 9905 }).request(EZRECEIPT_ENDPOINTS.list, {});
     expect(stid).toBe("9905");
+  });
+});
+
+describe("requestFile (binary)", () => {
+  const PROOF = EZRECEIPT_ENDPOINTS.proofAwPrint;
+
+  it("returns the file bytes + content-type on a binary response", async () => {
+    server.use(
+      http.post(url("/admin/user/login"), () => okToken()),
+      http.post(url(PROOF), () => file([0x25, 0x50, 0x44, 0x46])),
+    );
+    const res = await client().requestFile(PROOF, { awList: [1] });
+    expect(res.contentType).toContain("application/pdf");
+    expect(Array.from(res.data)).toEqual([0x25, 0x50, 0x44, 0x46]); // %PDF
+  });
+
+  it("throws the JSON error envelope on failure", async () => {
+    server.use(
+      http.post(url("/admin/user/login"), () => okToken()),
+      http.post(url(PROOF), () => fail(301, "awList required")),
+    );
+    await expect(client().requestFile(PROOF, {})).rejects.toMatchObject({ code: "VALIDATION", rawCode: "301" });
+  });
+
+  it("re-logs in once on -3 then returns the file", async () => {
+    let calls = 0;
+    server.use(
+      http.post(url("/admin/user/login"), () => okToken()),
+      http.post(url(PROOF), () => (++calls === 1 ? fail(-3, "Invalid token.") : file())),
+    );
+    const res = await client().requestFile(PROOF, { awList: [1] });
+    expect(res.contentType).toContain("pdf");
+    expect(calls).toBe(2);
   });
 });
 

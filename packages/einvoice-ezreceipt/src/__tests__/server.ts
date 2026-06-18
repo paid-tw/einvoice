@@ -28,6 +28,10 @@ export const okToken = (token = "tok_test") =>
 /** An error envelope `{ code, message }` (code is the COIMOTION numeric code). */
 export const fail = (code: number, message = "err") => HttpResponse.json({ code, message });
 
+/** A binary file response (for proof/print endpoints). Defaults to a `%PDF` stub. */
+export const file = (bytes: number[] = [0x25, 0x50, 0x44, 0x46], contentType = "application/pdf") =>
+  new HttpResponse(new Uint8Array(bytes), { headers: { "content-type": contentType } });
+
 /** The default login handler — most flows need a token first. */
 export const loginHandler = (token = "tok_test") => http.post(url("/admin/user/login"), () => okToken(token));
 

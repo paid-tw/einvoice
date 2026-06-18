@@ -2,7 +2,7 @@ import { Capability, supports } from "@paid-tw/einvoice";
 import { http } from "msw";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { EZRECEIPT_ENDPOINTS as EP, ezreceiptTaxType } from "../index.js";
-import { fail, listResolves, loginHandler, ok, server, testProvider, url } from "./server.js";
+import { fail, file, listResolves, loginHandler, ok, server, testProvider, url } from "./server.js";
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => server.resetHandlers());
@@ -454,6 +454,23 @@ describe("listInvoices (extension)", () => {
     );
     await testProvider().listInvoices({ fromTime: "2026-01-01 00:00:00", toTime: "2026-06-30 23:59:59", voided: true });
     expect(body).toEqual({ fromTime: "2026-01-01 00:00:00", toTime: "2026-06-30 23:59:59", isVoid: 1 });
+  });
+});
+
+describe("printAllowance (extension)", () => {
+  it("requests the allowance print file and returns the bytes", async () => {
+    let body: Record<string, unknown> | undefined;
+    server.use(
+      loginHandler(),
+      http.post(url(EP.proofAwPrint), async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>;
+        return file([0x25, 0x50, 0x44, 0x46]);
+      }),
+    );
+    const res = await testProvider().printAllowance([888], { zipped: true, format: 2 });
+    expect(body).toEqual({ awList: [888], isZipped: true, format: 2 });
+    expect(res.contentType).toContain("pdf");
+    expect(res.data.length).toBe(4);
   });
 });
 
