@@ -62,6 +62,28 @@ describe("issue (Issue)", () => {
     expect(captured?.data.Items).toHaveLength(1);
   });
 
+  it("maps the tax type onto the wire TaxType (TAXABLE→1 / ZERO_RATED→2 / TAX_FREE→3)", async () => {
+    let captured: Awaited<ReturnType<typeof parseRequest>> | undefined;
+    server.use(
+      http.post(url(ECPAY_ENDPOINTS.issue), async ({ request }) => {
+        captured = parseRequest(await request.text());
+        return HttpResponse.json(ecSuccess(ISSUE_OK));
+      }),
+    );
+    const cases: Array<[IssueInvoiceInput["taxType"], string]> = [
+      ["TAXABLE", "1"],
+      ["ZERO_RATED", "2"],
+      ["TAX_FREE", "3"],
+    ];
+    for (const [taxType, code] of cases) {
+      await testProvider().issue(
+        // ECPay requires a customs-clearance mark for zero-rated invoices.
+        issueInput({ taxType, ...(taxType === "ZERO_RATED" ? { providerOptions: { clearanceMark: "1" } } : {}) }),
+      );
+      expect(captured?.data.TaxType).toBe(code);
+    }
+  });
+
   it("sends B2B fields (CustomerIdentifier, Print=1) for a 統編 buyer", async () => {
     let data: Record<string, unknown> | undefined;
     server.use(
@@ -137,6 +159,22 @@ describe("issue (Issue)", () => {
 });
 
 describe("void / allowance / voidAllowance", () => {
+  it("rejects an allowance with an inconsistent amount before the network (shared schema guard)", async () => {
+    // amountSummarySchema enforces salesAmount + taxAmount === totalAmount for
+    // allowances too — this must reject (without any HTTP call). NOTE: the
+    // allowance path surfaces the schema's ZodError directly (unlike issue,
+    // which wraps validation in InvoiceError via assertValidIssuePayload).
+    await expect(
+      testProvider().allowance({
+        invoiceNumber: "JU11082062",
+        allowanceId: "A1",
+        items: [{ description: "退貨", quantity: 1, unitPrice: 100, amount: 100 }],
+        amount: { salesAmount: 100, taxAmount: 50, totalAmount: 999 },
+        providerOptions: { invoiceDate: "2026-06-17" },
+      }),
+    ).rejects.toThrow(/totalAmount must equal salesAmount/);
+  });
+
   it("void posts InvoiceNo + InvoiceDate + Reason", async () => {
     let data: Record<string, unknown> | undefined;
     server.use(

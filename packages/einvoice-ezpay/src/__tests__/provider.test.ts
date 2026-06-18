@@ -75,6 +75,34 @@ describe("issue (invoice_issue)", () => {
     });
   });
 
+  it("maps the tax type onto the wire TaxType (TAXABLE→1 / ZERO_RATED→2 / TAX_FREE→3)", async () => {
+    let captured: ReturnType<typeof parsePostData> | undefined;
+    server.use(
+      http.post(url(EZPAY_ENDPOINTS.issue), async ({ request }) => {
+        captured = parsePostData(await request.text());
+        return HttpResponse.json(ezSuccess(withCheckCode(ISSUE_OK)));
+      }),
+    );
+    const cases: Array<[IssueInvoiceInput["taxType"], string]> = [
+      ["TAXABLE", "1"],
+      ["ZERO_RATED", "2"],
+      ["TAX_FREE", "3"],
+    ];
+    for (const [taxType, code] of cases) {
+      const taxAmount = taxType === "TAXABLE" ? 5 : 0;
+      await testProvider().issue(
+        issueInput({
+          taxType,
+          items: [{ description: "品", quantity: 1, unitPrice: 100 + taxAmount, amount: 100 + taxAmount }],
+          amount: { salesAmount: 100, taxAmount, totalAmount: 100 + taxAmount },
+          // ezPay requires a customs-clearance mark for zero-rated invoices.
+          ...(taxType === "ZERO_RATED" ? { providerOptions: { CustomsClearance: "1" } } : {}),
+        }),
+      );
+      expect(captured?.params.TaxType).toBe(code);
+    }
+  });
+
   it("sends B2B fields (Category, BuyerUBN) for a 統編 buyer", async () => {
     let p: Record<string, string> | undefined;
     server.use(
