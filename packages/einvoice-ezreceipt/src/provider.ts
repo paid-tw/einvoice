@@ -3,6 +3,8 @@ import {
   InvoiceError,
   InvoiceErrorCode,
   InvoiceStatus,
+  parseTaipeiDate,
+  taipeiDateTime,
   type AllowanceInput,
   type AllowanceResult,
   type InvoiceProvider,
@@ -17,7 +19,6 @@ import {
 } from "@paid-tw/einvoice";
 import { EzreceiptClient } from "./client.js";
 import { type EzreceiptConfig } from "./config.js";
-import { parseDate, taipeiDateTime } from "./dates.js";
 import { ENDPOINTS } from "./endpoints.js";
 import { CARRIER_TYPE, carrierInfo, toBuyer, toProdItem } from "./mapping.js";
 import type {
@@ -69,7 +70,7 @@ export class EzreceiptProvider implements InvoiceProvider {
     const r = await this.client.request<Record<string, unknown>>(ENDPOINTS.issue, this.buildIssueBody(input));
     return {
       invoiceNumber: String(r.invNo ?? ""),
-      invoiceDate: parseDate(r.createTime ?? r.invoiceTime),
+      invoiceDate: parseTaipeiDate(r.createTime ?? r.invoiceTime),
       randomCode: String(r.randNo ?? ""),
       orderId: input.orderId,
       totalAmount: input.amount.totalAmount,
@@ -119,7 +120,7 @@ export class EzreceiptProvider implements InvoiceProvider {
     return {
       allowanceNumber: String(r.awNo ?? ""),
       invoiceNumber: input.invoiceNumber,
-      allowanceDate: parseDate(r.createTime),
+      allowanceDate: parseTaipeiDate(r.createTime),
       totalAmount: input.amount.totalAmount,
       raw: r,
     };
@@ -147,7 +148,7 @@ export class EzreceiptProvider implements InvoiceProvider {
     const buyer = (r.buyer ?? {}) as Record<string, unknown>;
     return {
       invoiceNumber: String(r.invNo ?? ""),
-      invoiceDate: parseDate(r.invoiceTime),
+      invoiceDate: parseTaipeiDate(r.invoiceTime),
       randomCode: String(r.randNo ?? ""),
       orderId: r.orderNo ? String(r.orderNo) : undefined,
       // procState: 11 已開立, 13 已作廢, 30 已註銷 — both 13 and 30 are cancelled.

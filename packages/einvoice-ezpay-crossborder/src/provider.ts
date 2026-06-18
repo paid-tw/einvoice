@@ -3,6 +3,7 @@ import {
   InvoiceError,
   InvoiceErrorCode,
   InvoiceStatus,
+  parseTaipeiDate,
   type AllowanceInput,
   type AllowanceResult,
   type InvoiceItem,
@@ -58,14 +59,6 @@ function joinItems(items: InvoiceItem[], foreign: boolean): Record<string, strin
   };
 }
 
-/** Parse an ezPay datetime ("YYYY-MM-DD HH:mm:ss", Asia/Taipei) into a Date. */
-function parseDate(value: unknown): Date {
-  const m = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/.exec(String(value ?? "").trim());
-  if (!m) return new Date();
-  const [, y, mo, d, hh, mi, ss] = m;
-  return new Date(`${y}-${mo}-${d}T${hh}:${mi}:${ss}+08:00`);
-}
-
 /**
  * ezPay 境外電商 (CES) provider — foreign-currency-native B2C e-invoices.
  *
@@ -99,7 +92,7 @@ export class EzpayCrossBorderProvider implements InvoiceProvider {
     this.verifyIssueCheckCode(r);
     return {
       invoiceNumber: String(r.InvoiceNumber ?? ""),
-      invoiceDate: parseDate(r.CreateTime),
+      invoiceDate: parseTaipeiDate(r.CreateTime),
       randomCode: String(r.RandomNum ?? ""),
       orderId: input.orderId,
       totalAmount: Number(r.TotalAmt ?? input.amount.totalAmount),
@@ -140,7 +133,7 @@ export class EzpayCrossBorderProvider implements InvoiceProvider {
     this.verifyIssueCheckCode(r);
     return {
       invoiceNumber: String(r.InvoiceNumber ?? ""),
-      invoiceDate: parseDate(r.CreateTime),
+      invoiceDate: parseTaipeiDate(r.CreateTime),
       randomCode: String(r.RandomNum ?? ""),
       orderId: args.orderId,
       totalAmount: Number(r.TotalAmt ?? args.totalAmount),
@@ -244,7 +237,7 @@ export class EzpayCrossBorderProvider implements InvoiceProvider {
     const items: InvoiceItem[] = parseItemDetail(r.ItemDetail);
     return {
       invoiceNumber: String(r.InvoiceNumber ?? ""),
-      invoiceDate: parseDate(r.CreateTime),
+      invoiceDate: parseTaipeiDate(r.CreateTime),
       randomCode: String(r.RandomNum ?? ""),
       orderId: r.MerchantOrderNo ? String(r.MerchantOrderNo) : undefined,
       status: String(r.InvoiceStatus) === "2" ? InvoiceStatus.VOIDED : InvoiceStatus.ISSUED,

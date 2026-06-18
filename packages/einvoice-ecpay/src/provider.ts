@@ -21,6 +21,7 @@ import {
   allowanceInputSchema,
   issueInvoiceInputSchema,
   queryInvoiceInputSchema,
+  taipeiDateTime,
   voidAllowanceInputSchema,
   voidInvoiceInputSchema,
 } from "@paid-tw/einvoice";
@@ -913,22 +914,6 @@ function taipeiDate(date?: Date): string {
     month: "2-digit",
     day: "2-digit",
   }).format(date ?? new Date());
-}
-
-/** Format a Date as `YYYY-MM-DD HH:mm:ss` in Asia/Taipei (24-hour). */
-function taipeiDateTime(date: Date): string {
-  return new Intl.DateTimeFormat("sv-SE", {
-    timeZone: "Asia/Taipei",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  })
-    .format(date)
-    .replace("T", " ");
 }
 
 function stringOrUndef(value: unknown, placeholder?: string): string | undefined {
