@@ -289,7 +289,7 @@ describe("allowance (g0401) — array, tax-exclusive, per-line Tax", () => {
     expect(arr[0]?.AllowanceNumber).toBe("ALW-1");
     expect(arr[0]?.TotalAmount).toBe(100); // 未稅 合計
     expect(arr[0]?.TaxAmount).toBe(5);
-    const item = (arr[0]?.ProductItem as Array<Record<string, unknown>>)[0];
+    const item = (arr[0]!.ProductItem as Array<Record<string, unknown>>)[0];
     expect(item?.OriginalInvoiceNumber).toBe("AA26513024");
     expect(item?.Tax).toBe(5);
     // g0401 returns no number — adapter echoes the supplied id.

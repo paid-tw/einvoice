@@ -337,9 +337,10 @@ export class EzreceiptProvider implements InvoiceProvider {
    * filter by `compType` (1 稅籍登記 / 2 非營利團體 / 3 學校).
    */
   async lookupBusiness(nid: string, opts: { compType?: 1 | 2 | 3 } = {}): Promise<BusinessInfo[]> {
-    const r = await this.client.request<{ list?: BusinessInfo[] }>(ENDPOINTS.openTaxGuidList(nid), {
-      ...(opts.compType != null ? { compType: opts.compType } : {}),
-    });
+    const r = await this.client.request<{ list?: BusinessInfo[] }>(
+      ENDPOINTS.openTaxGuidList(nid),
+      opts.compType != null ? { compType: opts.compType } : {},
+    );
     return r.list ?? [];
   }
 
@@ -459,9 +460,10 @@ export class EzreceiptProvider implements InvoiceProvider {
     inID: string | number,
     opts: { forGUINo?: boolean } = {},
   ): Promise<{ inID: number }> {
-    return this.client.request<{ inID: number }>(ENDPOINTS.settingsDefaultGUINo(inID), {
-      ...(opts.forGUINo != null ? { isForGUINo: opts.forGUINo } : {}),
-    });
+    return this.client.request<{ inID: number }>(
+      ENDPOINTS.settingsDefaultGUINo(inID),
+      opts.forGUINo != null ? { isForGUINo: opts.forGUINo } : {},
+    );
   }
 
   /** 商標識別碼清單 — list this store's uploaded logo ids (sgoID). */
@@ -638,7 +640,7 @@ export class EzreceiptProvider implements InvoiceProvider {
       prodList: input.items.map((item) => toProdItem(item, input)),
       // Record the caller's orderId as the order number (reconciliation); extend
       // with title/discount/xportFee via providerOptions.order.
-      order: { orderNo: input.orderId, ...((opts.order as Record<string, unknown>) ?? {}) },
+      order: { orderNo: input.orderId, ...(opts.order as Record<string, unknown>) },
       trCode: opts.trCode ?? 0,
       msgType: opts.msgType ?? 1,
       ...(input.currency && input.currency !== "TWD" ? { currency: input.currency } : {}),

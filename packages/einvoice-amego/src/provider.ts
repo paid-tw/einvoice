@@ -118,7 +118,7 @@ export class AmegoProvider implements InvoiceProvider {
         Remark: item.remark,
         TaxType: resolveItemTaxType(item, parsed.taxType),
       })),
-      ...(parsed.providerOptions ?? {}),
+      ...parsed.providerOptions,
     };
 
     if (this.config.validatePayload !== false) assertValidIssuePayload(data);

@@ -869,7 +869,7 @@ describe("voidWithReissue (VoidWithReIssue / 註銷重開)", () => {
       invoiceDate: new Date("2026-06-17T06:48:54Z"),
       reissue,
     });
-    expect((data?.IssueModel as Record<string, unknown>).InvoiceDate).toBe("2026-06-17 14:48:54");
+    expect((data!.IssueModel as Record<string, unknown>).InvoiceDate).toBe("2026-06-17 14:48:54");
   });
 
   it("rejects a VoidReason longer than 20 chars locally", async () => {

@@ -222,7 +222,7 @@ export class EzpayProvider implements InvoiceProvider {
       ItemPrice: parsed.items.map((i) => i.unitPrice).join("|"),
       ItemAmt: parsed.items.map((i) => i.amount).join("|"),
       Comment: parsed.remark,
-      ...(parsed.providerOptions ?? {}),
+      ...parsed.providerOptions,
     } as Record<string, string | number | undefined>;
 
     if (this.config.validatePayload !== false) assertValidIssuePayload(postData);
@@ -276,7 +276,7 @@ export class EzpayProvider implements InvoiceProvider {
       MerchantOrderNo: opts.orderId,
       TotalAmt: opts.totalAmount,
       TransNum: opts.transNum,
-      ...(opts.providerOptions ?? {}),
+      ...opts.providerOptions,
     };
     this.validate(assertValidTouchIssuePayload, postData);
     const { result, raw } = await ezpayRequest(this.config, ENDPOINTS.touchIssue.path, postData);
@@ -300,7 +300,7 @@ export class EzpayProvider implements InvoiceProvider {
       TimeStamp: ezpayTimestamp(),
       InvoiceNumber: parsed.invoiceNumber,
       InvalidReason: parsed.reason,
-      ...(parsed.providerOptions ?? {}),
+      ...parsed.providerOptions,
     };
     this.validate(assertValidVoidPayload, postData);
     const { raw } = await ezpayRequest(this.config, ENDPOINTS.void.path, postData);
@@ -350,7 +350,7 @@ export class EzpayProvider implements InvoiceProvider {
       TimeStamp: ezpayTimestamp(),
       AllowanceNo: parsed.allowanceNumber,
       InvalidReason: parsed.reason ?? "作廢折讓",
-      ...(parsed.providerOptions ?? {}),
+      ...parsed.providerOptions,
     };
     this.validate(assertValidVoidAllowancePayload, postData);
     const { raw } = await ezpayRequest(this.config, ENDPOINTS.voidAllowance.path, postData);
@@ -372,7 +372,7 @@ export class EzpayProvider implements InvoiceProvider {
       AllowanceNo: opts.allowanceNumber,
       MerchantOrderNo: opts.orderId,
       TotalAmt: opts.totalAmount,
-      ...(opts.providerOptions ?? {}),
+      ...opts.providerOptions,
     };
     this.validate(assertValidAllowanceTouchPayload, postData);
     const { result, raw } = await ezpayRequest(

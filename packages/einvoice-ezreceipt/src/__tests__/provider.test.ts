@@ -199,7 +199,7 @@ describe("issue", () => {
       randNo: "1234",
     });
     // ZERO_RATED item → taxType 2
-    expect((cap.body?.prodList as Array<{ taxType: number }>)[0]?.taxType).toBe(2);
+    expect((cap.body!.prodList as Array<{ taxType: number }>)[0]?.taxType).toBe(2);
   });
 
   it("records the orderId as order.orderNo and passes sendTo / credit4 / order overrides", async () => {
