@@ -495,6 +495,29 @@ describe("logo settings (extension)", () => {
     server.use(loginHandler(), http.post(url(EP.settingsViewLogo(9)), () => fail(32, "商標識別碼無效")));
     await expect(testProvider().viewLogo(9)).rejects.toMatchObject({ code: "NOT_FOUND", rawCode: "32" });
   });
+
+  it("uploads a new logo as multipart (files field) and returns the sgoID", async () => {
+    let contentType: string | null = null;
+    let hadFile = false;
+    server.use(
+      loginHandler(),
+      http.post(url(EP.settingsUploadLogo()), async ({ request }) => {
+        contentType = request.headers.get("content-type");
+        const form = await request.formData();
+        hadFile = form.get("files") instanceof Blob;
+        return ok({ sgoID: 99 });
+      }),
+    );
+    const res = await testProvider().uploadLogo({ data: new Uint8Array([0x89, 0x50, 0x4e, 0x47]), contentType: "image/png", filename: "brand.png" });
+    expect(res.sgoID).toBe(99);
+    expect(contentType).toContain("multipart/form-data");
+    expect(hadFile).toBe(true);
+  });
+
+  it("replaces an existing logo via the sgoID path; maps the limit (1334) to VALIDATION", async () => {
+    server.use(loginHandler(), http.post(url(EP.settingsUploadLogo(7)), () => fail(1334, "可使用的商標數量已達上限")));
+    await expect(testProvider().uploadLogo({ data: new Uint8Array([1]) }, { sgoID: 7 })).rejects.toMatchObject({ code: "VALIDATION", rawCode: "1334" });
+  });
 });
 
 describe("printInvoice (extension)", () => {

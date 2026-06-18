@@ -199,8 +199,24 @@ export class EzreceiptClient {
     });
   }
 
+  /**
+   * Authenticated MULTIPART upload — for endpoints that take a file (e.g. logo
+   * upload). The `buildForm` thunk is called per attempt so the body can be
+   * rebuilt for the `-3` re-login retry. Returns `value` on success, else throws.
+   */
+  async requestUpload<T = Record<string, unknown>>(path: string, buildForm: () => FormData): Promise<T> {
+    await this.ensureToken();
+    let env = await this.post(path, buildForm());
+    if (env.code === -3) {
+      await this.login();
+      env = await this.post(path, buildForm());
+    }
+    if (env.code !== 0) throw this.envError(env);
+    return (env.value ?? {}) as T;
+  }
+
   /** Low-level POST returning the raw envelope (no error throwing). */
-  private async post(path: string, body?: Record<string, unknown>): Promise<EzreceiptEnvelope> {
+  private async post(path: string, body?: Record<string, unknown> | FormData): Promise<EzreceiptEnvelope> {
     const res = await this.postRaw(path, body);
     try {
       return (await res.json()) as EzreceiptEnvelope;
@@ -215,14 +231,16 @@ export class EzreceiptClient {
   }
 
   /** Low-level POST returning the raw {@link Response} (NETWORK error on transport failure). */
-  private async postRaw(path: string, body?: Record<string, unknown>): Promise<Response> {
+  private async postRaw(path: string, body?: Record<string, unknown> | FormData): Promise<Response> {
     const doFetch = this.config.fetch ?? fetch;
+    const isForm = typeof FormData !== "undefined" && body instanceof FormData;
     const headers: Record<string, string> = {
-      "content-type": "application/json",
       "x-deva-appcode": this.config.appCode,
       "x-deva-appkey": this.config.appKey,
       "x-deva-locale": "zh",
     };
+    // For multipart, let fetch set content-type (it adds the boundary).
+    if (!isForm) headers["content-type"] = "application/json";
     if (this.token && path !== ENDPOINTS.login) headers["x-deva-token"] = this.token;
     if (this.config.stID != null) headers["x-deva-stid"] = String(this.config.stID);
 
@@ -230,7 +248,7 @@ export class EzreceiptClient {
       return await doFetch(`${resolveBaseUrl(this.config)}${path}`, {
         method: "POST",
         headers,
-        body: JSON.stringify(body ?? {}),
+        body: isForm ? (body as FormData) : JSON.stringify(body ?? {}),
         signal: this.config.timeoutMs ? AbortSignal.timeout(this.config.timeoutMs) : undefined,
       });
     } catch (cause) {

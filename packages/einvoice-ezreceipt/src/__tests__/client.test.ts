@@ -170,6 +170,45 @@ describe("requestFile (binary)", () => {
   });
 });
 
+describe("requestUpload (multipart)", () => {
+  const UP = EZRECEIPT_ENDPOINTS.settingsUploadLogo();
+
+  it("posts multipart without a JSON content-type and returns value", async () => {
+    let ct: string | null = null;
+    server.use(
+      http.post(url("/admin/user/login"), () => okToken()),
+      http.post(url(UP), ({ request }) => {
+        ct = request.headers.get("content-type");
+        return ok({ sgoID: 5 });
+      }),
+    );
+    const form = () => {
+      const f = new FormData();
+      f.append("files", new Blob([new Uint8Array([1, 2])], { type: "image/png" }), "l.png");
+      return f;
+    };
+    const res = await client().requestUpload<{ sgoID: number }>(UP, form);
+    expect(res.sgoID).toBe(5);
+    expect(ct).toContain("multipart/form-data");
+    expect(ct).not.toContain("application/json");
+  });
+
+  it("rebuilds the form and re-logs in once on -3", async () => {
+    let calls = 0;
+    server.use(
+      http.post(url("/admin/user/login"), () => okToken()),
+      http.post(url(UP), () => (++calls === 1 ? fail(-3, "Invalid token.") : ok({ sgoID: 6 }))),
+    );
+    const res = await client().requestUpload<{ sgoID: number }>(UP, () => {
+      const f = new FormData();
+      f.append("files", new Blob([new Uint8Array([1])]), "l.png");
+      return f;
+    });
+    expect(res.sgoID).toBe(6);
+    expect(calls).toBe(2);
+  });
+});
+
 describe("mapEzreceiptError (table-driven)", () => {
   it.each([
     [-3, "AUTH"],

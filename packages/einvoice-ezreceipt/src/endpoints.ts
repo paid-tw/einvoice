@@ -69,4 +69,6 @@ export const ENDPOINTS = {
   settingsListLogo: "/eInvoice/settings/listLogo",
   /** 讀取商標圖檔 (by sgoID) — BINARY image. Body: `{ w?, h?, maxw?, maxh? }`. */
   settingsViewLogo: (sgoID: string | number) => `/eInvoice/settings/viewLogo/${sgoID}`,
+  /** 上傳商標圖檔 (MULTIPART `files`; sgoID in path = replace, omit = new). */
+  settingsUploadLogo: (sgoID?: string | number) => `/eInvoice/settings/uploadLogo${sgoID != null ? `/${sgoID}` : ""}`,
 } as const;

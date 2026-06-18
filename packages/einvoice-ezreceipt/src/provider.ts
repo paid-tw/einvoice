@@ -572,6 +572,25 @@ export class EzreceiptProvider implements InvoiceProvider {
   }
 
   /**
+   * 上傳商標圖檔 — store a logo image (printed as the invoice header). Pass
+   * `sgoID` to replace an existing logo, omit it to add a new one.
+   *
+   * NOTE: live-unverified — the TEST environment returns `-100 系統內部錯誤` for
+   * this endpoint regardless of a valid multipart PNG; the wire format here is
+   * the documented one (`files` field) and is covered by MSW tests.
+   */
+  async uploadLogo(
+    image: { data: Uint8Array | ArrayBuffer; filename?: string; contentType?: string },
+    opts: { sgoID?: number } = {},
+  ): Promise<{ sgoID: number }> {
+    return this.client.requestUpload<{ sgoID: number }>(ENDPOINTS.settingsUploadLogo(opts.sgoID), () => {
+      const form = new FormData();
+      form.append("files", new Blob([image.data], { type: image.contentType ?? "application/octet-stream" }), image.filename ?? "logo.png");
+      return form;
+    });
+  }
+
+  /**
    * 讀取商標圖檔 — the logo image bytes (binary). Optional `w`/`h` resize, or
    * `maxw`/`maxh` to bound the size while keeping the aspect ratio.
    */
