@@ -1,5 +1,30 @@
 # @paid-tw/einvoice-amego
 
+## 0.4.0
+
+### Minor Changes
+
+- Observability, error-guard robustness, and a higher-fidelity test double.
+
+  - **Opt-in request tracing.** Set `debug` on any provider config to receive
+    metadata-only trace events (`provider` / `method` / `url` / `status` /
+    `durationMs` / `error`) for each HTTP call. Every adapter routes its fetch
+    through the new core `tracedFetch`; it is a zero-overhead passthrough when
+    `debug` is unset, and request/response bodies are never logged.
+  - **`isInvoiceError` now checks a `Symbol.for` brand**, not `instanceof`, so it
+    still narrows correctly when two copies of the package are loaded (dual
+    ESM/CJS, transitive version skew).
+  - **MockProvider fidelity.** Configurable `capabilities` (a non-TWD `currency` is
+    rejected with `UNSUPPORTED` when `FOREIGN_CURRENCY` is omitted), a tighter state
+    machine (`allowance` on a voided invoice → `CONFLICT`; `voidAllowance` checks
+    the allowance exists → `NOT_FOUND`), validation via the shared `parseInput`, and
+    `failNext(error)` to inject a one-shot failure for exercising error paths.
+
+### Patch Changes
+
+- Updated dependencies
+  - @paid-tw/einvoice@0.4.0
+
 ## 0.3.2
 
 ### Patch Changes

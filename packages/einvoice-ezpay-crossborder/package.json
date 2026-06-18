@@ -1,6 +1,6 @@
 {
   "name": "@paid-tw/einvoice-ezpay-crossborder",
-  "version": "0.1.4",
+  "version": "0.2.0",
   "description": "ezPay 境外電商 (cross-border e-commerce supplier) adapter for @paid-tw/einvoice — foreign-currency B2C e-invoices over the ezPay CES API.",
   "license": "MIT",
   "repository": {
