@@ -3,7 +3,18 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import type { IssueInvoiceInput } from "@paid-tw/einvoice";
 import { EZPAY_ENDPOINTS } from "../index.js";
 import { decryptPostData } from "../crypto.js";
-import { BASE, ezError, ezSuccess, IV, KEY, MERCHANT, parsePostData, server, testProvider, withCheckCode } from "./server.js";
+import {
+  BASE,
+  ezError,
+  ezSuccess,
+  IV,
+  KEY,
+  MERCHANT,
+  parsePostData,
+  server,
+  testProvider,
+  withCheckCode,
+} from "./server.js";
 
 /** Decrypt the PostData_ field of a built form into a params object. */
 function decodeForm(form: { MerchantID_: string; PostData_: string }) {
@@ -93,7 +104,9 @@ describe("issue (invoice_issue)", () => {
       await testProvider().issue(
         issueInput({
           taxType,
-          items: [{ description: "品", quantity: 1, unitPrice: 100 + taxAmount, amount: 100 + taxAmount }],
+          items: [
+            { description: "品", quantity: 1, unitPrice: 100 + taxAmount, amount: 100 + taxAmount },
+          ],
           amount: { salesAmount: 100, taxAmount, totalAmount: 100 + taxAmount },
           // ezPay requires a customs-clearance mark for zero-rated invoices.
           ...(taxType === "ZERO_RATED" ? { providerOptions: { CustomsClearance: "1" } } : {}),
@@ -105,7 +118,9 @@ describe("issue (invoice_issue)", () => {
 
   it("rejects invalid input as a normalized InvoiceError (parseInput, not a raw ZodError)", async () => {
     await expect(
-      testProvider().issue(issueInput({ amount: { salesAmount: 100, taxAmount: 5, totalAmount: 999 } })),
+      testProvider().issue(
+        issueInput({ amount: { salesAmount: 100, taxAmount: 5, totalAmount: 999 } }),
+      ),
     ).rejects.toMatchObject({ code: "VALIDATION", provider: "ezpay" });
   });
 
@@ -157,7 +172,9 @@ describe("issue (invoice_issue)", () => {
         HttpResponse.json(ezError("INV10013", "發票欄位資料不齊全或格式錯誤")),
       ),
     );
-    const err = await testProvider().issue(issueInput()).catch((e) => e);
+    const err = await testProvider()
+      .issue(issueInput())
+      .catch((e) => e);
     expect(err.code).toBe("VALIDATION");
     expect(err.rawCode).toBe("INV10013");
     expect(err.rawMessage).toBe("發票欄位資料不齊全或格式錯誤");
@@ -166,16 +183,18 @@ describe("issue (invoice_issue)", () => {
 
   it("rejects an ezPay-invalid built payload locally (MerchantOrderNo format)", async () => {
     // core accepts this orderId, but ezPay's MerchantOrderNo allows only [A-Za-z0-9_].
-    await expect(
-      testProvider().issue(issueInput({ orderId: "bad order!" })),
-    ).rejects.toMatchObject({ code: "VALIDATION", provider: "ezpay" });
+    await expect(testProvider().issue(issueInput({ orderId: "bad order!" }))).rejects.toMatchObject(
+      { code: "VALIDATION", provider: "ezpay" },
+    );
   });
 });
 
 describe("issue response CheckCode verification", () => {
   it("accepts a response whose CheckCode matches the 5 result fields", async () => {
     server.use(
-      http.post(url(EZPAY_ENDPOINTS.issue), () => HttpResponse.json(ezSuccess(withCheckCode(ISSUE_OK)))),
+      http.post(url(EZPAY_ENDPOINTS.issue), () =>
+        HttpResponse.json(ezSuccess(withCheckCode(ISSUE_OK))),
+      ),
     );
     const res = await testProvider().issue(issueInput());
     expect(res.invoiceNumber).toBe("DS12223139");
@@ -187,7 +206,9 @@ describe("issue response CheckCode verification", () => {
         HttpResponse.json(ezSuccess({ ...ISSUE_OK, CheckCode: "DEADBEEF" })),
       ),
     );
-    const err = await testProvider().issue(issueInput()).catch((e) => e);
+    const err = await testProvider()
+      .issue(issueInput())
+      .catch((e) => e);
     expect(err.code).toBe("PROVIDER");
     expect(err.rawCode).toBe("CHECKCODE_MISMATCH");
   });
@@ -222,20 +243,33 @@ describe("void (invoice_invalid)", () => {
       http.post(url(EZPAY_ENDPOINTS.void), async ({ request }) => {
         p = parsePostData(await request.text()).params;
         return HttpResponse.json(
-          ezSuccess({ MerchantID: MERCHANT, InvoiceNumber: "DS12223139", CreateTime: "2026-06-17 18:00:00", CheckCode: "X" }),
+          ezSuccess({
+            MerchantID: MERCHANT,
+            InvoiceNumber: "DS12223139",
+            CreateTime: "2026-06-17 18:00:00",
+            CheckCode: "X",
+          }),
         );
       }),
     );
     const res = await testProvider().void({ invoiceNumber: "DS12223139", reason: "客戶取消" });
-    expect(p).toMatchObject({ Version: "1.0", InvoiceNumber: "DS12223139", InvalidReason: "客戶取消" });
+    expect(p).toMatchObject({
+      Version: "1.0",
+      InvoiceNumber: "DS12223139",
+      InvalidReason: "客戶取消",
+    });
     expect(res.status).toBe("VOIDED");
   });
 
   it("maps a void state-conflict error (LIB10005 已作廢過) to CONFLICT", async () => {
     server.use(
-      http.post(url(EZPAY_ENDPOINTS.void), () => HttpResponse.json(ezError("LIB10005", "發票已作廢過"))),
+      http.post(url(EZPAY_ENDPOINTS.void), () =>
+        HttpResponse.json(ezError("LIB10005", "發票已作廢過")),
+      ),
     );
-    const err = await testProvider().void({ invoiceNumber: "DS1", reason: "x" }).catch((e) => e);
+    const err = await testProvider()
+      .void({ invoiceNumber: "DS1", reason: "x" })
+      .catch((e) => e);
     expect(err.code).toBe("CONFLICT");
     expect(err.rawCode).toBe("LIB10005");
   });
@@ -325,7 +359,9 @@ describe("觸發折讓 (triggerAllowance)", () => {
     server.use(
       http.post(url(EZPAY_ENDPOINTS.allowanceTouch), async ({ request }) => {
         p = parsePostData(await request.text()).params;
-        return HttpResponse.json(ezSuccess({ MerchantID: MERCHANT, AllowanceNo: "A26061710261630" }));
+        return HttpResponse.json(
+          ezSuccess({ MerchantID: MERCHANT, AllowanceNo: "A26061710261630" }),
+        );
       }),
     );
     const res = await testProvider().triggerAllowance({
@@ -402,7 +438,14 @@ describe("allowance / voidAllowance / query", () => {
       http.post(url(EZPAY_ENDPOINTS.allowance), async ({ request }) => {
         p = parsePostData(await request.text()).params;
         return HttpResponse.json(
-          ezSuccess({ MerchantID: MERCHANT, AllowanceNo: "A151015111705007", InvoiceNumber: "DS12223139", AllowanceAmt: 105, RemainAmt: 0, CheckCode: "X" }),
+          ezSuccess({
+            MerchantID: MERCHANT,
+            AllowanceNo: "A151015111705007",
+            InvoiceNumber: "DS12223139",
+            AllowanceAmt: 105,
+            RemainAmt: 0,
+            CheckCode: "X",
+          }),
         );
       }),
     );
@@ -412,7 +455,13 @@ describe("allowance / voidAllowance / query", () => {
       items: [{ description: "退款", quantity: 1, unitPrice: 100, amount: 100 }],
       amount: { salesAmount: 100, taxAmount: 5, totalAmount: 105 },
     });
-    expect(p).toMatchObject({ Version: "1.3", InvoiceNo: "DS12223139", ItemTaxAmt: "5", TotalAmt: "105", Status: "1" });
+    expect(p).toMatchObject({
+      Version: "1.3",
+      InvoiceNo: "DS12223139",
+      ItemTaxAmt: "5",
+      TotalAmt: "105",
+      Status: "1",
+    });
     expect(res.allowanceNumber).toBe("A151015111705007");
   });
 
@@ -421,10 +470,20 @@ describe("allowance / voidAllowance / query", () => {
     server.use(
       http.post(url(EZPAY_ENDPOINTS.voidAllowance), async ({ request }) => {
         p = parsePostData(await request.text()).params;
-        return HttpResponse.json(ezSuccess({ MerchantID: MERCHANT, AllowanceNo: "A1", CreateTime: "2026-06-17 18:00:00", CheckCode: "X" }));
+        return HttpResponse.json(
+          ezSuccess({
+            MerchantID: MERCHANT,
+            AllowanceNo: "A1",
+            CreateTime: "2026-06-17 18:00:00",
+            CheckCode: "X",
+          }),
+        );
       }),
     );
-    const res = await testProvider().voidAllowance({ invoiceNumber: "DS1", allowanceNumber: "A180528095517632" });
+    const res = await testProvider().voidAllowance({
+      invoiceNumber: "DS1",
+      allowanceNumber: "A180528095517632",
+    });
     expect(p).toMatchObject({ AllowanceNo: "A180528095517632" });
     expect(res.allowanceNumber).toBe("A180528095517632");
   });
@@ -450,7 +509,10 @@ describe("allowance / voidAllowance / query", () => {
         );
       }),
     );
-    const res = await testProvider().query({ invoiceNumber: "DS12223139", providerOptions: { randomNum: "4253" } });
+    const res = await testProvider().query({
+      invoiceNumber: "DS12223139",
+      providerOptions: { randomNum: "4253" },
+    });
     expect(p).toMatchObject({ SearchType: "0", InvoiceNumber: "DS12223139", RandomNum: "4253" });
     expect(res.amount).toEqual({ salesAmount: 100, taxAmount: 5, totalAmount: 105 });
     expect(res.buyer.ubn).toBe("28080623");
@@ -458,9 +520,13 @@ describe("allowance / voidAllowance / query", () => {
 
   it("query by orderId uses SearchType 1; INV20006 → NOT_FOUND", async () => {
     server.use(
-      http.post(url(EZPAY_ENDPOINTS.search), () => HttpResponse.json(ezError("INV20006", "查無發票資料"))),
+      http.post(url(EZPAY_ENDPOINTS.search), () =>
+        HttpResponse.json(ezError("INV20006", "查無發票資料")),
+      ),
     );
-    const err = await testProvider().query({ orderId: "NOPE", providerOptions: { totalAmt: 105 } }).catch((e) => e);
+    const err = await testProvider()
+      .query({ orderId: "NOPE", providerOptions: { totalAmt: 105 } })
+      .catch((e) => e);
     expect(err.code).toBe("NOT_FOUND");
     expect(err.rawCode).toBe("INV20006");
   });
@@ -480,7 +546,10 @@ describe("allowance / voidAllowance / query", () => {
         ),
       ),
     );
-    const res = await testProvider().query({ invoiceNumber: "BB00000001", providerOptions: { randomNum: "1234" } });
+    const res = await testProvider().query({
+      invoiceNumber: "BB00000001",
+      providerOptions: { randomNum: "1234" },
+    });
     expect(res.buyer.ubn).toBeUndefined();
   });
 });

@@ -21,7 +21,12 @@ import {
   type VoidInvoiceInput,
   type VoidInvoiceResult,
 } from "@paid-tw/einvoice";
-import { type EzpayConfig, ezpayRequest, ezpayTimestamp, makeCheckCode } from "@paid-tw/einvoice-ezpay";
+import {
+  type EzpayConfig,
+  ezpayRequest,
+  ezpayTimestamp,
+  makeCheckCode,
+} from "@paid-tw/einvoice-ezpay";
 import { CB_ENDPOINTS } from "./endpoints.js";
 import { assertValidCrossBorderIssue, resolveCurrency } from "./validation.js";
 
@@ -94,7 +99,11 @@ export class EzpayCrossBorderProvider implements InvoiceProvider {
     // shared issueInvoiceInputSchema — foreign-currency sales carry 2-decimal
     // amounts, which the core amountSummarySchema (integer-only) would reject.
     if (this.config.validatePayload !== false) assertValidCrossBorderIssue(input);
-    const res = await ezpayRequest(this.config, CB_ENDPOINTS.issue.path, this.buildIssuePostData(input, "1"));
+    const res = await ezpayRequest(
+      this.config,
+      CB_ENDPOINTS.issue.path,
+      this.buildIssuePostData(input, "1"),
+    );
     const r = res.result;
     this.verifyIssueCheckCode(r);
     return {
@@ -112,7 +121,10 @@ export class EzpayCrossBorderProvider implements InvoiceProvider {
    * 等待觸發 (Status=0) / 預約自動開立 (Status=3) — stages the invoice without a
    * number. Trigger it (or wait for the scheduled date) with {@link triggerIssue}.
    */
-  async issuePending(input: IssueInvoiceInput, options: IssuePendingOptions = {}): Promise<CrossBorderPendingInvoice> {
+  async issuePending(
+    input: IssueInvoiceInput,
+    options: IssuePendingOptions = {},
+  ): Promise<CrossBorderPendingInvoice> {
     const schedule = options.mode === "SCHEDULE";
     if (this.config.validatePayload !== false) {
       assertValidCrossBorderIssue(input);
@@ -122,11 +134,20 @@ export class EzpayCrossBorderProvider implements InvoiceProvider {
     }
     const postData = this.buildIssuePostData(input, schedule ? "3" : "0", options.createStatusTime);
     const res = await ezpayRequest(this.config, CB_ENDPOINTS.issue.path, postData);
-    return { invoiceTransNo: String(res.result.InvoiceTransNo ?? ""), orderId: input.orderId, raw: res.raw };
+    return {
+      invoiceTransNo: String(res.result.InvoiceTransNo ?? ""),
+      orderId: input.orderId,
+      raw: res.raw,
+    };
   }
 
   /** 觸發開立 — issue a staged (Status 0/3) invoice now. */
-  async triggerIssue(args: { invoiceTransNo: string; orderId: string; totalAmount: number; currency?: string }): Promise<IssueInvoiceResult> {
+  async triggerIssue(args: {
+    invoiceTransNo: string;
+    orderId: string;
+    totalAmount: number;
+    currency?: string;
+  }): Promise<IssueInvoiceResult> {
     const foreign = (args.currency ?? "TWD").toUpperCase() !== "TWD";
     const res = await ezpayRequest(this.config, CB_ENDPOINTS.triggerIssue.path, {
       RespondType: "JSON",
@@ -200,12 +221,22 @@ export class EzpayCrossBorderProvider implements InvoiceProvider {
   }
 
   /** 觸發確認折讓 (C) — upload a pending (Status=0) allowance to the MOF. */
-  async confirmAllowance(args: { allowanceNumber: string; orderId: string; totalAmount: number; currency?: string }): Promise<VoidAllowanceResult> {
+  async confirmAllowance(args: {
+    allowanceNumber: string;
+    orderId: string;
+    totalAmount: number;
+    currency?: string;
+  }): Promise<VoidAllowanceResult> {
     return this.touchAllowance("C", args);
   }
 
   /** 觸發取消折讓 (D) — cancel a still-pending allowance. */
-  async cancelAllowance(args: { allowanceNumber: string; orderId: string; totalAmount: number; currency?: string }): Promise<VoidAllowanceResult> {
+  async cancelAllowance(args: {
+    allowanceNumber: string;
+    orderId: string;
+    totalAmount: number;
+    currency?: string;
+  }): Promise<VoidAllowanceResult> {
     return this.touchAllowance("D", args);
   }
 
@@ -222,7 +253,10 @@ export class EzpayCrossBorderProvider implements InvoiceProvider {
       AllowanceNo: input.allowanceNumber,
       InvalidReason: input.reason ?? "作廢折讓",
     });
-    return { allowanceNumber: String(res.result.AllowanceNo ?? input.allowanceNumber), raw: res.raw };
+    return {
+      allowanceNumber: String(res.result.AllowanceNo ?? input.allowanceNumber),
+      raw: res.raw,
+    };
   }
 
   /**
@@ -232,13 +266,27 @@ export class EzpayCrossBorderProvider implements InvoiceProvider {
   async query(input: QueryInvoiceInput): Promise<QueryInvoiceResult> {
     parseInput(queryInvoiceInputSchema, input, "ezpay-crossborder");
     const opts = (input.providerOptions ?? {}) as Record<string, unknown>;
-    const base = { RespondType: "JSON", Version: CB_ENDPOINTS.search.version, TimeStamp: ezpayTimestamp() };
+    const base = {
+      RespondType: "JSON",
+      Version: CB_ENDPOINTS.search.version,
+      TimeStamp: ezpayTimestamp(),
+    };
     let postData: Record<string, string | number | undefined>;
     if (input.orderId) {
-      const foreign = (opts.currency as string | undefined ?? "TWD").toUpperCase() !== "TWD";
-      postData = { ...base, SearchType: "1", MerchantOrderNo: input.orderId, TotalAmt: fmtAmount(Number(opts.totalAmount), foreign) };
+      const foreign = ((opts.currency as string | undefined) ?? "TWD").toUpperCase() !== "TWD";
+      postData = {
+        ...base,
+        SearchType: "1",
+        MerchantOrderNo: input.orderId,
+        TotalAmt: fmtAmount(Number(opts.totalAmount), foreign),
+      };
     } else if (input.invoiceNumber) {
-      postData = { ...base, SearchType: "0", InvoiceNumber: input.invoiceNumber, RandomNum: String(opts.randomCode ?? "") };
+      postData = {
+        ...base,
+        SearchType: "0",
+        InvoiceNumber: input.invoiceNumber,
+        RandomNum: String(opts.randomCode ?? ""),
+      };
     } else {
       throw fail("query requires invoiceNumber (+ randomCode) or orderId (+ totalAmount)");
     }
@@ -251,8 +299,16 @@ export class EzpayCrossBorderProvider implements InvoiceProvider {
       randomCode: String(r.RandomNum ?? ""),
       orderId: r.MerchantOrderNo ? String(r.MerchantOrderNo) : undefined,
       status: String(r.InvoiceStatus) === "2" ? InvoiceStatus.VOIDED : InvoiceStatus.ISSUED,
-      amount: { salesAmount: Number(r.Amt ?? 0), taxAmount: Number(r.TaxAmt ?? 0), totalAmount: Number(r.TotalAmt ?? 0) },
-      buyer: { name: r.BuyerName ? String(r.BuyerName) : undefined, address: r.BuyerAddress ? String(r.BuyerAddress) : undefined, email: r.BuyerEmail ? String(r.BuyerEmail) : undefined },
+      amount: {
+        salesAmount: Number(r.Amt ?? 0),
+        taxAmount: Number(r.TaxAmt ?? 0),
+        totalAmount: Number(r.TotalAmt ?? 0),
+      },
+      buyer: {
+        name: r.BuyerName ? String(r.BuyerName) : undefined,
+        address: r.BuyerAddress ? String(r.BuyerAddress) : undefined,
+        email: r.BuyerEmail ? String(r.BuyerEmail) : undefined,
+      },
       items,
       raw: res.raw,
     };
@@ -272,7 +328,10 @@ export class EzpayCrossBorderProvider implements InvoiceProvider {
       MerchantOrderNo: args.orderId,
       TotalAmt: fmtAmount(args.totalAmount, foreign),
     });
-    return { allowanceNumber: String(res.result.AllowanceNo ?? args.allowanceNumber), raw: res.raw };
+    return {
+      allowanceNumber: String(res.result.AllowanceNo ?? args.allowanceNumber),
+      raw: res.raw,
+    };
   }
 
   /**
@@ -296,12 +355,15 @@ export class EzpayCrossBorderProvider implements InvoiceProvider {
       this.config.hashIV,
     );
     if (expected !== String(r.CheckCode ?? "")) {
-      throw new InvoiceError("ezPay cross-border response CheckCode mismatch — possible tampering", {
-        provider: "ezpay-crossborder",
-        code: InvoiceErrorCode.PROVIDER,
-        rawMessage: "CheckCode mismatch",
-        raw: r,
-      });
+      throw new InvoiceError(
+        "ezPay cross-border response CheckCode mismatch — possible tampering",
+        {
+          provider: "ezpay-crossborder",
+          code: InvoiceErrorCode.PROVIDER,
+          rawMessage: "CheckCode mismatch",
+          raw: r,
+        },
+      );
     }
   }
 
@@ -338,7 +400,12 @@ export class EzpayCrossBorderProvider implements InvoiceProvider {
 function parseItemDetail(value: unknown): InvoiceItem[] {
   let rows: Array<Record<string, unknown>>;
   try {
-    rows = typeof value === "string" ? JSON.parse(value) : Array.isArray(value) ? (value as Array<Record<string, unknown>>) : [];
+    rows =
+      typeof value === "string"
+        ? JSON.parse(value)
+        : Array.isArray(value)
+          ? (value as Array<Record<string, unknown>>)
+          : [];
   } catch {
     rows = [];
   }
@@ -352,6 +419,8 @@ function parseItemDetail(value: unknown): InvoiceItem[] {
 }
 
 /** Create an ezPay cross-border {@link InvoiceProvider}. */
-export function createEzpayCrossBorderProvider(config: EzpayCrossBorderConfig): EzpayCrossBorderProvider {
+export function createEzpayCrossBorderProvider(
+  config: EzpayCrossBorderConfig,
+): EzpayCrossBorderProvider {
   return new EzpayCrossBorderProvider(config);
 }

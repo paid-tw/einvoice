@@ -5,7 +5,11 @@ import type { EcpayResult } from "./client.js";
 
 /** 字軌狀態: 停用 / 暫停 / 啟用. */
 export type EcpayWordStatus = "DISABLE" | "PAUSE" | "ENABLE";
-export const WORD_STATUS_CODE: Record<EcpayWordStatus, number> = { DISABLE: 0, PAUSE: 1, ENABLE: 2 };
+export const WORD_STATUS_CODE: Record<EcpayWordStatus, number> = {
+  DISABLE: 0,
+  PAUSE: 1,
+  ENABLE: 2,
+};
 
 /** A 字軌's use status (UseStatus 1–6). */
 export type EcpayWordTrackStatus =

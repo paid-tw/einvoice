@@ -69,8 +69,20 @@ const CASES: Array<{
   {
     name: "invoice.print by orderId + print_invoice_type/detail",
     path: ENDPOINTS.invoicePrint,
-    invoke: (p) => p.invoice.print({ orderId: "O1", printerType: 2, printInvoiceType: 1, printInvoiceDetail: 1 }),
-    expectData: { type: "order", order_id: "O1", printer_type: 2, print_invoice_type: 1, print_invoice_detail: 1 },
+    invoke: (p) =>
+      p.invoice.print({
+        orderId: "O1",
+        printerType: 2,
+        printInvoiceType: 1,
+        printInvoiceDetail: 1,
+      }),
+    expectData: {
+      type: "order",
+      order_id: "O1",
+      printer_type: 2,
+      print_invoice_type: 1,
+      print_invoice_detail: 1,
+    },
   },
   {
     name: "invoice.file by invoiceNumber (type:invoice)",
@@ -200,7 +212,9 @@ describe("Amego endpoint contracts (verified live shapes)", () => {
 
   describe("validateMobileBarcode (boolean wrapper)", () => {
     it("returns true for a registered barcode (code 0)", async () => {
-      server.use(http.post(`${BASE}${ENDPOINTS.barcode}`, () => HttpResponse.json({ code: 0, msg: "" })));
+      server.use(
+        http.post(`${BASE}${ENDPOINTS.barcode}`, () => HttpResponse.json({ code: 0, msg: "" })),
+      );
       expect(await testProvider().validateMobileBarcode("/TRM+O+P")).toBe(true);
     });
 
@@ -215,7 +229,9 @@ describe("Amego endpoint contracts (verified live shapes)", () => {
 
     it("rethrows a non-NOT_FOUND error and throws VALIDATION on malformed input", async () => {
       server.use(
-        http.post(`${BASE}${ENDPOINTS.barcode}`, () => HttpResponse.json({ code: 99, msg: "系統錯誤" })),
+        http.post(`${BASE}${ENDPOINTS.barcode}`, () =>
+          HttpResponse.json({ code: 99, msg: "系統錯誤" }),
+        ),
       );
       await expect(testProvider().validateMobileBarcode("/TRM+O+P")).rejects.toMatchObject({
         provider: "amego",
@@ -230,7 +246,11 @@ describe("Amego endpoint contracts (verified live shapes)", () => {
     it("returns true when a company is registered for the 統編", async () => {
       server.use(
         http.post(`${BASE}${ENDPOINTS.banQuery}`, () =>
-          HttpResponse.json({ code: 0, msg: "", data: [{ ban: "28080623", name: "光貿科技股份有限公司" }] }),
+          HttpResponse.json({
+            code: 0,
+            msg: "",
+            data: [{ ban: "28080623", name: "光貿科技股份有限公司" }],
+          }),
         ),
       );
       expect(await testProvider().validateBan("28080623")).toBe(true);
@@ -246,7 +266,9 @@ describe("Amego endpoint contracts (verified live shapes)", () => {
     });
 
     it("throws VALIDATION on a bad checksum (no network call)", async () => {
-      await expect(testProvider().validateBan("28080624")).rejects.toMatchObject({ code: "VALIDATION" });
+      await expect(testProvider().validateBan("28080624")).rejects.toMatchObject({
+        code: "VALIDATION",
+      });
     });
   });
 
@@ -317,8 +339,18 @@ describe("Amego endpoint contracts (verified live shapes)", () => {
         return HttpResponse.json(INVOICE_LIST_OK);
       }),
     );
-    const res = await testProvider().invoice.list({ startDate: "2026-06-01", endDate: 20260630, dateSelect: 2 });
-    expect(data).toEqual({ date_select: 2, date_start: 20260601, date_end: 20260630, limit: 20, page: 1 });
+    const res = await testProvider().invoice.list({
+      startDate: "2026-06-01",
+      endDate: 20260630,
+      dateSelect: 2,
+    });
+    expect(data).toEqual({
+      date_select: 2,
+      date_start: 20260601,
+      date_end: 20260630,
+      limit: 20,
+      page: 1,
+    });
     expect(res.data_total).toBe(6041);
     expect(res.page_total).toBe(303);
     const row = (res.data as Array<Record<string, unknown>>)[0]!;
@@ -336,8 +368,17 @@ describe("Amego endpoint contracts (verified live shapes)", () => {
         return HttpResponse.json(ALLOWANCE_LIST_OK);
       }),
     );
-    const res = await testProvider().allowances.list({ startDate: "2026-06-01", endDate: 20260630 });
-    expect(data).toEqual({ date_select: 1, date_start: 20260601, date_end: 20260630, limit: 20, page: 1 });
+    const res = await testProvider().allowances.list({
+      startDate: "2026-06-01",
+      endDate: 20260630,
+    });
+    expect(data).toEqual({
+      date_select: 1,
+      date_start: 20260601,
+      date_end: 20260630,
+      limit: 20,
+      page: 1,
+    });
     expect(res.data_total).toBe(302);
     expect(res.page_total).toBe(16);
     const row = (res.data as Array<Record<string, unknown>>)[0]!;
@@ -362,7 +403,10 @@ describe("Amego endpoint contracts (verified live shapes)", () => {
         return HttpResponse.json(FILE_URL_OK);
       }),
     );
-    const inv = await testProvider().invoice.file({ invoiceNumber: "AA26513024", downloadStyle: 1 });
+    const inv = await testProvider().invoice.file({
+      invoiceNumber: "AA26513024",
+      downloadStyle: 1,
+    });
     expect(invData).toEqual({ type: "invoice", invoice_number: "AA26513024", download_style: 1 });
     expect((inv.data as { file_url: string }).file_url).toContain("https://");
 
@@ -382,7 +426,11 @@ describe("Amego endpoint contracts (verified live shapes)", () => {
     const res = await testProvider().lottery.status(2022, 3);
     expect(data).toEqual({ Year: 2022, Period: 3 });
     const rows = res.data as Array<Record<string, unknown>>;
-    expect(rows[0]).toMatchObject({ invoice_number: "DF73530001", invoice_date: "20220819", type: "22" });
+    expect(rows[0]).toMatchObject({
+      invoice_number: "DF73530001",
+      invoice_date: "20220819",
+      type: "22",
+    });
   });
 
   it("lottery.type sends an EMPTY data string (not '{}') and returns the prize types", async () => {
@@ -401,7 +449,11 @@ describe("Amego endpoint contracts (verified live shapes)", () => {
     const res = await testProvider().lottery.type();
     // data must be empty, and the signature must be md5("" + time + appKey)
     expect(dataStr).toBe("");
-    expect(sign).toBe(createHash("md5").update("" + time + APP_KEY).digest("hex"));
+    expect(sign).toBe(
+      createHash("md5")
+        .update("" + time + APP_KEY)
+        .digest("hex"),
+    );
     const rows = res.data as Array<Record<string, unknown>>;
     expect(rows[0]).toEqual({ type: 11, name: "特別獎(1,000萬)" });
   });

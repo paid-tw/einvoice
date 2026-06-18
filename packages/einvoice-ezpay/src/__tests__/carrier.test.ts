@@ -65,8 +65,12 @@ describe("validateLoveCode (checkLoveCode)", () => {
   });
 
   it("rejects a non 3–7 digit love code locally", async () => {
-    await expect(testProvider().validateLoveCode("12")).rejects.toMatchObject({ code: "VALIDATION" });
-    await expect(testProvider().validateLoveCode("abc")).rejects.toMatchObject({ code: "VALIDATION" });
+    await expect(testProvider().validateLoveCode("12")).rejects.toMatchObject({
+      code: "VALIDATION",
+    });
+    await expect(testProvider().validateLoveCode("abc")).rejects.toMatchObject({
+      code: "VALIDATION",
+    });
   });
 
   it("maps an API error (API10002 查詢失敗) to NOT_FOUND", async () => {
@@ -75,23 +79,32 @@ describe("validateLoveCode (checkLoveCode)", () => {
         HttpResponse.json(ezError("API10002", "查詢失敗")),
       ),
     );
-    const err = await testProvider().validateLoveCode("8585").catch((e) => e);
+    const err = await testProvider()
+      .validateLoveCode("8585")
+      .catch((e) => e);
     expect(err.code).toBe("NOT_FOUND");
     expect(err.rawCode).toBe("API10002");
   });
 
   it("wraps a network failure as a NETWORK error", async () => {
     server.use(http.post(url(EZPAY_ENDPOINTS.checkLoveCode), () => HttpResponse.error()));
-    const err = await testProvider().validateLoveCode("8585").catch((e) => e);
+    const err = await testProvider()
+      .validateLoveCode("8585")
+      .catch((e) => e);
     expect(err.code).toBe("NETWORK");
     expect(err.provider).toBe("ezpay");
   });
 
   it("wraps a non-JSON response as a PROVIDER error", async () => {
     server.use(
-      http.post(url(EZPAY_ENDPOINTS.checkLoveCode), () => new HttpResponse("<html/>", { status: 502 })),
+      http.post(
+        url(EZPAY_ENDPOINTS.checkLoveCode),
+        () => new HttpResponse("<html/>", { status: 502 }),
+      ),
     );
-    const err = await testProvider().validateLoveCode("8585").catch((e) => e);
+    const err = await testProvider()
+      .validateLoveCode("8585")
+      .catch((e) => e);
     expect(err.code).toBe("PROVIDER");
     expect(err.rawCode).toBe("502");
   });

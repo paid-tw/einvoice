@@ -11,11 +11,7 @@ export { ENDPOINTS as EZPAY_ENDPOINTS } from "./endpoints.js";
 export { ezpayRequest, ezpayCarrierCheck, mapEzpayError, ezpayTimestamp } from "./client.js";
 export type { EzpayResponse, EzpayResult, CarrierCheckResult } from "./client.js";
 export { createEzpayProvider, EzpayProvider, ezpayTaxType, ezpayTaxRate } from "./provider.js";
-export type {
-  EzpayPendingInvoice,
-  TriggerIssueInput,
-  TriggerAllowanceInput,
-} from "./provider.js";
+export type { EzpayPendingInvoice, TriggerIssueInput, TriggerAllowanceInput } from "./provider.js";
 export {
   ezpayIssuePayloadSchema,
   ezpayVoidPayloadSchema,

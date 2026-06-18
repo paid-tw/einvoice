@@ -76,7 +76,10 @@ export class EzreceiptProvider implements InvoiceProvider {
     // ezReceipt accepts a member id via `buyer.email` (carrierInfo fallback), so a
     // non-email value is valid here and the schema's `.email()` check would reject
     // it. void / allowance / voidAllowance / query DO use the shared schemas.
-    const r = await this.client.request<Record<string, unknown>>(ENDPOINTS.issue, this.buildIssueBody(input));
+    const r = await this.client.request<Record<string, unknown>>(
+      ENDPOINTS.issue,
+      this.buildIssueBody(input),
+    );
     return {
       invoiceNumber: String(r.invNo ?? ""),
       invoiceDate: parseTaipeiDate(r.createTime ?? r.invoiceTime),
@@ -99,7 +102,9 @@ export class EzreceiptProvider implements InvoiceProvider {
     // providerOptions.voidOrder also voids the underlying order.
     const r = await this.client.request(ENDPOINTS.void(invID), {
       voidReason: input.reason,
-      ...((input.providerOptions as { voidOrder?: boolean } | undefined)?.voidOrder ? { voidOrder: true } : {}),
+      ...((input.providerOptions as { voidOrder?: boolean } | undefined)?.voidOrder
+        ? { voidOrder: true }
+        : {}),
     });
     return { invoiceNumber: input.invoiceNumber, status: InvoiceStatus.VOIDED, raw: r };
   }
@@ -110,7 +115,12 @@ export class EzreceiptProvider implements InvoiceProvider {
    */
   async allowance(input: AllowanceInput): Promise<AllowanceResult> {
     parseInput(allowanceInputSchema, input, "ezreceipt");
-    const opts = (input.providerOptions ?? {}) as { invID?: number; itemTax?: number[]; allowTime?: string; needConfirm?: boolean };
+    const opts = (input.providerOptions ?? {}) as {
+      invID?: number;
+      itemTax?: number[];
+      allowTime?: string;
+      needConfirm?: boolean;
+    };
     const invID = await this.resolveInvID(input.invoiceNumber, input.providerOptions);
     // The invoice line ids (soiID) come from a view; the create call keys off
     // those (no path id), so the credited invoice is identified per line.
@@ -147,7 +157,9 @@ export class EzreceiptProvider implements InvoiceProvider {
       throw fail("作廢原因 (voidReason) must be ≤20 chars");
     }
     const awID = await this.resolveAwID(input.allowanceNumber, input.providerOptions);
-    const r = await this.client.request(ENDPOINTS.allowanceVoid(awID), { voidReason: input.reason ?? "作廢折讓" });
+    const r = await this.client.request(ENDPOINTS.allowanceVoid(awID), {
+      voidReason: input.reason ?? "作廢折讓",
+    });
     return { allowanceNumber: input.allowanceNumber, raw: r };
   }
 
@@ -165,7 +177,9 @@ export class EzreceiptProvider implements InvoiceProvider {
       randomCode: String(r.randNo ?? ""),
       orderId: r.orderNo ? String(r.orderNo) : undefined,
       // procState: 11 已開立, 13 已作廢, 30 已註銷 — both 13 and 30 are cancelled.
-      status: ["13", "30"].includes(String(r.procState)) ? InvoiceStatus.VOIDED : InvoiceStatus.ISSUED,
+      status: ["13", "30"].includes(String(r.procState))
+        ? InvoiceStatus.VOIDED
+        : InvoiceStatus.ISSUED,
       amount: { salesAmount: sales, taxAmount: tax, totalAmount: sales + tax },
       buyer: {
         name: buyer.name ? String(buyer.name) : undefined,
@@ -190,20 +204,25 @@ export class EzreceiptProvider implements InvoiceProvider {
    * `period` (or a fromTime/toTime range); it can't reach back more than 5 years.
    * Returns the raw invoice rows plus the total `entries` count (for paging).
    */
-  async listInvoices(input: ListInvoicesInput = {}): Promise<{ entries: number; list: Record<string, unknown>[] }> {
-    const r = await this.client.request<{ entries?: number; list?: Record<string, unknown>[] }>(ENDPOINTS.list, {
-      ...(input.period ? { period: input.period } : {}),
-      ...(input.fromTime ? { fromTime: input.fromTime } : {}),
-      ...(input.toTime ? { toTime: input.toTime } : {}),
-      ...(input.prop ? { prop: input.prop } : {}),
-      ...(input.propValue != null ? { propValue: input.propValue } : {}),
-      ...(input.carrierType ? { carrierType: input.carrierType } : {}),
-      ...(input.voided != null ? { isVoid: input.voided ? 1 : 0 } : {}),
-      ...(input.msgType ? { msgType: input.msgType } : {}),
-      ...(input.withUbn != null ? { withGUINo: input.withUbn } : {}),
-      ...(input.page ? { _pn: input.page } : {}),
-      ...(input.pageSize ? { _ps: input.pageSize } : {}),
-    });
+  async listInvoices(
+    input: ListInvoicesInput = {},
+  ): Promise<{ entries: number; list: Record<string, unknown>[] }> {
+    const r = await this.client.request<{ entries?: number; list?: Record<string, unknown>[] }>(
+      ENDPOINTS.list,
+      {
+        ...(input.period ? { period: input.period } : {}),
+        ...(input.fromTime ? { fromTime: input.fromTime } : {}),
+        ...(input.toTime ? { toTime: input.toTime } : {}),
+        ...(input.prop ? { prop: input.prop } : {}),
+        ...(input.propValue != null ? { propValue: input.propValue } : {}),
+        ...(input.carrierType ? { carrierType: input.carrierType } : {}),
+        ...(input.voided != null ? { isVoid: input.voided ? 1 : 0 } : {}),
+        ...(input.msgType ? { msgType: input.msgType } : {}),
+        ...(input.withUbn != null ? { withGUINo: input.withUbn } : {}),
+        ...(input.page ? { _pn: input.page } : {}),
+        ...(input.pageSize ? { _ps: input.pageSize } : {}),
+      },
+    );
     return { entries: Number(r.entries ?? 0), list: r.list ?? [] };
   }
 
@@ -252,9 +271,15 @@ export class EzreceiptProvider implements InvoiceProvider {
    * each line's remaining creditable quantity / amount (untaxed) / tax. Useful
    * for validating or building a partial allowance.
    */
-  async getAllowanceQuota(invoiceNumber: string, providerOptions?: Record<string, unknown>): Promise<AllowanceQuotaItem[]> {
+  async getAllowanceQuota(
+    invoiceNumber: string,
+    providerOptions?: Record<string, unknown>,
+  ): Promise<AllowanceQuotaItem[]> {
     const invID = await this.resolveInvID(invoiceNumber, providerOptions);
-    const r = await this.client.request<{ itemList?: AllowanceQuotaItem[] }>(ENDPOINTS.allowQuota(invID), {});
+    const r = await this.client.request<{ itemList?: AllowanceQuotaItem[] }>(
+      ENDPOINTS.allowQuota(invID),
+      {},
+    );
     return r.itemList ?? [];
   }
 
@@ -280,7 +305,10 @@ export class EzreceiptProvider implements InvoiceProvider {
    * 取得列印發票所需的資料 — barcode, both QR codes, logo/titles and line items, so
    * a caller can render its own paper proof (消費證明聯). JSON, not a file.
    */
-  async getInvoicePrintInfo(invoiceNumber: string, providerOptions?: Record<string, unknown>): Promise<InvoicePrintInfo> {
+  async getInvoicePrintInfo(
+    invoiceNumber: string,
+    providerOptions?: Record<string, unknown>,
+  ): Promise<InvoicePrintInfo> {
     const invID = await this.resolveInvID(invoiceNumber, providerOptions);
     return this.client.request<InvoicePrintInfo>(ENDPOINTS.proofInvInfo(invID), {});
   }
@@ -290,13 +318,17 @@ export class EzreceiptProvider implements InvoiceProvider {
    * (format `/` + 7 alphanumerics). Returns whether it exists/is registered.
    */
   async checkMobileCode(mobileCode: string): Promise<boolean> {
-    const r = await this.client.request<{ isExist: number }>(ENDPOINTS.openTaxCheckMobileCode, { mobileCode });
+    const r = await this.client.request<{ isExist: number }>(ENDPOINTS.openTaxCheckMobileCode, {
+      mobileCode,
+    });
     return r.isExist === 1;
   }
 
   /** 檢查捐贈碼 — validate a 捐贈碼 (3–7 digits) against the 財政部 platform. */
   async checkCharity(donate: string): Promise<boolean> {
-    const r = await this.client.request<{ isExist: number }>(ENDPOINTS.openTaxCheckCharity, { donate });
+    const r = await this.client.request<{ isExist: number }>(ENDPOINTS.openTaxCheckCharity, {
+      donate,
+    });
     return r.isExist === 1;
   }
 
@@ -319,7 +351,13 @@ export class EzreceiptProvider implements InvoiceProvider {
    */
   async printInvoice(
     invoiceNumbers: string[],
-    opts: { isCopy?: boolean; zipped?: boolean; format?: number; printTime?: string; device?: string } = {},
+    opts: {
+      isCopy?: boolean;
+      zipped?: boolean;
+      format?: number;
+      printTime?: string;
+      device?: string;
+    } = {},
   ): Promise<{ contentType: string; data: Uint8Array }> {
     const invList = await Promise.all(invoiceNumbers.map((n) => this.resolveInvID(n)));
     return this.client.requestFile(ENDPOINTS.proofInvPrint, {
@@ -359,7 +397,9 @@ export class EzreceiptProvider implements InvoiceProvider {
     event: "ISSUE" | "CONFIRM" | "VOID" | "VOID_CONFIRM" | "WON" | "REQUEST",
     opts: { forceToBuyer?: boolean; format?: number; action?: 1 | 2 } = {},
   ): Promise<void> {
-    const eventType = { ISSUE: 1, CONFIRM: 2, VOID: 4, VOID_CONFIRM: 5, WON: 20, REQUEST: 30 }[event];
+    const eventType = { ISSUE: 1, CONFIRM: 2, VOID: 4, VOID_CONFIRM: 5, WON: 20, REQUEST: 30 }[
+      event
+    ];
     await this.client.request(ENDPOINTS.notificationInvoice, {
       invList: invIDs,
       eventType,
@@ -376,17 +416,20 @@ export class EzreceiptProvider implements InvoiceProvider {
    * backend-only; the API can only manage existing tracks.)
    */
   async listInvoiceTracks(input: ListInvoiceTracksInput = {}): Promise<InvoiceTrack[]> {
-    const r = await this.client.request<{ list?: InvoiceTrack[] }>(ENDPOINTS.invNumberList(this.config.stID), {
-      ...(input.period ? { period: input.period } : {}),
-      ...(input.invType ? { invType: input.invType } : {}),
-      ...(input.bizType != null ? { bizType: input.bizType } : {}),
-      ...(input.forceBiz ? { forceBiz: true } : {}),
-      ...(input.activeOnly ? { isActive: 1 } : {}),
-      ...(input.platform ? { platform: input.platform } : {}),
-      ...(input.order ? { dspOrder: input.order === "ASC" ? 2 : 1 } : {}),
-      ...(input.page ? { _pn: input.page } : {}),
-      ...(input.pageSize ? { _ps: input.pageSize } : {}),
-    });
+    const r = await this.client.request<{ list?: InvoiceTrack[] }>(
+      ENDPOINTS.invNumberList(this.config.stID),
+      {
+        ...(input.period ? { period: input.period } : {}),
+        ...(input.invType ? { invType: input.invType } : {}),
+        ...(input.bizType != null ? { bizType: input.bizType } : {}),
+        ...(input.forceBiz ? { forceBiz: true } : {}),
+        ...(input.activeOnly ? { isActive: 1 } : {}),
+        ...(input.platform ? { platform: input.platform } : {}),
+        ...(input.order ? { dspOrder: input.order === "ASC" ? 2 : 1 } : {}),
+        ...(input.page ? { _pn: input.page } : {}),
+        ...(input.pageSize ? { _ps: input.pageSize } : {}),
+      },
+    );
     return r.list ?? [];
   }
 
@@ -412,7 +455,10 @@ export class EzreceiptProvider implements InvoiceProvider {
    * (`false`) invoices. Fails if the track is already pinned to the opposite use
    * (1320/1321).
    */
-  async setDefaultTrack(inID: string | number, opts: { forGUINo?: boolean } = {}): Promise<{ inID: number }> {
+  async setDefaultTrack(
+    inID: string | number,
+    opts: { forGUINo?: boolean } = {},
+  ): Promise<{ inID: number }> {
     return this.client.request<{ inID: number }>(ENDPOINTS.settingsDefaultGUINo(inID), {
       ...(opts.forGUINo != null ? { isForGUINo: opts.forGUINo } : {}),
     });
@@ -420,7 +466,10 @@ export class EzreceiptProvider implements InvoiceProvider {
 
   /** 商標識別碼清單 — list this store's uploaded logo ids (sgoID). */
   async listLogos(): Promise<number[]> {
-    const r = await this.client.request<{ list?: Array<{ sgoID: number }> }>(ENDPOINTS.settingsListLogo, {});
+    const r = await this.client.request<{ list?: Array<{ sgoID: number }> }>(
+      ENDPOINTS.settingsListLogo,
+      {},
+    );
     return (r.list ?? []).map((x) => x.sgoID);
   }
 
@@ -436,11 +485,18 @@ export class EzreceiptProvider implements InvoiceProvider {
     image: { data: Uint8Array | ArrayBuffer; filename?: string; contentType?: string },
     opts: { sgoID?: number } = {},
   ): Promise<{ sgoID: number }> {
-    return this.client.requestUpload<{ sgoID: number }>(ENDPOINTS.settingsUploadLogo(opts.sgoID), () => {
-      const form = new FormData();
-      form.append("files", new Blob([image.data], { type: image.contentType ?? "application/octet-stream" }), image.filename ?? "logo.png");
-      return form;
-    });
+    return this.client.requestUpload<{ sgoID: number }>(
+      ENDPOINTS.settingsUploadLogo(opts.sgoID),
+      () => {
+        const form = new FormData();
+        form.append(
+          "files",
+          new Blob([image.data], { type: image.contentType ?? "application/octet-stream" }),
+          image.filename ?? "logo.png",
+        );
+        return form;
+      },
+    );
   }
 
   /**
@@ -463,7 +519,10 @@ export class EzreceiptProvider implements InvoiceProvider {
    * 開啟/關閉字軌分段 — a closed track's numbers can't be issued; an exhausted or
    * expired track can't be re-opened.
    */
-  async setInvoiceTrackStatus(inID: string | number, action: "OPEN" | "CLOSE"): Promise<{ inID: number; action: number }> {
+  async setInvoiceTrackStatus(
+    inID: string | number,
+    action: "OPEN" | "CLOSE",
+  ): Promise<{ inID: number; action: number }> {
     return this.client.request<{ inID: number; action: number }>(ENDPOINTS.invNumberClose(inID), {
       action: action === "CLOSE" ? 1 : 0,
     });
@@ -473,7 +532,10 @@ export class EzreceiptProvider implements InvoiceProvider {
    * 設定字軌印製發票的商標 (logo) by its `sgoID`. Pass `null` to clear it (printed
    * invoices then use no logo).
    */
-  async setInvoiceTrackLogo(inID: string | number, sgoID: number | null): Promise<{ inID: number }> {
+  async setInvoiceTrackLogo(
+    inID: string | number,
+    sgoID: number | null,
+  ): Promise<{ inID: number }> {
     return this.client.request<{ inID: number }>(ENDPOINTS.invNumberSetLogo(inID), { sgoID });
   }
 
@@ -520,10 +582,13 @@ export class EzreceiptProvider implements InvoiceProvider {
     const invID = providerOptions?.invID;
     if (invID != null) return invID as string | number;
     if (!invoiceNumber) throw fail("either invoiceNumber or providerOptions.invID is required");
-    const r = await this.client.request<{ list?: Array<{ invNo?: string; invID?: number }> }>(ENDPOINTS.list, {
-      invNo: invoiceNumber,
-      _ps: 1,
-    });
+    const r = await this.client.request<{ list?: Array<{ invNo?: string; invID?: number }> }>(
+      ENDPOINTS.list,
+      {
+        invNo: invoiceNumber,
+        _ps: 1,
+      },
+    );
     const found = (r.list ?? []).find((x) => x.invNo === invoiceNumber)?.invID;
     if (found == null) {
       throw new InvoiceError(`ezReceipt invoice ${invoiceNumber} not found`, {
@@ -546,10 +611,13 @@ export class EzreceiptProvider implements InvoiceProvider {
     const awID = providerOptions?.awID;
     if (awID != null) return awID as string | number;
     if (!allowanceNumber) throw fail("either allowanceNumber or providerOptions.awID is required");
-    const r = await this.client.request<{ list?: Array<{ awNo?: string; awID?: number }> }>(ENDPOINTS.allowanceList, {
-      awNo: allowanceNumber,
-      _ps: 1,
-    });
+    const r = await this.client.request<{ list?: Array<{ awNo?: string; awID?: number }> }>(
+      ENDPOINTS.allowanceList,
+      {
+        awNo: allowanceNumber,
+        _ps: 1,
+      },
+    );
     const found = (r.list ?? []).find((x) => x.awNo === allowanceNumber)?.awID;
     if (found == null) {
       throw new InvoiceError(`ezReceipt allowance ${allowanceNumber} not found`, {
@@ -563,7 +631,9 @@ export class EzreceiptProvider implements InvoiceProvider {
 
   private buildIssueBody(input: IssueInvoiceInput): Record<string, unknown> {
     const opts = (input.providerOptions ?? {}) as Record<string, unknown>;
-    const invoiceTime = input.date ? taipeiDateTime(input.date) : (opts.invoiceTime as string | undefined);
+    const invoiceTime = input.date
+      ? taipeiDateTime(input.date)
+      : (opts.invoiceTime as string | undefined);
     const body: Record<string, unknown> = {
       prodList: input.items.map((item) => toProdItem(item, input)),
       // Record the caller's orderId as the order number (reconciliation); extend
@@ -595,7 +665,8 @@ export class EzreceiptProvider implements InvoiceProvider {
       if (input.carrier) {
         const carrierType = CARRIER_TYPE[input.carrier.type];
         body.carrier = { carrierType, carrierInfo: carrierInfo(input.carrier, input.buyer) };
-        if (carrierType === 1) body.buyer = toBuyer(input.buyer, carrierInfo(input.carrier, input.buyer));
+        if (carrierType === 1)
+          body.buyer = toBuyer(input.buyer, carrierInfo(input.carrier, input.buyer));
       }
       if (input.buyer.ubn) {
         body.issueTo = {

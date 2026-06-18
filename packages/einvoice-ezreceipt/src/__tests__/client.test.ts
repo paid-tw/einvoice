@@ -9,12 +9,21 @@ afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
 
 const client = (overrides = {}) =>
-  new EzreceiptClient({ appCode: "83567500", appKey: "k", accName: "A123", password: "pw", mode: "TEST", ...overrides });
+  new EzreceiptClient({
+    appCode: "83567500",
+    appKey: "k",
+    accName: "A123",
+    password: "pw",
+    mode: "TEST",
+    ...overrides,
+  });
 
 describe("hashPassword", () => {
   it("matches the documented example sha1(sha1(accName)+password)", () => {
     expect(hashPassword("test", "5678")).toBe("e6bae8c0bfbd44d29944eab05ec4e08a807313b0");
-    const manual = createHash("sha1").update(createHash("sha1").update("A123").digest("hex") + "pw").digest("hex");
+    const manual = createHash("sha1")
+      .update(createHash("sha1").update("A123").digest("hex") + "pw")
+      .digest("hex");
     expect(hashPassword("A123", "pw")).toBe(manual);
   });
 });
@@ -81,15 +90,22 @@ describe("token auth", () => {
         logins++;
         return okToken();
       }),
-      http.post(url("/eInvoice/invoice/list"), ({ request }) => ok({ token: request.headers.get("x-deva-token") })),
+      http.post(url("/eInvoice/invoice/list"), ({ request }) =>
+        ok({ token: request.headers.get("x-deva-token") }),
+      ),
     );
-    const res = await client({ token: "PRESET", password: undefined }).request<{ token: string }>(EZRECEIPT_ENDPOINTS.list, {});
+    const res = await client({ token: "PRESET", password: undefined }).request<{ token: string }>(
+      EZRECEIPT_ENDPOINTS.list,
+      {},
+    );
     expect(logins).toBe(0);
     expect(res.token).toBe("PRESET");
   });
 
   it("throws AUTH when no password and no token are configured", async () => {
-    await expect(client({ password: undefined }).request(EZRECEIPT_ENDPOINTS.list, {})).rejects.toMatchObject({ code: "AUTH" });
+    await expect(
+      client({ password: undefined }).request(EZRECEIPT_ENDPOINTS.list, {}),
+    ).rejects.toMatchObject({ code: "AUTH" });
   });
 
   it("maps a login failure (308) to AUTH", async () => {
@@ -99,15 +115,22 @@ describe("token auth", () => {
 
   it("throws NETWORK when the transport fails", async () => {
     server.use(http.post(url("/admin/user/login"), () => HttpResponse.error()));
-    await expect(client().request(EZRECEIPT_ENDPOINTS.list, {})).rejects.toMatchObject({ code: "NETWORK" });
+    await expect(client().request(EZRECEIPT_ENDPOINTS.list, {})).rejects.toMatchObject({
+      code: "NETWORK",
+    });
   });
 
   it("throws PROVIDER on a non-JSON response", async () => {
     server.use(
       http.post(url("/admin/user/login"), () => okToken()),
-      http.post(url("/eInvoice/invoice/list"), () => new HttpResponse("<html>", { headers: { "content-type": "text/html" } })),
+      http.post(
+        url("/eInvoice/invoice/list"),
+        () => new HttpResponse("<html>", { headers: { "content-type": "text/html" } }),
+      ),
     );
-    await expect(client().request(EZRECEIPT_ENDPOINTS.list, {})).rejects.toMatchObject({ code: "PROVIDER" });
+    await expect(client().request(EZRECEIPT_ENDPOINTS.list, {})).rejects.toMatchObject({
+      code: "PROVIDER",
+    });
   });
 
   it("targets the production host when mode is PRODUCTION", async () => {
@@ -155,7 +178,10 @@ describe("requestFile (binary)", () => {
       http.post(url("/admin/user/login"), () => okToken()),
       http.post(url(PROOF), () => fail(301, "awList required")),
     );
-    await expect(client().requestFile(PROOF, {})).rejects.toMatchObject({ code: "VALIDATION", rawCode: "301" });
+    await expect(client().requestFile(PROOF, {})).rejects.toMatchObject({
+      code: "VALIDATION",
+      rawCode: "301",
+    });
   });
 
   it("re-logs in once on -3 then returns the file", async () => {

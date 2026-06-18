@@ -147,7 +147,10 @@ export class EzreceiptClient {
    * Authenticated request. Ensures a token, POSTs the body, and on `-3` re-logs
    * in once and retries. Returns `value` on `code === 0`, else throws.
    */
-  async request<T = Record<string, unknown>>(path: string, body?: Record<string, unknown>): Promise<T> {
+  async request<T = Record<string, unknown>>(
+    path: string,
+    body?: Record<string, unknown>,
+  ): Promise<T> {
     await this.ensureToken();
     let env = await this.post(path, body);
     if (env.code === -3) {
@@ -172,7 +175,10 @@ export class EzreceiptClient {
    * an error the API still replies with a JSON envelope, which is thrown. Re-logs
    * in once on `-3` like {@link request}.
    */
-  async requestFile(path: string, body?: Record<string, unknown>): Promise<{ contentType: string; data: Uint8Array }> {
+  async requestFile(
+    path: string,
+    body?: Record<string, unknown>,
+  ): Promise<{ contentType: string; data: Uint8Array }> {
     await this.ensureToken();
     let res = await this.postRaw(path, body);
     if (isJson(res)) {
@@ -204,7 +210,10 @@ export class EzreceiptClient {
    * upload). The `buildForm` thunk is called per attempt so the body can be
    * rebuilt for the `-3` re-login retry. Returns `value` on success, else throws.
    */
-  async requestUpload<T = Record<string, unknown>>(path: string, buildForm: () => FormData): Promise<T> {
+  async requestUpload<T = Record<string, unknown>>(
+    path: string,
+    buildForm: () => FormData,
+  ): Promise<T> {
     await this.ensureToken();
     let env = await this.post(path, buildForm());
     if (env.code === -3) {
@@ -216,7 +225,10 @@ export class EzreceiptClient {
   }
 
   /** Low-level POST returning the raw envelope (no error throwing). */
-  private async post(path: string, body?: Record<string, unknown> | FormData): Promise<EzreceiptEnvelope> {
+  private async post(
+    path: string,
+    body?: Record<string, unknown> | FormData,
+  ): Promise<EzreceiptEnvelope> {
     const res = await this.postRaw(path, body);
     try {
       return (await res.json()) as EzreceiptEnvelope;
@@ -231,7 +243,10 @@ export class EzreceiptClient {
   }
 
   /** Low-level POST returning the raw {@link Response} (NETWORK error on transport failure). */
-  private async postRaw(path: string, body?: Record<string, unknown> | FormData): Promise<Response> {
+  private async postRaw(
+    path: string,
+    body?: Record<string, unknown> | FormData,
+  ): Promise<Response> {
     const doFetch = this.config.fetch ?? fetch;
     const isForm = typeof FormData !== "undefined" && body instanceof FormData;
     const headers: Record<string, string> = {

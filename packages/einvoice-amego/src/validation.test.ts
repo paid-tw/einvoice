@@ -29,8 +29,10 @@ describe("amegoAllowancePayloadSchema (g0401)", () => {
     TotalAmount: "100",
     ...o,
   });
-  const ok = (o: Record<string, unknown> = {}) => amegoAllowancePayloadSchema.safeParse(valid(o)).success;
-  const item = (o: Record<string, unknown>) => amegoAllowancePayloadSchema.safeParse(valid({ ProductItem: [validItem(o)] })).success;
+  const ok = (o: Record<string, unknown> = {}) =>
+    amegoAllowancePayloadSchema.safeParse(valid(o)).success;
+  const item = (o: Record<string, unknown>) =>
+    amegoAllowancePayloadSchema.safeParse(valid({ ProductItem: [validItem(o)] })).success;
 
   it("accepts the official example shape (amounts as strings or numbers)", () => {
     expect(ok()).toBe(true);
@@ -67,7 +69,8 @@ describe("amegoAllowancePayloadSchema (g0401)", () => {
     expect(item({ Tax: "5" })).toBe(true);
   });
   it("item TaxType must be 1/2/3 (4040140)", () => expect(item({ TaxType: 5 })).toBe(false));
-  it("item UnitPrice/Amount ≤7 decimals", () => expect(item({ UnitPrice: 1.123456789 })).toBe(false));
+  it("item UnitPrice/Amount ≤7 decimals", () =>
+    expect(item({ UnitPrice: 1.123456789 })).toBe(false));
   it("requires at least one ProductItem", () => expect(ok({ ProductItem: [] })).toBe(false));
 });
 
@@ -103,7 +106,13 @@ function validIssue(overrides: Record<string, unknown> = {}) {
 }
 const ok = (o: Record<string, unknown>) => amegoIssuePayloadSchema.safeParse(validIssue(o)).success;
 const item = (o: Record<string, unknown>) =>
-  amegoIssuePayloadSchema.safeParse(validIssue({ ProductItem: [{ Description: "x", Quantity: 1, UnitPrice: 105, Amount: 105, TaxType: 1, ...o }] })).success;
+  amegoIssuePayloadSchema.safeParse(
+    validIssue({
+      ProductItem: [
+        { Description: "x", Quantity: 1, UnitPrice: 105, Amount: 105, TaxType: 1, ...o },
+      ],
+    }),
+  ).success;
 
 describe("amegoIssuePayloadSchema — buyer", () => {
   it("accepts a valid payload", () => expect(ok({})).toBe(true));
@@ -127,12 +136,14 @@ describe("amegoIssuePayloadSchema — buyer", () => {
 });
 
 describe("amegoIssuePayloadSchema — items", () => {
-  it("rejects Description > 256", () => expect(item({ Description: "字".repeat(257) })).toBe(false));
+  it("rejects Description > 256", () =>
+    expect(item({ Description: "字".repeat(257) })).toBe(false));
   it("rejects Unit > 6", () => expect(item({ Unit: "1234567" })).toBe(false));
   it("rejects Remark > 120", () => expect(item({ Remark: "字".repeat(121) })).toBe(false));
   it("rejects RelateNumber > 50", () => expect(item({ RelateNumber: "x".repeat(51) })).toBe(false));
   it("rejects item TaxType outside 1–3", () => expect(item({ TaxType: 5 })).toBe(false));
-  it("rejects > 7 decimal places on Quantity", () => expect(item({ Quantity: 1.123456789 })).toBe(false));
+  it("rejects > 7 decimal places on Quantity", () =>
+    expect(item({ Quantity: 1.123456789 })).toBe(false));
   it("allows a negative line Amount (e.g. discount)", () =>
     expect(item({ UnitPrice: -2, Amount: -2 })).toBe(true));
   it("requires at least one item", () => expect(ok({ ProductItem: [] })).toBe(false));
@@ -140,7 +151,8 @@ describe("amegoIssuePayloadSchema — items", () => {
 
 describe("amegoIssuePayloadSchema — amounts & tax", () => {
   it("rejects invoice TaxType outside 1/2/3/4/9", () => expect(ok({ TaxType: 7 })).toBe(false));
-  it("rejects negative SalesAmount", () => expect(ok({ SalesAmount: -105, TotalAmount: 105 })).toBe(false));
+  it("rejects negative SalesAmount", () =>
+    expect(ok({ SalesAmount: -105, TotalAmount: 105 })).toBe(false));
   it("rejects a malformed Currency, accepts ISO 4217", () => {
     expect(ok({ Currency: "US" })).toBe(false);
     expect(ok({ Currency: "usd" })).toBe(false);
@@ -157,7 +169,9 @@ describe("amegoIssuePayloadSchema — conditional rules", () => {
   });
   it("requires a carrier code for known carrier types", () => {
     expect(ok({ CarrierType: "3J0002" })).toBe(false);
-    expect(ok({ CarrierType: "3J0002", CarrierId1: "/ABC1234", CarrierId2: "/ABC1234" })).toBe(true);
+    expect(ok({ CarrierType: "3J0002", CarrierId1: "/ABC1234", CarrierId2: "/ABC1234" })).toBe(
+      true,
+    );
   });
   it("validates member carrier (amego) id format", () => {
     expect(ok({ CarrierType: "amego", CarrierId1: "xyz" })).toBe(false);
@@ -165,7 +179,13 @@ describe("amegoIssuePayloadSchema — conditional rules", () => {
     expect(ok({ CarrierType: "amego", CarrierId1: "user@example.com" })).toBe(true);
   });
   it("requires CustomsClearanceMark + ZeroTaxRateReason for zero-rated", () => {
-    const zero = { TaxType: 2, ProductItem: [{ Description: "x", Quantity: 1, UnitPrice: 100, Amount: 100, TaxType: 2 }], SalesAmount: 0, ZeroTaxSalesAmount: 100, TotalAmount: 100 };
+    const zero = {
+      TaxType: 2,
+      ProductItem: [{ Description: "x", Quantity: 1, UnitPrice: 100, Amount: 100, TaxType: 2 }],
+      SalesAmount: 0,
+      ZeroTaxSalesAmount: 100,
+      TotalAmount: 100,
+    };
     expect(ok(zero)).toBe(false);
     expect(ok({ ...zero, CustomsClearanceMark: 1, ZeroTaxRateReason: 71 })).toBe(true);
   });
@@ -211,16 +231,28 @@ describe("amegoIssuePayloadSchema — conditional rules", () => {
 describe("amegoCustomIssuePayloadSchema (f0401_custom)", () => {
   const validCustom = (o: Record<string, unknown> = {}) =>
     amegoCustomIssuePayloadSchema.safeParse(
-      validIssue({ InvoiceNumber: "AA00000010", InvoiceDate: "20260617", InvoiceTime: "16:40:42", RandomNumber: "1234", PrintMark: "Y", order_id: "C1", OrderId: undefined, ...o }),
+      validIssue({
+        InvoiceNumber: "AA00000010",
+        InvoiceDate: "20260617",
+        InvoiceTime: "16:40:42",
+        RandomNumber: "1234",
+        PrintMark: "Y",
+        order_id: "C1",
+        OrderId: undefined,
+        ...o,
+      }),
     ).success;
 
   it("accepts a valid custom record", () => expect(validCustom()).toBe(true));
   it("requires InvoiceNumber", () => expect(validCustom({ InvoiceNumber: undefined })).toBe(false));
-  it("requires PrintMark (verified live)", () => expect(validCustom({ PrintMark: undefined })).toBe(false));
+  it("requires PrintMark (verified live)", () =>
+    expect(validCustom({ PrintMark: undefined })).toBe(false));
   it("PrintMark=N requires a carrier or donation", () => {
     expect(validCustom({ PrintMark: "N" })).toBe(false);
     expect(validCustom({ PrintMark: "N", NPOBAN: "168" })).toBe(true);
-    expect(validCustom({ PrintMark: "N", CarrierType: "3J0002", CarrierId1: "/ABC1234" })).toBe(true);
+    expect(validCustom({ PrintMark: "N", CarrierType: "3J0002", CarrierId1: "/ABC1234" })).toBe(
+      true,
+    );
   });
   it("requires InvoiceDate as YYYYMMDD", () => {
     expect(validCustom({ InvoiceDate: "2026-06-17" })).toBe(false);
@@ -230,7 +262,10 @@ describe("amegoCustomIssuePayloadSchema (f0401_custom)", () => {
     expect(validCustom({ InvoiceTime: "164042" })).toBe(false);
     expect(validCustom({ InvoiceTime: "16:40:42" })).toBe(true);
   });
-  it("rejects RandomNumber that isn't 4 digits", () => expect(validCustom({ RandomNumber: "12" })).toBe(false));
-  it("rejects SellerPersonInCharge > 30", () => expect(validCustom({ SellerPersonInCharge: "人".repeat(31) })).toBe(false));
-  it("requires order_id or OrderId", () => expect(validCustom({ order_id: undefined, OrderId: undefined })).toBe(false));
+  it("rejects RandomNumber that isn't 4 digits", () =>
+    expect(validCustom({ RandomNumber: "12" })).toBe(false));
+  it("rejects SellerPersonInCharge > 30", () =>
+    expect(validCustom({ SellerPersonInCharge: "人".repeat(31) })).toBe(false));
+  it("requires order_id or OrderId", () =>
+    expect(validCustom({ order_id: undefined, OrderId: undefined })).toBe(false));
 });

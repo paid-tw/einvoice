@@ -12,7 +12,17 @@ function valid(o: Record<string, unknown> = {}) {
     TaxType: "1",
     SalesAmount: 100,
     InvType: "07",
-    Items: [{ ItemSeq: 1, ItemName: "商品", ItemCount: 1, ItemWord: "式", ItemPrice: 100, ItemAmount: 100, ItemTaxType: "1" }],
+    Items: [
+      {
+        ItemSeq: 1,
+        ItemName: "商品",
+        ItemCount: 1,
+        ItemWord: "式",
+        ItemPrice: 100,
+        ItemAmount: 100,
+        ItemTaxType: "1",
+      },
+    ],
     ...o,
   };
 }
@@ -34,14 +44,48 @@ describe("ecpayIssuePayloadSchema", () => {
   it("enforces SalesAmount = round(Σ ItemAmount) for vat=1, but is lenient for vat=0", () => {
     expect(ok({ SalesAmount: 999 })).toBe(false); // vat=1 default, mismatch
     // vat=0: the API recomputes, so a mismatch is tolerated (live-verified).
-    expect(ok({ vat: "0", SalesAmount: 105, Items: [{ ItemSeq: 1, ItemName: "a", ItemCount: 1, ItemWord: "式", ItemPrice: 100, ItemAmount: 100, ItemTaxType: "1" }] })).toBe(true);
+    expect(
+      ok({
+        vat: "0",
+        SalesAmount: 105,
+        Items: [
+          {
+            ItemSeq: 1,
+            ItemName: "a",
+            ItemCount: 1,
+            ItemWord: "式",
+            ItemPrice: 100,
+            ItemAmount: 100,
+            ItemTaxType: "1",
+          },
+        ],
+      }),
+    ).toBe(true);
   });
 
   it("paper invoices (Print=1) need name + address + email/phone", () => {
     expect(ok({ Print: "1", CarrierType: "" })).toBe(false);
-    expect(ok({ Print: "1", CarrierType: "", CustomerName: "王", CustomerAddr: "台北" })).toBe(false);
-    expect(ok({ Print: "1", CarrierType: "", CustomerName: "王", CustomerAddr: "台北", CustomerEmail: "a@b.c" })).toBe(true);
-    expect(ok({ Print: "1", CarrierType: "", CustomerName: "王", CustomerAddr: "台北", CustomerPhone: "0900000000" })).toBe(true);
+    expect(ok({ Print: "1", CarrierType: "", CustomerName: "王", CustomerAddr: "台北" })).toBe(
+      false,
+    );
+    expect(
+      ok({
+        Print: "1",
+        CarrierType: "",
+        CustomerName: "王",
+        CustomerAddr: "台北",
+        CustomerEmail: "a@b.c",
+      }),
+    ).toBe(true);
+    expect(
+      ok({
+        Print: "1",
+        CarrierType: "",
+        CustomerName: "王",
+        CustomerAddr: "台北",
+        CustomerPhone: "0900000000",
+      }),
+    ).toBe(true);
   });
 
   it("a B2C carrier invoice cannot print (live: 5000015)", () => {
@@ -61,13 +105,41 @@ describe("ecpayIssuePayloadSchema", () => {
   });
 
   it("zero-rated (TaxType 2) requires ClearanceMark (live: 5000007)", () => {
-    const zero = { TaxType: "2", Items: [{ ItemSeq: 1, ItemName: "a", ItemCount: 1, ItemWord: "式", ItemPrice: 100, ItemAmount: 100, ItemTaxType: "2" }] };
+    const zero = {
+      TaxType: "2",
+      Items: [
+        {
+          ItemSeq: 1,
+          ItemName: "a",
+          ItemCount: 1,
+          ItemWord: "式",
+          ItemPrice: 100,
+          ItemAmount: 100,
+          ItemTaxType: "2",
+        },
+      ],
+    };
     expect(ok(zero)).toBe(false); // no ClearanceMark
     expect(ok({ ...zero, ClearanceMark: "2" })).toBe(true); // ZeroTaxRateReason NOT required (live)
   });
 
   it("mixed tax (TaxType=9) needs ItemTaxType on every item + ClearanceMark", () => {
-    expect(ok({ TaxType: "9", ClearanceMark: "1", Items: [{ ItemSeq: 1, ItemName: "a", ItemCount: 1, ItemWord: "式", ItemPrice: 100, ItemAmount: 100 }] })).toBe(false);
+    expect(
+      ok({
+        TaxType: "9",
+        ClearanceMark: "1",
+        Items: [
+          {
+            ItemSeq: 1,
+            ItemName: "a",
+            ItemCount: 1,
+            ItemWord: "式",
+            ItemPrice: 100,
+            ItemAmount: 100,
+          },
+        ],
+      }),
+    ).toBe(false);
   });
 
   it("validates field formats (Identifier 8 digits, LoveCode 3–7 digits)", () => {

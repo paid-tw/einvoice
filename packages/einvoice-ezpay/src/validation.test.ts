@@ -49,11 +49,15 @@ describe("ezpayIssuePayloadSchema", () => {
 
   it("ezPay carrier (CarrierType=2) requires BuyerEmail", () => {
     expect(ok({ CarrierType: "2", CarrierNum: "member@x.com", PrintFlag: "N" })).toBe(false);
-    expect(ok({ CarrierType: "2", CarrierNum: "member@x.com", BuyerEmail: "b@x.com", PrintFlag: "N" })).toBe(true);
+    expect(
+      ok({ CarrierType: "2", CarrierNum: "member@x.com", BuyerEmail: "b@x.com", PrintFlag: "N" }),
+    ).toBe(true);
   });
 
   it("rejects carrier + donation together", () => {
-    expect(ok({ CarrierType: "0", CarrierNum: "/ABC1234", LoveCode: "168", PrintFlag: "N" })).toBe(false);
+    expect(ok({ CarrierType: "0", CarrierNum: "/ABC1234", LoveCode: "168", PrintFlag: "N" })).toBe(
+      false,
+    );
   });
 
   it("validates email format and caps BuyerEmail at 50 chars", () => {
@@ -73,8 +77,21 @@ describe("ezpayIssuePayloadSchema", () => {
   });
 
   it("requires equal item segment counts", () => {
-    expect(ok({ ItemName: "a|b", ItemCount: "1", ItemUnit: "個", ItemPrice: "1|1", ItemAmt: "1|1" })).toBe(false);
-    expect(ok({ ItemName: "a|b", ItemCount: "1|1", ItemUnit: "個|個", ItemPrice: "1|1", ItemAmt: "1|1", Amt: 2, TaxAmt: 0, TotalAmt: 2 })).toBe(true);
+    expect(
+      ok({ ItemName: "a|b", ItemCount: "1", ItemUnit: "個", ItemPrice: "1|1", ItemAmt: "1|1" }),
+    ).toBe(false);
+    expect(
+      ok({
+        ItemName: "a|b",
+        ItemCount: "1|1",
+        ItemUnit: "個|個",
+        ItemPrice: "1|1",
+        ItemAmt: "1|1",
+        Amt: 2,
+        TaxAmt: 0,
+        TotalAmt: 2,
+      }),
+    ).toBe(true);
   });
 
   it("zero-rated (TaxType=2) requires CustomsClearance 1/2", () => {

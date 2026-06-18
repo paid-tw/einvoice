@@ -184,11 +184,14 @@ export class EzpayProvider implements InvoiceProvider {
     // ezPay has no foreign-currency field (no FOREIGN_CURRENCY capability), so
     // reject a non-TWD currency rather than silently dropping it.
     if (this.config.validatePayload !== false && parsed.currency && parsed.currency !== "TWD") {
-      throw new InvoiceError(`ezPay does not support foreign-currency invoices; currency must be TWD (got ${parsed.currency})`, {
-        provider: "ezpay",
-        code: InvoiceErrorCode.UNSUPPORTED,
-        rawMessage: "FOREIGN_CURRENCY is not supported",
-      });
+      throw new InvoiceError(
+        `ezPay does not support foreign-currency invoices; currency must be TWD (got ${parsed.currency})`,
+        {
+          provider: "ezpay",
+          code: InvoiceErrorCode.UNSUPPORTED,
+          rawMessage: "FOREIGN_CURRENCY is not supported",
+        },
+      );
     }
     const category = parsed.category ?? deriveCategory(parsed.buyer);
     const hasCarrierOrDonation = Boolean(parsed.carrier || parsed.donation);
@@ -372,7 +375,11 @@ export class EzpayProvider implements InvoiceProvider {
       ...(opts.providerOptions ?? {}),
     };
     this.validate(assertValidAllowanceTouchPayload, postData);
-    const { result, raw } = await ezpayRequest(this.config, ENDPOINTS.allowanceTouch.path, postData);
+    const { result, raw } = await ezpayRequest(
+      this.config,
+      ENDPOINTS.allowanceTouch.path,
+      postData,
+    );
     return {
       allowanceNumber: String(result.AllowanceNo ?? opts.allowanceNumber),
       invoiceNumber: opts.invoiceNumber ?? "",
@@ -438,9 +445,7 @@ export class EzpayProvider implements InvoiceProvider {
       buyer: {
         name: result.BuyerName ? String(result.BuyerName) : undefined,
         ubn:
-          result.BuyerUBN && result.BuyerUBN !== "0000000000"
-            ? String(result.BuyerUBN)
-            : undefined,
+          result.BuyerUBN && result.BuyerUBN !== "0000000000" ? String(result.BuyerUBN) : undefined,
         email: result.BuyerEmail ? String(result.BuyerEmail) : undefined,
       },
       items: [],

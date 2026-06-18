@@ -86,8 +86,7 @@ export function computeAmegoAmounts(opts: {
   }
   // B2C keeps the 含稅 total as SalesAmount with TaxAmount = 0 (verified live).
 
-  const totalAmount =
-    salesAmount + freeTaxSalesAmount + zeroTaxSalesAmount + taxAmount;
+  const totalAmount = salesAmount + freeTaxSalesAmount + zeroTaxSalesAmount + taxAmount;
 
   return {
     SalesAmount: salesAmount,

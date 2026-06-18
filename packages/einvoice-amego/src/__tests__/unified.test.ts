@@ -4,13 +4,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import type { IssueInvoiceInput } from "@paid-tw/einvoice";
 import { createAmegoProvider } from "../provider.js";
 import { APP_KEY, BASE, parseBody, SELLER, server, testProvider } from "./server.js";
-import {
-  ALLOWANCE_OK,
-  CUSTOM_ISSUE_OK,
-  INVOICE_QUERY_OK,
-  ISSUE_OK,
-  VOID_OK,
-} from "./fixtures.js";
+import { ALLOWANCE_OK, CUSTOM_ISSUE_OK, INVOICE_QUERY_OK, ISSUE_OK, VOID_OK } from "./fixtures.js";
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => server.resetHandlers());
@@ -31,7 +25,9 @@ function issueInput(overrides: Partial<IssueInvoiceInput> = {}): IssueInvoiceInp
 describe("issue (f0401)", () => {
   it("rejects invalid input as a normalized InvoiceError (parseInput, not a raw ZodError)", async () => {
     await expect(
-      testProvider().issue(issueInput({ amount: { salesAmount: 100, taxAmount: 5, totalAmount: 999 } })),
+      testProvider().issue(
+        issueInput({ amount: { salesAmount: 100, taxAmount: 5, totalAmount: 999 } }),
+      ),
     ).rejects.toMatchObject({ code: "VALIDATION", provider: "amego" });
   });
 
@@ -69,9 +65,7 @@ describe("issue (f0401)", () => {
       }),
     );
     // A buyer name with chars that MUST be url-encoded on the wire (中文 + &).
-    await testProvider().issue(
-      issueInput({ buyer: { ubn: "28080623", name: "測試 & 公司" } }),
-    );
+    await testProvider().issue(issueInput({ buyer: { ubn: "28080623", name: "測試 & 公司" } }));
 
     // (3) Content-Type is form-urlencoded, never application/json.
     expect(contentType).toContain("application/x-www-form-urlencoded");
@@ -91,7 +85,11 @@ describe("issue (f0401)", () => {
     //     sees after its url-decode), NOT the encoded wire form.
     const time = /(?:^|&)time=([^&]*)/.exec(rawBody)![1]!;
     const wireSign = /(?:^|&)sign=([^&]*)/.exec(rawBody)![1]!;
-    expect(wireSign).toBe(createHash("md5").update(decoded + time + APP_KEY).digest("hex"));
+    expect(wireSign).toBe(
+      createHash("md5")
+        .update(decoded + time + APP_KEY)
+        .digest("hex"),
+    );
   });
 
   it("sends B2C amounts (SalesAmount = total, TaxAmount = 0) + DetailVat=1 for anonymous buyers", async () => {
@@ -173,7 +171,9 @@ describe("issue — local payload validation", () => {
     // proves no request is made.
     await expect(
       testProvider().issue(
-        issueInput({ items: [{ description: "字".repeat(257), quantity: 1, unitPrice: 105, amount: 105 }] }),
+        issueInput({
+          items: [{ description: "字".repeat(257), quantity: 1, unitPrice: 105, amount: 105 }],
+        }),
       ),
     ).rejects.toMatchObject({ code: "VALIDATION", provider: "amego" });
   });
@@ -186,8 +186,17 @@ describe("issue — local payload validation", () => {
         return HttpResponse.json(ISSUE_OK);
       }),
     );
-    const provider = createAmegoProvider({ sellerUbn: "12345678", appKey: "k", baseUrl: BASE, validatePayload: false });
-    await provider.issue(issueInput({ items: [{ description: "字".repeat(257), quantity: 1, unitPrice: 105, amount: 105 }] }));
+    const provider = createAmegoProvider({
+      sellerUbn: "12345678",
+      appKey: "k",
+      baseUrl: BASE,
+      validatePayload: false,
+    });
+    await provider.issue(
+      issueInput({
+        items: [{ description: "字".repeat(257), quantity: 1, unitPrice: 105, amount: 105 }],
+      }),
+    );
     expect(hit).toBe(true);
   });
 });
@@ -234,7 +243,10 @@ describe("issueCustom (f0401_custom) — array + validation", () => {
 
   it("rejects a malformed InvoiceDate locally", async () => {
     await expect(
-      testProvider().invoice.issueCustom("AA00000010", { ...validRecord, InvoiceDate: "2026-06-17" }),
+      testProvider().invoice.issueCustom("AA00000010", {
+        ...validRecord,
+        InvoiceDate: "2026-06-17",
+      }),
     ).rejects.toMatchObject({ code: "VALIDATION" });
   });
 });
@@ -384,7 +396,15 @@ describe("query (invoice_query) — type discriminator + nested data", () => {
             ...INVOICE_QUERY_OK.data,
             buyer_identifier: "0000000000", // B2C placeholder → ubn undefined
             product_item: [
-              { description: "應稅", quantity: 1, unit_price: 100, amount: 100, tax_type: 1, unit: "個", remark: "r" },
+              {
+                description: "應稅",
+                quantity: 1,
+                unit_price: 100,
+                amount: 100,
+                tax_type: 1,
+                unit: "個",
+                remark: "r",
+              },
               { description: "零稅率", quantity: 1, unit_price: 100, amount: 100, tax_type: 2 },
               { description: "免稅", quantity: 1, unit_price: 100, amount: 100, tax_type: 3 },
               { description: "未知", quantity: 1, unit_price: 100, amount: 100, tax_type: 9 },
@@ -395,7 +415,12 @@ describe("query (invoice_query) — type discriminator + nested data", () => {
     );
     const res = await testProvider().query({ invoiceNumber: "AA26513024" });
     expect(res.buyer.ubn).toBeUndefined();
-    expect(res.items.map((i) => i.taxType)).toEqual(["TAXABLE", "ZERO_RATED", "TAX_FREE", undefined]);
+    expect(res.items.map((i) => i.taxType)).toEqual([
+      "TAXABLE",
+      "ZERO_RATED",
+      "TAX_FREE",
+      undefined,
+    ]);
     expect(res.items[0]?.unit).toBe("個");
     expect(res.items[0]?.remark).toBe("r");
   });

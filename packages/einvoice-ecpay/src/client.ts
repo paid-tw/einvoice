@@ -127,7 +127,8 @@ export function mapEcpayError(rtnCode: number, rtnMsg = ""): InvoiceErrorCode {
   if (/特店.*不存在|平台商.*不存在|金鑰|簽章|未授權/.test(rtnMsg)) return InvoiceErrorCode.AUTH;
   if (/字軌.*(用罄|用完|不足|已滿)|號碼.*(用罄|用完)/.test(rtnMsg))
     return InvoiceErrorCode.NUMBER_EXHAUSTED;
-  if (/已作廢|已開立|已存在|已折讓|折讓過|同意|重複|不可重複/.test(rtnMsg)) return InvoiceErrorCode.CONFLICT;
+  if (/已作廢|已開立|已存在|已折讓|折讓過|同意|重複|不可重複/.test(rtnMsg))
+    return InvoiceErrorCode.CONFLICT;
   // AUTH already claimed 特店/平台商 不存在 above, so a bare 不存在 here is a
   // missing record (e.g. 4000001 不存在此交易單號 for an unknown Tsr).
   if (/查無|查不到|無.*資料|不存在/.test(rtnMsg)) return InvoiceErrorCode.NOT_FOUND;

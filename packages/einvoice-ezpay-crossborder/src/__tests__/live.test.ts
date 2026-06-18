@@ -73,85 +73,112 @@ describe.skipIf(!live)("ezPay cross-border live (test env) — foreign currency"
     expect(res.invoiceNumber).toMatch(/^[A-Z]{2}\d{8}$/);
     expect(res.totalAmount).toBeCloseTo(21.3, 2);
 
-    const q = await p.query({ invoiceNumber: res.invoiceNumber, providerOptions: { randomCode: res.randomCode } });
+    const q = await p.query({
+      invoiceNumber: res.invoiceNumber,
+      providerOptions: { randomCode: res.randomCode },
+    });
     expect(q.amount.totalAmount).toBeCloseTo(21.3, 2);
     expect(q.amount.taxAmount).toBeCloseTo(1, 2);
   });
 });
 
-describe.skipIf(!live)("ezPay cross-border live (test env) — allowance + two-phase", LIVE_OPTS, () => {
-  const p = provider();
+describe.skipIf(!live)(
+  "ezPay cross-border live (test env) — allowance + two-phase",
+  LIVE_OPTS,
+  () => {
+    const p = provider();
 
-  it("issues an allowance (immediate confirm) then voids it", async () => {
-    const orderId = oid("CA");
-    const inv = await p.issue({
-      orderId,
-      buyer,
-      items: [{ description: "商品", quantity: 2, unitPrice: 105, amount: 210 }],
-      amount: { salesAmount: 200, taxAmount: 10, totalAmount: 210 },
-      taxType: "TAXABLE",
-      priceMode: "TAX_INCLUSIVE",
-    });
-    const al = await p.allowance({
-      invoiceNumber: inv.invoiceNumber,
-      allowanceId: orderId,
-      items: [{ description: "商品", quantity: 1, unitPrice: 105, amount: 105 }],
-      amount: { salesAmount: 100, taxAmount: 5, totalAmount: 105 },
-      providerOptions: { currency: "TWD", buyerEmail: "test@example.com", merchantOrderNo: orderId, confirm: true },
-    });
-    expect(al.allowanceNumber).toMatch(/^A\d+$/);
-    const va = await p.voidAllowance({ invoiceNumber: inv.invoiceNumber, allowanceNumber: al.allowanceNumber, reason: "測試" });
-    expect(va.allowanceNumber).toBe(al.allowanceNumber);
-  });
-
-  it("stages a TRIGGER invoice then triggers it", async () => {
-    const orderId = oid("CP");
-    const pend = await p.issuePending({
-      orderId,
-      buyer,
-      items: [{ description: "商品", quantity: 1, unitPrice: 105, amount: 105 }],
-      amount: { salesAmount: 100, taxAmount: 5, totalAmount: 105 },
-      taxType: "TAXABLE",
-      priceMode: "TAX_INCLUSIVE",
-    });
-    expect(pend.invoiceTransNo).toMatch(/^\d+$/);
-    const trig = await p.triggerIssue({ invoiceTransNo: pend.invoiceTransNo, orderId, totalAmount: 105 });
-    expect(trig.invoiceNumber).toMatch(/^[A-Z]{2}\d{8}$/);
-    expect(trig.status).toBe("ISSUED");
-  });
-});
-
-describe.skipIf(!live)("ezPay cross-border live (test env) — every currency (附件三)", LIVE_OPTS, () => {
-  const p = provider();
-
-  it.each(EZPAY_CB_CURRENCIES)("issues a %s invoice", async (currency) => {
-    const foreign = currency !== "TWD";
-    const res = await p.issue({
-      orderId: oid("CC"),
-      buyer,
-      items: [{ description: `${currency}商品`, quantity: 1, unitPrice: 21, amount: 21 }],
-      amount: { salesAmount: 20, taxAmount: 1, totalAmount: 21 },
-      taxType: "TAXABLE",
-      priceMode: "TAX_INCLUSIVE",
-      currency,
-      ...(foreign ? { exchangeRate: 1 } : {}),
-    });
-    expect(res.invoiceNumber).toMatch(/^[A-Z]{2}\d{8}$/);
-  });
-
-  // Verified live: a currency outside 附件三 is rejected with INV10002.
-  it.each(["INR", "BRL", "ZZZ"])("rejects unlisted currency %s with INV10002", async (currency) => {
-    await expect(
-      p.issue({
-        orderId: oid("CX"),
+    it("issues an allowance (immediate confirm) then voids it", async () => {
+      const orderId = oid("CA");
+      const inv = await p.issue({
+        orderId,
         buyer,
-        items: [{ description: "x", quantity: 1, unitPrice: 21, amount: 21 }],
+        items: [{ description: "商品", quantity: 2, unitPrice: 105, amount: 210 }],
+        amount: { salesAmount: 200, taxAmount: 10, totalAmount: 210 },
+        taxType: "TAXABLE",
+        priceMode: "TAX_INCLUSIVE",
+      });
+      const al = await p.allowance({
+        invoiceNumber: inv.invoiceNumber,
+        allowanceId: orderId,
+        items: [{ description: "商品", quantity: 1, unitPrice: 105, amount: 105 }],
+        amount: { salesAmount: 100, taxAmount: 5, totalAmount: 105 },
+        providerOptions: {
+          currency: "TWD",
+          buyerEmail: "test@example.com",
+          merchantOrderNo: orderId,
+          confirm: true,
+        },
+      });
+      expect(al.allowanceNumber).toMatch(/^A\d+$/);
+      const va = await p.voidAllowance({
+        invoiceNumber: inv.invoiceNumber,
+        allowanceNumber: al.allowanceNumber,
+        reason: "測試",
+      });
+      expect(va.allowanceNumber).toBe(al.allowanceNumber);
+    });
+
+    it("stages a TRIGGER invoice then triggers it", async () => {
+      const orderId = oid("CP");
+      const pend = await p.issuePending({
+        orderId,
+        buyer,
+        items: [{ description: "商品", quantity: 1, unitPrice: 105, amount: 105 }],
+        amount: { salesAmount: 100, taxAmount: 5, totalAmount: 105 },
+        taxType: "TAXABLE",
+        priceMode: "TAX_INCLUSIVE",
+      });
+      expect(pend.invoiceTransNo).toMatch(/^\d+$/);
+      const trig = await p.triggerIssue({
+        invoiceTransNo: pend.invoiceTransNo,
+        orderId,
+        totalAmount: 105,
+      });
+      expect(trig.invoiceNumber).toMatch(/^[A-Z]{2}\d{8}$/);
+      expect(trig.status).toBe("ISSUED");
+    });
+  },
+);
+
+describe.skipIf(!live)(
+  "ezPay cross-border live (test env) — every currency (附件三)",
+  LIVE_OPTS,
+  () => {
+    const p = provider();
+
+    it.each(EZPAY_CB_CURRENCIES)("issues a %s invoice", async (currency) => {
+      const foreign = currency !== "TWD";
+      const res = await p.issue({
+        orderId: oid("CC"),
+        buyer,
+        items: [{ description: `${currency}商品`, quantity: 1, unitPrice: 21, amount: 21 }],
         amount: { salesAmount: 20, taxAmount: 1, totalAmount: 21 },
         taxType: "TAXABLE",
         priceMode: "TAX_INCLUSIVE",
         currency,
-        exchangeRate: 1,
-      }),
-    ).rejects.toMatchObject({ code: "VALIDATION", rawCode: "INV10002" });
-  });
-});
+        ...(foreign ? { exchangeRate: 1 } : {}),
+      });
+      expect(res.invoiceNumber).toMatch(/^[A-Z]{2}\d{8}$/);
+    });
+
+    // Verified live: a currency outside 附件三 is rejected with INV10002.
+    it.each(["INR", "BRL", "ZZZ"])(
+      "rejects unlisted currency %s with INV10002",
+      async (currency) => {
+        await expect(
+          p.issue({
+            orderId: oid("CX"),
+            buyer,
+            items: [{ description: "x", quantity: 1, unitPrice: 21, amount: 21 }],
+            amount: { salesAmount: 20, taxAmount: 1, totalAmount: 21 },
+            taxType: "TAXABLE",
+            priceMode: "TAX_INCLUSIVE",
+            currency,
+            exchangeRate: 1,
+          }),
+        ).rejects.toMatchObject({ code: "VALIDATION", rawCode: "INV10002" });
+      },
+    );
+  },
+);

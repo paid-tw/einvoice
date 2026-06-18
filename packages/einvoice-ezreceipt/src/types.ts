@@ -82,7 +82,19 @@ export interface ListInvoicesInput {
   /** Issue-time range end `YYYY-MM-DD HH:mm:ss`. */
   toTime?: string;
   /** Field to filter on; append `%` to propValue for a partial match. */
-  prop?: "invNo" | "nid" | "orderNo" | "boNo" | "devNo" | "winNo" | "accName" | "extID" | "storeName" | "storeNID" | "carrierInfo" | "buyerName";
+  prop?:
+    | "invNo"
+    | "nid"
+    | "orderNo"
+    | "boNo"
+    | "devNo"
+    | "winNo"
+    | "accName"
+    | "extID"
+    | "storeName"
+    | "storeNID"
+    | "carrierInfo"
+    | "buyerName";
   /** Value for {@link prop}. */
   propValue?: string;
   /** 1 會員 / 2 手機條碼 / 3 自然人憑證 / 5 捐贈 / 10 紙本 / 20 境外. */

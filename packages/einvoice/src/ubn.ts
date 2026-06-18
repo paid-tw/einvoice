@@ -41,8 +41,5 @@ export function isValidUbn(input: string | number, options: UbnOptions = {}): bo
   }
 
   const divisor = options.legacy ? 10 : 5;
-  return (
-    checksum % divisor === 0 ||
-    (n.charAt(6) === "7" && (checksum + 1) % divisor === 0)
-  );
+  return checksum % divisor === 0 || (n.charAt(6) === "7" && (checksum + 1) % divisor === 0);
 }

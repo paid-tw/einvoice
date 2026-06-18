@@ -88,7 +88,14 @@ describe("mapAmegoErrorCode (from info_detail?mid=71)", () => {
   it("categorizes the full g0401 error-code family", () => {
     const conflict = [4040152, 4040153, 4040154, 4040161, 4040162, 4040163];
     const notFound = [4040156];
-    const all = [4040112, ...range(4040121, 4040142), ...range(4040151, 4040156), ...range(4040161, 4040163), 4040171, 4040173];
+    const all = [
+      4040112,
+      ...range(4040121, 4040142),
+      ...range(4040151, 4040156),
+      ...range(4040161, 4040163),
+      4040171,
+      4040173,
+    ];
     for (const c of conflict) expect(mapAmegoErrorCode(c)).toBe("CONFLICT");
     for (const c of notFound) expect(mapAmegoErrorCode(c)).toBe("NOT_FOUND");
     const validation = all.filter((c) => !conflict.includes(c) && !notFound.includes(c));
@@ -132,8 +139,14 @@ describe("mapAmegoErrorCode (from info_detail?mid=71)", () => {
   // left as a bare PROVIDER fallthrough except the system print-format error.
   it("categorizes the full f0401 error-code family", () => {
     const f0401 = [
-      3040111, 3040112, ...range(3040121, 3040163), 3040171,
-      ...range(3040172, 3040184), 3040191, 3040192, 3040193,
+      3040111,
+      3040112,
+      ...range(3040121, 3040163),
+      3040171,
+      ...range(3040172, 3040184),
+      3040191,
+      3040192,
+      3040193,
     ];
     expect(mapAmegoErrorCode(3040111)).toBe("NUMBER_EXHAUSTED");
     expect(mapAmegoErrorCode(3040191)).toBe("NUMBER_EXHAUSTED"); // 無法取得下一張發票
@@ -176,7 +189,9 @@ describe("error propagation", () => {
   });
 
   it("propagates a real f0401_custom field error (code 99) as VALIDATION", async () => {
-    server.use(http.post(`${BASE}/json/f0401_custom`, () => HttpResponse.json(ERR_CUSTOM_INVOICEDATE)));
+    server.use(
+      http.post(`${BASE}/json/f0401_custom`, () => HttpResponse.json(ERR_CUSTOM_INVOICEDATE)),
+    );
     // A locally-valid record so it reaches the server, which then rejects it.
     const err = await testProvider()
       .invoice.issueCustom("AA00000010", {

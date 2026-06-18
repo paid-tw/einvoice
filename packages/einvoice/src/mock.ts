@@ -154,11 +154,8 @@ export class MockProvider implements InvoiceProvider {
   async query(input: QueryInvoiceInput): Promise<QueryInvoiceResult> {
     const parsed = this.parse(queryInvoiceInputSchema, input);
     const invoiceNumber =
-      parsed.invoiceNumber ??
-      (parsed.orderId ? this.byOrderId.get(parsed.orderId) : undefined);
-    const stored = invoiceNumber
-      ? this.invoices.get(invoiceNumber)
-      : undefined;
+      parsed.invoiceNumber ?? (parsed.orderId ? this.byOrderId.get(parsed.orderId) : undefined);
+    const stored = invoiceNumber ? this.invoices.get(invoiceNumber) : undefined;
     if (!stored || !invoiceNumber) {
       throw new InvoiceError("Invoice not found", {
         provider: this.name,

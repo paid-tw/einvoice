@@ -94,7 +94,11 @@ describe.skipIf(!live)("ezPay live — allowance lifecycle", LIVE_OPTS, () => {
   });
 
   it("voids the allowance (allowanceInvalid)", async () => {
-    const res = await provider.voidAllowance({ invoiceNumber, allowanceNumber, reason: "測試作廢折讓" });
+    const res = await provider.voidAllowance({
+      invoiceNumber,
+      allowanceNumber,
+      reason: "測試作廢折讓",
+    });
     expect(res.allowanceNumber).toBe(allowanceNumber);
   });
 });

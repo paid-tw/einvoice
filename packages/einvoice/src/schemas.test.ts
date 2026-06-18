@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { InvoiceError } from "./errors.js";
-import { allowanceInputSchema, carrierSchema, issueInvoiceInputSchema, parseInput } from "./schemas.js";
+import {
+  allowanceInputSchema,
+  carrierSchema,
+  issueInvoiceInputSchema,
+  parseInput,
+} from "./schemas.js";
 import type { IssueInvoiceInput } from "./types.js";
 
 const valid: IssueInvoiceInput = {
@@ -93,7 +98,11 @@ describe("parseInput", () => {
   it("throws an InvoiceError(VALIDATION) — not a ZodError — on failure", () => {
     let thrown: unknown;
     try {
-      parseInput(issueInvoiceInputSchema, { ...valid, amount: { salesAmount: 100, taxAmount: 5, totalAmount: 999 } }, "ecpay");
+      parseInput(
+        issueInvoiceInputSchema,
+        { ...valid, amount: { salesAmount: 100, taxAmount: 5, totalAmount: 999 } },
+        "ecpay",
+      );
     } catch (e) {
       thrown = e;
     }
@@ -108,7 +117,9 @@ describe("parseInput", () => {
 
 describe("carrierSchema", () => {
   it("validates a mobile-barcode format", () => {
-    expect(carrierSchema.safeParse({ type: "MOBILE_BARCODE", code: "/ABC1234" }).success).toBe(true);
+    expect(carrierSchema.safeParse({ type: "MOBILE_BARCODE", code: "/ABC1234" }).success).toBe(
+      true,
+    );
     expect(carrierSchema.safeParse({ type: "MOBILE_BARCODE", code: "bad" }).success).toBe(false);
   });
 });

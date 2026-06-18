@@ -52,7 +52,8 @@ export const ENDPOINTS = {
   /** 取得發票列印檔 (PDF/ZIP — binary). Body: `{ invList, isCopy?, isZipped?, format?, printTime?, device? }`. */
   proofInvPrint: "/eInvoice/proof/invPrint",
   /** 字軌分段清單 (一般用戶不帶 stID；合作廠商帶 stID 查指定店家). */
-  invNumberList: (stID?: string | number) => `/eInvoice/invNumber/list${stID != null ? `/${stID}` : ""}`,
+  invNumberList: (stID?: string | number) =>
+    `/eInvoice/invNumber/list${stID != null ? `/${stID}` : ""}`,
   /** 調整字軌分段的起始/結束號碼 (by inID). Body: `{ startNo?, endNo? }`. */
   invNumberAdjustNo: (inID: string | number) => `/eInvoice/invNumber/adjustNo/${inID}`,
   /** 開啟/關閉字軌分段 (by inID). Body: `{ action }` (1 close / 0 open). */
@@ -70,7 +71,8 @@ export const ENDPOINTS = {
   /** 讀取商標圖檔 (by sgoID) — BINARY image. Body: `{ w?, h?, maxw?, maxh? }`. */
   settingsViewLogo: (sgoID: string | number) => `/eInvoice/settings/viewLogo/${sgoID}`,
   /** 上傳商標圖檔 (MULTIPART `files`; sgoID in path = replace, omit = new). */
-  settingsUploadLogo: (sgoID?: string | number) => `/eInvoice/settings/uploadLogo${sgoID != null ? `/${sgoID}` : ""}`,
+  settingsUploadLogo: (sgoID?: string | number) =>
+    `/eInvoice/settings/uploadLogo${sgoID != null ? `/${sgoID}` : ""}`,
   // 財政部 lookups (openTax/* — the maintained versions; twOpen/* are deprecated).
   /** 檢查捐贈碼是否存在於財政部平台. Body: `{ donate }` → `{ isExist }`. */
   openTaxCheckCharity: "/openTax/carrier/checkCharity",

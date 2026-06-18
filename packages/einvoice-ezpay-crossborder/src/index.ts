@@ -4,10 +4,7 @@ export type { EzpayCbCurrency } from "./currencies.js";
 export { CB_ENDPOINTS as EZPAY_CB_ENDPOINTS } from "./endpoints.js";
 export type { CrossBorderEndpointKey } from "./endpoints.js";
 export { assertValidCrossBorderIssue, resolveCurrency } from "./validation.js";
-export {
-  createEzpayCrossBorderProvider,
-  EzpayCrossBorderProvider,
-} from "./provider.js";
+export { createEzpayCrossBorderProvider, EzpayCrossBorderProvider } from "./provider.js";
 export type {
   EzpayCrossBorderConfig,
   CrossBorderPendingInvoice,

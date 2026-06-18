@@ -1,10 +1,6 @@
 import { createHash } from "node:crypto";
 import { InvoiceError, InvoiceErrorCode } from "@paid-tw/einvoice";
-import {
-  type AmegoConfig,
-  resolveBaseUrl,
-  resolveRetry,
-} from "./config.js";
+import { type AmegoConfig, resolveBaseUrl, resolveRetry } from "./config.js";
 
 /**
  * Amego signs every request with `md5(data + time + appKey)` and posts it as

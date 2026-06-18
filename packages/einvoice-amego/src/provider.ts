@@ -27,10 +27,7 @@ import {
   voidAllowanceInputSchema,
   voidInvoiceInputSchema,
 } from "@paid-tw/einvoice";
-import {
-  type AmegoProductTaxType,
-  computeAmegoAmounts,
-} from "./amounts.js";
+import { type AmegoProductTaxType, computeAmegoAmounts } from "./amounts.js";
 import {
   type AmegoResponse,
   type AmegoTimeResponse,
@@ -291,14 +288,16 @@ export class AmegoProvider implements InvoiceProvider {
      * YYYYMMDD) + `limit` (20–500) + `page`; response paginates as
      * `page_total`/`page_now`/`data_total` (verified live).
      */
-    list: (opts: {
-      startDate?: string | number;
-      endDate?: string | number;
-      page?: number;
-      limit?: number;
-      /** 1: 發票日期 (default), 2: 建立日期. */
-      dateSelect?: 1 | 2;
-    } = {}) =>
+    list: (
+      opts: {
+        startDate?: string | number;
+        endDate?: string | number;
+        page?: number;
+        limit?: number;
+        /** 1: 發票日期 (default), 2: 建立日期. */
+        dateSelect?: 1 | 2;
+      } = {},
+    ) =>
       this.raw(ENDPOINTS.invoiceList, {
         date_select: opts.dateSelect ?? 1,
         ...(opts.startDate != null ? { date_start: toYmdNumber(opts.startDate) } : {}),
@@ -328,8 +327,12 @@ export class AmegoProvider implements InvoiceProvider {
           : { type: "invoice", invoice_number: opts.invoiceNumber }),
         printer_type: opts.printerType,
         ...(opts.printerLang !== undefined ? { printer_lang: opts.printerLang } : {}),
-        ...(opts.printInvoiceType !== undefined ? { print_invoice_type: opts.printInvoiceType } : {}),
-        ...(opts.printInvoiceDetail !== undefined ? { print_invoice_detail: opts.printInvoiceDetail } : {}),
+        ...(opts.printInvoiceType !== undefined
+          ? { print_invoice_type: opts.printInvoiceType }
+          : {}),
+        ...(opts.printInvoiceDetail !== undefined
+          ? { print_invoice_detail: opts.printInvoiceDetail }
+          : {}),
       }),
     /**
      * 發票檔案 (PDF) — look up by `invoiceNumber` or `orderId`. Returns
@@ -337,11 +340,7 @@ export class AmegoProvider implements InvoiceProvider {
      * 1 A4(地址+A5) / 2 A4(A5x2) / 3 A5 / 5 QRcode_A4 (no-統編 supports only 0).
      * Carrier invoices can only be downloaded after winning the lottery.
      */
-    file: (opts: {
-      invoiceNumber?: string;
-      orderId?: string;
-      downloadStyle?: 0 | 1 | 2 | 3 | 5;
-    }) =>
+    file: (opts: { invoiceNumber?: string; orderId?: string; downloadStyle?: 0 | 1 | 2 | 3 | 5 }) =>
       this.raw(ENDPOINTS.invoiceFile, {
         ...(opts.orderId
           ? { type: "order", order_id: opts.orderId }
@@ -350,7 +349,10 @@ export class AmegoProvider implements InvoiceProvider {
       }),
     /** 發票狀態 — ARRAY payload, nested `data[]`. */
     status: (invoiceNumbers: string[]) =>
-      this.raw(ENDPOINTS.invoiceStatus, invoiceNumbers.map((InvoiceNumber) => ({ InvoiceNumber }))),
+      this.raw(
+        ENDPOINTS.invoiceStatus,
+        invoiceNumbers.map((InvoiceNumber) => ({ InvoiceNumber })),
+      ),
     /**
      * 開立發票 (自訂配號). Takes an ARRAY payload (verified live); validates the
      * record (InvoiceNumber/InvoiceDate YYYYMMDD/InvoiceTime hh:mm:ss, etc.).
@@ -368,13 +370,15 @@ export class AmegoProvider implements InvoiceProvider {
     query: (allowanceNumber: string) =>
       this.raw(ENDPOINTS.allowanceQuery, { allowance_number: allowanceNumber }),
     /** 折讓列表 — same `date_select`/`date_start`/`date_end`/`limit`/`page` shape as invoice_list. */
-    list: (opts: {
-      startDate?: string | number;
-      endDate?: string | number;
-      page?: number;
-      limit?: number;
-      dateSelect?: 1 | 2;
-    } = {}) =>
+    list: (
+      opts: {
+        startDate?: string | number;
+        endDate?: string | number;
+        page?: number;
+        limit?: number;
+        dateSelect?: 1 | 2;
+      } = {},
+    ) =>
       this.raw(ENDPOINTS.allowanceList, {
         date_select: opts.dateSelect ?? 1,
         ...(opts.startDate != null ? { date_start: toYmdNumber(opts.startDate) } : {}),
@@ -439,7 +443,12 @@ export class AmegoProvider implements InvoiceProvider {
      * `data: { code, start, end }` (the allocated range). `period` is 0:01-02 …
      * 5:11-12; the `Book`/`Year`/`Period` fields are PascalCase.
      */
-    get: (opts: { year: number; period: 0 | 1 | 2 | 3 | 4 | 5; book: number; trackApiCode?: string }) =>
+    get: (opts: {
+      year: number;
+      period: 0 | 1 | 2 | 3 | 4 | 5;
+      book: number;
+      trackApiCode?: string;
+    }) =>
       this.raw(ENDPOINTS.trackGet, {
         Year: opts.year,
         Period: opts.period,
@@ -476,7 +485,10 @@ export class AmegoProvider implements InvoiceProvider {
         });
       }
     }
-    return this.raw(ENDPOINTS.banQuery, bans.map((ban) => ({ ban })));
+    return this.raw(
+      ENDPOINTS.banQuery,
+      bans.map((ban) => ({ ban })),
+    );
   }
 
   /**
@@ -592,7 +604,6 @@ function fromYmd(value: unknown): Date {
 
 function deriveStatus(d: Record<string, unknown>): InvoiceStatus {
   if (Number(d.cancel_date ?? 0) > 0) return InvoiceStatus.VOIDED;
-  if (Array.isArray(d.allowance) && d.allowance.length > 0)
-    return InvoiceStatus.ALLOWANCE;
+  if (Array.isArray(d.allowance) && d.allowance.length > 0) return InvoiceStatus.ALLOWANCE;
   return InvoiceStatus.ISSUED;
 }

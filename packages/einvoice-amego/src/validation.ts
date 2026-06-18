@@ -30,9 +30,7 @@ const maxDecimals = (max: number) => (v: number) => {
   return dot < 0 || s.length - dot - 1 <= max;
 };
 
-const amount7 = z
-  .number()
-  .refine(maxDecimals(7), "must have at most 7 decimal places");
+const amount7 = z.number().refine(maxDecimals(7), "must have at most 7 decimal places");
 
 const nonNegativeAmount = z
   .number()
@@ -41,7 +39,10 @@ const nonNegativeAmount = z
 
 export const amegoProductItemSchema = z
   .object({
-    Description: z.string().min(1, "Description is required").max(256, "Description must be ≤256 chars"),
+    Description: z
+      .string()
+      .min(1, "Description is required")
+      .max(256, "Description must be ≤256 chars"),
     Quantity: amount7,
     UnitPrice: amount7, // line prices may be negative (e.g. discounts)
     Amount: amount7,
@@ -78,7 +79,10 @@ const issueBaseObject = z.object({
   CarrierType: z.string().optional(),
   CarrierId1: z.string().optional(),
   CarrierId2: z.string().optional(),
-  NPOBAN: z.string().regex(/^\d{3,7}$/, "NPOBAN must be 3–7 digits").optional(),
+  NPOBAN: z
+    .string()
+    .regex(/^\d{3,7}$/, "NPOBAN must be 3–7 digits")
+    .optional(),
   ProductItem: z
     .array(amegoProductItemSchema)
     .min(1, "at least one ProductItem is required")
@@ -92,7 +96,10 @@ const issueBaseObject = z.object({
   TaxRate: z.union([z.string(), z.number()]),
   TaxAmount: nonNegativeAmount,
   TotalAmount: nonNegativeAmount,
-  Currency: z.string().regex(/^[A-Z]{3}$/, "Currency must be a 3-letter ISO 4217 code").optional(),
+  Currency: z
+    .string()
+    .regex(/^[A-Z]{3}$/, "Currency must be a 3-letter ISO 4217 code")
+    .optional(),
   ExchangeRate: z.number().positive("ExchangeRate must be a positive number").optional(),
   CustomsClearanceMark: z.union([z.literal(1), z.literal(2)]).optional(),
   ZeroTaxRateReason: z
@@ -197,9 +204,7 @@ function refineIssue(p: IssueLike, ctx: z.RefinementCtx): void {
 }
 
 /** Payload for `/json/f0401` (auto-numbered issue). */
-export const amegoIssuePayloadSchema = issueBaseObject
-  .passthrough()
-  .superRefine(refineIssue);
+export const amegoIssuePayloadSchema = issueBaseObject.passthrough().superRefine(refineIssue);
 
 /**
  * One record for `/json/f0401_custom` (self-numbered issue). Adds the
@@ -209,17 +214,26 @@ export const amegoIssuePayloadSchema = issueBaseObject
 export const amegoCustomIssuePayloadSchema = issueBaseObject
   .extend({
     OrderId: z.string().min(1).max(40).optional(),
-    order_id: z.string().min(1, "order_id is required").max(40, "order_id must be ≤40 chars").optional(),
+    order_id: z
+      .string()
+      .min(1, "order_id is required")
+      .max(40, "order_id must be ≤40 chars")
+      .optional(),
     InvoiceNumber: z.string().min(1, "InvoiceNumber is required"),
     InvoiceDate: z.union([
       z.string().regex(/^\d{8}$/, "InvoiceDate must be YYYYMMDD"),
       z.number().int(),
     ]),
     InvoiceTime: z.string().regex(/^\d{2}:\d{2}:\d{2}$/, "InvoiceTime must be hh:mm:ss"),
-    RandomNumber: z.string().regex(/^\d{4}$/, "RandomNumber must be 4 digits").optional(),
+    RandomNumber: z
+      .string()
+      .regex(/^\d{4}$/, "RandomNumber must be 4 digits")
+      .optional(),
     SellerPersonInCharge: z.string().max(30, "SellerPersonInCharge must be ≤30 chars").optional(),
     // f0401_custom requires PrintMark (verified live: omitting it → "PrintMark 錯誤").
-    PrintMark: z.enum(["Y", "N"], { required_error: "PrintMark (Y/N) is required for f0401_custom" }),
+    PrintMark: z.enum(["Y", "N"], {
+      required_error: "PrintMark (Y/N) is required for f0401_custom",
+    }),
   })
   .passthrough()
   .superRefine((p, ctx) => {
@@ -252,22 +266,35 @@ export type AmegoCustomIssuePayload = z.input<typeof amegoCustomIssuePayloadSche
 // ---------------------------------------------------------------------------
 
 const numericLike = z.union([z.number(), z.string().regex(/^-?\d+(\.\d+)?$/, "must be numeric")]);
-const decimal7Like = numericLike.refine((v) => maxDecimals(7)(Number(v)), "must have ≤7 decimal places");
+const decimal7Like = numericLike.refine(
+  (v) => maxDecimals(7)(Number(v)),
+  "must have ≤7 decimal places",
+);
 const integerLike = numericLike.refine((v) => Number.isInteger(Number(v)), "must be an integer");
 const ymdLike = z.union([
   z.string().regex(/^\d{8}$/, "must be YYYYMMDD"),
-  z.number().int().refine((n) => String(n).length === 8, "must be YYYYMMDD"),
+  z
+    .number()
+    .int()
+    .refine((n) => String(n).length === 8, "must be YYYYMMDD"),
 ]);
 const itemTaxType = z.union([
-  z.literal(1), z.literal(2), z.literal(3),
-  z.literal("1"), z.literal("2"), z.literal("3"),
+  z.literal(1),
+  z.literal(2),
+  z.literal(3),
+  z.literal("1"),
+  z.literal("2"),
+  z.literal("3"),
 ]);
 
 export const amegoAllowanceItemSchema = z
   .object({
     OriginalInvoiceNumber: z.string().min(1, "OriginalInvoiceNumber is required"),
     OriginalInvoiceDate: ymdLike,
-    OriginalDescription: z.string().min(1, "OriginalDescription is required").max(256, "OriginalDescription must be ≤256 chars"),
+    OriginalDescription: z
+      .string()
+      .min(1, "OriginalDescription is required")
+      .max(256, "OriginalDescription must be ≤256 chars"),
     Quantity: decimal7Like,
     UnitPrice: decimal7Like, // 未稅
     Amount: decimal7Like, // 未稅
@@ -280,19 +307,29 @@ export const amegoAllowanceItemSchema = z
 /** One record for `/json/g0401` (開立折讓). All amounts are tax-EXCLUSIVE. */
 export const amegoAllowancePayloadSchema = z
   .object({
-    AllowanceNumber: z.string().min(1, "AllowanceNumber is required").max(16, "AllowanceNumber must be ≤16 chars"),
+    AllowanceNumber: z
+      .string()
+      .min(1, "AllowanceNumber is required")
+      .max(16, "AllowanceNumber must be ≤16 chars"),
     AllowanceDate: ymdLike,
     AllowanceType: z.union([z.literal(1), z.literal(2), z.literal("1"), z.literal("2")]),
     BuyerIdentifier: z
       .string()
-      .refine((v) => v === "0000000000" || isValidUbn(v), "BuyerIdentifier must be a valid 統一編號 or 0000000000"),
+      .refine(
+        (v) => v === "0000000000" || isValidUbn(v),
+        "BuyerIdentifier must be a valid 統一編號 or 0000000000",
+      ),
     BuyerName: z
       .string()
       .min(1, "BuyerName is required")
       .refine((v) => !["0", "00", "000", "0000"].includes(v), "BuyerName cannot be 0/00/000/0000"),
     BuyerAddress: z.string().optional(),
     BuyerTelephoneNumber: z.string().optional(),
-    BuyerEmailAddress: z.string().email("BuyerEmailAddress must be a valid email").optional().or(z.literal("")),
+    BuyerEmailAddress: z
+      .string()
+      .email("BuyerEmailAddress must be a valid email")
+      .optional()
+      .or(z.literal("")),
     ProductItem: z
       .array(amegoAllowanceItemSchema)
       .min(1, "at least one ProductItem is required")

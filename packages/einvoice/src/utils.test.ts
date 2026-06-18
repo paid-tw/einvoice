@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { composeTaxExclusive, deriveCategory, parseTaipeiDate, splitTaxInclusive, taipeiDateTime, taxTypeToCode } from "./utils.js";
+import {
+  composeTaxExclusive,
+  deriveCategory,
+  parseTaipeiDate,
+  splitTaxInclusive,
+  taipeiDateTime,
+  taxTypeToCode,
+} from "./utils.js";
 
 describe("amount helpers", () => {
   it("composeTaxExclusive adds 5% tax", () => {
@@ -36,7 +43,9 @@ describe("Taipei date helpers", () => {
   });
 
   it("parseTaipeiDate trims and accepts a T separator", () => {
-    expect(parseTaipeiDate("  2026-01-02T03:04:05  ").toISOString()).toBe("2026-01-01T19:04:05.000Z");
+    expect(parseTaipeiDate("  2026-01-02T03:04:05  ").toISOString()).toBe(
+      "2026-01-01T19:04:05.000Z",
+    );
   });
 
   it("parseTaipeiDate falls back to a Date for unparseable input", () => {

@@ -48,7 +48,15 @@ export const INVOICE_QUERY_OK = {
     detail_amount_round: 0,
     create_date: 1781650039,
     product_item: [
-      { tax_type: 1, description: "測試商品", unit_price: 105, quantity: 1, unit: "", amount: 105, remark: "" },
+      {
+        tax_type: 1,
+        description: "測試商品",
+        unit_price: 105,
+        quantity: 1,
+        unit: "",
+        amount: 105,
+        remark: "",
+      },
     ],
     wait: [],
     allowance: [],
@@ -104,7 +112,15 @@ export const ALLOWANCE_LIST_OK = {
 export const ALLOWANCE_STATUS_OK = {
   code: 0,
   msg: "",
-  data: [{ allowance_number: "ALW1781650040", type: "D0401", status: 1, tax_amount: 5, total_amount: 100 }],
+  data: [
+    {
+      allowance_number: "ALW1781650040",
+      type: "D0401",
+      status: 1,
+      tax_amount: 5,
+      total_amount: 100,
+    },
+  ],
 };
 
 /**
@@ -203,7 +219,8 @@ export const CUSTOM_ISSUE_OK = {
     {
       invoice_number: "EE00006850",
       barcode: "11506EE000068504321",
-      qrcode_left: "EE000068501150617432100000064000000690000000012345678goMz1DO3V133QXLaMhZpDQ==:**********:1:1:0:",
+      qrcode_left:
+        "EE000068501150617432100000064000000690000000012345678goMz1DO3V133QXLaMhZpDQ==:**********:1:1:0:",
       qrcode_right: "**自訂配號測試:1:105",
       base64_data: "",
     },
@@ -261,9 +278,33 @@ export const TRACK_STATUS_OK = {
   code: 0,
   msg: "",
   data: [
-    { code: "EE", start: "00000000", end: "00009999", now: "00006849", total_booklet: 200, used_booklet: 137, status: 1 },
-    { code: "EF", start: "00000000", end: "00009999", now: "", total_booklet: 200, used_booklet: 0, status: 1 },
-    { code: "IT", start: "62008000", end: "62009099", now: "62009099", total_booklet: 22, used_booklet: 22, status: 3 },
+    {
+      code: "EE",
+      start: "00000000",
+      end: "00009999",
+      now: "00006849",
+      total_booklet: 200,
+      used_booklet: 137,
+      status: 1,
+    },
+    {
+      code: "EF",
+      start: "00000000",
+      end: "00009999",
+      now: "",
+      total_booklet: 200,
+      used_booklet: 0,
+      status: 1,
+    },
+    {
+      code: "IT",
+      start: "62008000",
+      end: "62009099",
+      now: "62009099",
+      total_booklet: 22,
+      used_booklet: 22,
+      status: 3,
+    },
   ],
 };
 
@@ -297,7 +338,10 @@ export const LOTTERY_TYPE_OK = {
 export const FILE_URL_OK = {
   code: 0,
   msg: "",
-  data: { file_url: "https://invoice.amego.tw/user/invoice_print_type?token=1781657356_65e6f89b3ed08441931fc647eab8e6a0&type=0" },
+  data: {
+    file_url:
+      "https://invoice.amego.tw/user/invoice_print_type?token=1781657356_65e6f89b3ed08441931fc647eab8e6a0&type=0",
+  },
 };
 
 export const VOID_OK = { code: 0, msg: "" };
@@ -319,7 +363,10 @@ export const TIME_OK = {
 };
 
 /** Real error envelopes (code !== 0), captured live by sending invalid values. */
-export const ERR_VOID_NOT_ARRAY = { code: 3050112, msg: "此 API 支援傳輸多張發票，data 欄位資料應為陣列字串" };
+export const ERR_VOID_NOT_ARRAY = {
+  code: 3050112,
+  msg: "此 API 支援傳輸多張發票，data 欄位資料應為陣列字串",
+};
 export const ERR_QUERY_NO_TYPE = { code: 31, msg: "type 查詢類型不存在" };
 export const ERR_ALREADY_ALLOWANCE = { code: 3050141, msg: "AA26513024 已存在折讓單" };
 export const ERR_BUYER_NAME = { code: 3040123, msg: "BuyerName 不可為空或過長" };
@@ -330,4 +377,8 @@ export const ERR_DETAILVAT = { code: 3040162, msg: "只有打統編發票， 才
 export const ERR_ZERORATE_CCM = { code: 3040179, msg: "若為零稅率發票，通關方式註記必填" };
 export const ERR_CARRIER = { code: 3040132, msg: "載具號碼不存在" };
 export const ERR_NPOBAN = { code: 3040137, msg: "NPOBAN 不存在" };
-export const ERR_CUSTOM_INVOICEDATE = { code: 99, msg: "第1筆 發票號碼AA00000010 InvoiceDate 錯誤", data: [] };
+export const ERR_CUSTOM_INVOICEDATE = {
+  code: 99,
+  msg: "第1筆 發票號碼AA00000010 InvoiceDate 錯誤",
+  data: [],
+};

@@ -47,11 +47,23 @@ describe.skipIf(!live)("ECPay live (stage) — issue → query → void", LIVE_O
 
   it("sends an issue notification (InvoiceNotify, stage validates but won't deliver)", async () => {
     await expect(
-      p.sendNotification({ invoiceNumber, tag: "ISSUE", method: "EMAIL", recipient: "CUSTOMER", email: "test@example.com" }),
+      p.sendNotification({
+        invoiceNumber,
+        tag: "ISSUE",
+        method: "EMAIL",
+        recipient: "CUSTOMER",
+        email: "test@example.com",
+      }),
     ).resolves.toBeUndefined();
     // A non-winning invoice has no award data → NOT_FOUND, proving the AW tag is processed.
     await expect(
-      p.sendNotification({ invoiceNumber, tag: "AWARD", method: "EMAIL", recipient: "CUSTOMER", email: "test@example.com" }),
+      p.sendNotification({
+        invoiceNumber,
+        tag: "AWARD",
+        method: "EMAIL",
+        recipient: "CUSTOMER",
+        email: "test@example.com",
+      }),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 
@@ -82,7 +94,11 @@ describe.skipIf(!live)("ECPay live (stage) — issue → query → void", LIVE_O
     expect(res.allowanceNumber).toMatch(/^\d+$/);
     expect(res.expiresAt.getTime()).toBeGreaterThan(res.createdAt.getTime());
     // Cancel the pending online allowance (before buyer confirmation).
-    const c = await p.cancelAllowanceOnline({ invoiceNumber: oinv.invoiceNumber, allowanceNumber: res.allowanceNumber, reason: "測試取消" });
+    const c = await p.cancelAllowanceOnline({
+      invoiceNumber: oinv.invoiceNumber,
+      allowanceNumber: res.allowanceNumber,
+      reason: "測試取消",
+    });
     expect((c.raw as { RtnCode: number }).RtnCode).toBe(1);
   });
 
@@ -96,15 +112,24 @@ describe.skipIf(!live)("ECPay live (stage) — issue → query → void", LIVE_O
     });
     expect(al.allowanceNumber).toMatch(/^\d+$/);
     // The invoice now reports ALLOWANCE (remaining < sales).
-    expect((await p.query({ invoiceNumber, providerOptions: { invoiceDate } })).status).toBe("ALLOWANCE");
+    expect((await p.query({ invoiceNumber, providerOptions: { invoiceDate } })).status).toBe(
+      "ALLOWANCE",
+    );
     // The allowance is queryable by its number (GetAllowanceList).
     const details = await p.getAllowanceList({ allowanceNumber: al.allowanceNumber });
     expect(details[0]?.invoiceNumber).toBe(invoiceNumber);
     expect(details[0]?.totalAmount).toBe(100);
-    const va = await p.voidAllowance({ invoiceNumber, allowanceNumber: al.allowanceNumber, reason: "測試作廢" });
+    const va = await p.voidAllowance({
+      invoiceNumber,
+      allowanceNumber: al.allowanceNumber,
+      reason: "測試作廢",
+    });
     expect((va.raw as { RtnCode: number }).RtnCode).toBe(1);
     // The voided allowance is queryable (GetAllowanceInvalid).
-    const inval = await p.getAllowanceInvalid({ invoiceNumber, allowanceNumber: al.allowanceNumber });
+    const inval = await p.getAllowanceInvalid({
+      invoiceNumber,
+      allowanceNumber: al.allowanceNumber,
+    });
     expect(inval.reason).toBe("測試作廢");
     // Voiding it again → 2000063 該折讓單已作廢過 → CONFLICT.
     await expect(
@@ -113,7 +138,11 @@ describe.skipIf(!live)("ECPay live (stage) — issue → query → void", LIVE_O
   });
 
   it("voids it (Invalid), then reads the void detail (GetInvalid)", async () => {
-    const res = await p.void({ invoiceNumber, reason: "整合測試作廢", providerOptions: { invoiceDate } });
+    const res = await p.void({
+      invoiceNumber,
+      reason: "整合測試作廢",
+      providerOptions: { invoiceDate },
+    });
     expect(res.status).toBe("VOIDED");
     const detail = await p.getInvalid({ orderId, invoiceNumber, invoiceDate });
     expect(detail.invoiceNumber).toBe(invoiceNumber);
@@ -137,18 +166,24 @@ describe.skipIf(!live)("ECPay live (stage) — Issue field-rule audit", LIVE_OPT
   // Verified live: zero-rated REQUIRES ClearanceMark (API: 5000007), but the
   // docs' "ZeroTaxRateReason required" is NOT enforced.
   it("issues a zero-rated invoice with ClearanceMark (no ZeroTaxRateReason needed)", async () => {
-    const res = await p.issue(base({ taxType: "ZERO_RATED", providerOptions: { clearanceMark: "2" } }));
+    const res = await p.issue(
+      base({ taxType: "ZERO_RATED", providerOptions: { clearanceMark: "2" } }),
+    );
     expect(res.invoiceNumber).toMatch(/^[A-Z]{2}\d{8}$/);
   });
 
   it("rejects a zero-rated invoice with no ClearanceMark locally", async () => {
-    await expect(p.issue(base({ taxType: "ZERO_RATED" }))).rejects.toMatchObject({ code: "VALIDATION" });
+    await expect(p.issue(base({ taxType: "ZERO_RATED" }))).rejects.toMatchObject({
+      code: "VALIDATION",
+    });
   });
 
   // Verified live: a B2B (統編) invoice CAN store a carrier (情境二) — our schema
   // no longer wrongly rejects it.
   it("issues a B2B invoice that stores an ECPay carrier", async () => {
-    const res = await p.issue(base({ buyer: { ubn: "53538851", name: "歐付寶", email: "test@example.com" } }));
+    const res = await p.issue(
+      base({ buyer: { ubn: "53538851", name: "歐付寶", email: "test@example.com" } }),
+    );
     expect(res.invoiceNumber).toMatch(/^[A-Z]{2}\d{8}$/);
   });
 });
@@ -208,13 +243,21 @@ describe.skipIf(!live)("ECPay live (stage) — 發票列印", LIVE_OPTS, () => {
       priceMode: "TAX_INCLUSIVE",
     });
     const date = paper.invoiceDate.toISOString().slice(0, 10);
-    const u = await p.getPrintUrl({ invoiceNumber: paper.invoiceNumber, invoiceDate: date, style: "DOUBLE", reprint: true });
+    const u = await p.getPrintUrl({
+      invoiceNumber: paper.invoiceNumber,
+      invoiceDate: date,
+      style: "DOUBLE",
+      reprint: true,
+    });
     expect(u).toMatch(/^https:\/\//);
 
     // A carrier invoice has Print=0 and cannot be printed → 查無資料 (NOT_FOUND).
     const carrier = await p.issue(carrierIssue(`PRC${Date.now()}`));
     await expect(
-      p.getPrintUrl({ invoiceNumber: carrier.invoiceNumber, invoiceDate: carrier.invoiceDate.toISOString().slice(0, 10) }),
+      p.getPrintUrl({
+        invoiceNumber: carrier.invoiceNumber,
+        invoiceDate: carrier.invoiceDate.toISOString().slice(0, 10),
+      }),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 });
@@ -240,7 +283,10 @@ describe.skipIf(!live)("ECPay live (stage) — 延遲/觸發開立", LIVE_OPTS, 
   });
 
   it("issuePending SCHEDULE (DelayFlag=1) stages an auto-issuing invoice", async () => {
-    const res = await p.issuePending(carrierIssue(`${orderId}S`), { mode: "SCHEDULE", delayDay: 3 });
+    const res = await p.issuePending(carrierIssue(`${orderId}S`), {
+      mode: "SCHEDULE",
+      delayDay: 3,
+    });
     expect(res.raw.RtnCode).toBe(1);
   });
 
@@ -254,9 +300,15 @@ describe.skipIf(!live)("ECPay live (stage) — 延遲/觸發開立", LIVE_OPTS, 
   it("editDelayIssue updates a still-pending invoice; unknown Tsr → NOT_FOUND", async () => {
     const eid = `${orderId}E`;
     await p.issuePending(carrierIssue(eid)); // TRIGGER mode → stays pending
-    const edited = await p.editDelayIssue({ ...carrierIssue(eid), items: [{ description: "改後商品", quantity: 1, unitPrice: 200, amount: 200 }], amount: { salesAmount: 200, taxAmount: 0, totalAmount: 200 } });
+    const edited = await p.editDelayIssue({
+      ...carrierIssue(eid),
+      items: [{ description: "改後商品", quantity: 1, unitPrice: 200, amount: 200 }],
+      amount: { salesAmount: 200, taxAmount: 0, totalAmount: 200 },
+    });
     expect(edited.raw.RtnCode).toBe(1);
-    await expect(p.editDelayIssue(carrierIssue(eid), { tsr: "NONEXISTENT999" })).rejects.toMatchObject({ code: "NOT_FOUND" });
+    await expect(
+      p.editDelayIssue(carrierIssue(eid), { tsr: "NONEXISTENT999" }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 });
 
@@ -282,7 +334,9 @@ describe.skipIf(!live)("ECPay live (stage) — 載具驗證", LIVE_OPTS, () => {
 describe.skipIf(!live)("ECPay live (stage) — 查詢財政部配號", LIVE_OPTS, () => {
   const p = provider();
   const thisYear = String(new Date().getFullYear() - 1911); // 民國年
-  const thisYearDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Taipei" }).format(new Date());
+  const thisYearDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Taipei" }).format(
+    new Date(),
+  );
 
   it("lists the allocated 字軌 ranges for the current 民國年", async () => {
     const ranges = await p.getGovInvoiceWordSetting(thisYear);
@@ -304,7 +358,12 @@ describe.skipIf(!live)("ECPay live (stage) — 查詢財政部配號", LIVE_OPTS
   });
 
   it("lists multiple invoices in a date range (GetIssueList, paginated, plain JSON)", async () => {
-    const page = await p.listInvoices({ beginDate: thisYearDate, endDate: thisYearDate, numPerPage: 3, page: 1 });
+    const page = await p.listInvoices({
+      beginDate: thisYearDate,
+      endDate: thisYearDate,
+      numPerPage: 3,
+      page: 1,
+    });
     expect(page.totalCount).toBeGreaterThan(0);
     expect(page.invoices.length).toBeGreaterThan(0);
     expect(page.invoices[0]?.invoiceNumber).toMatch(/^[A-Z]{2}\d{8}$/);
@@ -315,11 +374,15 @@ describe.skipIf(!live)("ECPay live (stage) — 查詢財政部配號", LIVE_OPTS
     const tracks = await p.getInvoiceWordSetting({ invoiceYear: thisYear });
     expect(tracks.length).toBeGreaterThan(0);
     expect(tracks[0]?.trackId).toMatch(/^\d+$/);
-    expect(tracks[0]?.status).toMatch(/^(INACTIVE|IN_USE|DISABLED|PAUSED|PENDING_REVIEW|REJECTED)$/);
+    expect(tracks[0]?.status).toMatch(
+      /^(INACTIVE|IN_USE|DISABLED|PAUSED|PENDING_REVIEW|REJECTED)$/,
+    );
   });
 
   // Read-only: a bogus TrackID confirms the endpoint without mutating a real 字軌.
   it("setInvoiceWordStatus rejects an unknown TrackID with NOT_FOUND", async () => {
-    await expect(p.setInvoiceWordStatus("9999999", "ENABLE")).rejects.toMatchObject({ code: "NOT_FOUND" });
+    await expect(p.setInvoiceWordStatus("9999999", "ENABLE")).rejects.toMatchObject({
+      code: "NOT_FOUND",
+    });
   });
 });

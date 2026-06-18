@@ -54,9 +54,7 @@ describe("retry (network only, opt-in)", () => {
 
 describe("transport errors", () => {
   it("wraps a non-JSON POST response as a PROVIDER error", async () => {
-    server.use(
-      http.post(`${BASE}/json/f0501`, () => new HttpResponse("<html/>", { status: 502 })),
-    );
+    server.use(http.post(`${BASE}/json/f0501`, () => new HttpResponse("<html/>", { status: 502 })));
     const err = await createAmegoProvider(cfg)
       .void({ invoiceNumber: "AA1", reason: "x" })
       .catch((e) => e);
@@ -66,7 +64,9 @@ describe("transport errors", () => {
 
   it("wraps a time() GET network failure as a NETWORK error", async () => {
     server.use(http.get(`${BASE}/json/time`, () => HttpResponse.error()));
-    const err = await createAmegoProvider(cfg).time().catch((e) => e);
+    const err = await createAmegoProvider(cfg)
+      .time()
+      .catch((e) => e);
     expect(err.code).toBe("NETWORK");
     expect(err.provider).toBe("amego");
   });

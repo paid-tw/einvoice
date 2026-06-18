@@ -22,7 +22,13 @@ const b2cInput = {
 function issueCapture(into: { body?: Record<string, unknown> }) {
   return http.post(url(EP.issue), async ({ request }) => {
     into.body = (await request.json()) as Record<string, unknown>;
-    return ok({ id: 999, invNo: "SX60721900", period: "202605", createTime: "2026-06-18 06:32:38", randNo: "6611" });
+    return ok({
+      id: 999,
+      invNo: "SX60721900",
+      period: "202605",
+      createTime: "2026-06-18 06:32:38",
+      randNo: "6611",
+    });
   });
 }
 
@@ -55,7 +61,16 @@ describe("ezreceiptTaxType + endpoints", () => {
 describe("capabilities", () => {
   it("declares issue/void/allowance/query + B2B + mixed tax + carrier validation, not foreign currency", () => {
     const p = testProvider();
-    for (const c of [Capability.ISSUE, Capability.VOID, Capability.ALLOWANCE, Capability.VOID_ALLOWANCE, Capability.QUERY, Capability.B2B, Capability.MIXED_TAX, Capability.CARRIER_VALIDATION]) {
+    for (const c of [
+      Capability.ISSUE,
+      Capability.VOID,
+      Capability.ALLOWANCE,
+      Capability.VOID_ALLOWANCE,
+      Capability.QUERY,
+      Capability.B2B,
+      Capability.MIXED_TAX,
+      Capability.CARRIER_VALIDATION,
+    ]) {
       expect(supports(p, c)).toBe(true);
     }
     for (const c of [Capability.FOREIGN_CURRENCY, Capability.SCHEDULED_ISSUE]) {
@@ -69,7 +84,13 @@ describe("issue", () => {
     const cap: { body?: Record<string, unknown> } = {};
     server.use(loginHandler(), issueCapture(cap));
     const res = await testProvider().issue(b2cInput);
-    expect(res).toMatchObject({ invoiceNumber: "SX60721900", randomCode: "6611", orderId: "ORDER_1", totalAmount: 105, status: "ISSUED" });
+    expect(res).toMatchObject({
+      invoiceNumber: "SX60721900",
+      randomCode: "6611",
+      orderId: "ORDER_1",
+      totalAmount: 105,
+      status: "ISSUED",
+    });
     expect(res.invoiceDate.getFullYear()).toBe(2026);
     expect(cap.body).toMatchObject({
       prodList: [{ title: "商品", qty: 1, sales: 100, incTax: false, taxType: 1, unit: "件" }],
@@ -84,7 +105,11 @@ describe("issue", () => {
   it("maps a B2B invoice to issueTo (統編), no carrier", async () => {
     const cap: { body?: Record<string, unknown> } = {};
     server.use(loginHandler(), issueCapture(cap));
-    await testProvider().issue({ ...b2cInput, buyer: { ubn: "53538851", name: "歐付寶", address: "台北市" }, carrier: undefined });
+    await testProvider().issue({
+      ...b2cInput,
+      buyer: { ubn: "53538851", name: "歐付寶", address: "台北市" },
+      carrier: undefined,
+    });
     expect(cap.body?.issueTo).toMatchObject({ nid: "53538851", title: "歐付寶", addr: "台北市" });
     expect(cap.body?.carrier).toBeUndefined();
   });
@@ -99,7 +124,10 @@ describe("issue", () => {
   it("maps a mobile-barcode carrier (carrierType 2, no buyer)", async () => {
     const cap: { body?: Record<string, unknown> } = {};
     server.use(loginHandler(), issueCapture(cap));
-    await testProvider().issue({ ...b2cInput, carrier: { type: "MOBILE_BARCODE", code: "/ABC1234" } });
+    await testProvider().issue({
+      ...b2cInput,
+      carrier: { type: "MOBILE_BARCODE", code: "/ABC1234" },
+    });
     expect(cap.body?.carrier).toMatchObject({ carrierType: 2, carrierInfo: "/ABC1234" });
     expect(cap.body?.buyer).toBeUndefined();
   });
@@ -152,7 +180,14 @@ describe("issue", () => {
       ...b2cInput,
       taxType: "ZERO_RATED",
       date: new Date("2026-06-18T06:00:00Z"), // → 2026-06-18 14:00:00 Asia/Taipei
-      providerOptions: { zeroTaxReason: 71, clearanceMark: 1, invNo: "SX60721900", autoInvNo: true, winvNo: "W1", randNo: "1234" },
+      providerOptions: {
+        zeroTaxReason: 71,
+        clearanceMark: 1,
+        invNo: "SX60721900",
+        autoInvNo: true,
+        winvNo: "W1",
+        randNo: "1234",
+      },
     });
     expect(cap.body).toMatchObject({
       invoiceTime: "2026-06-18 14:00:00",
@@ -172,7 +207,11 @@ describe("issue", () => {
     server.use(loginHandler(), issueCapture(cap));
     await testProvider().issue({
       ...b2cInput,
-      providerOptions: { order: { title: "訂單標題", discount: 10 }, sendTo: { name: "收件人", addr: "台北" }, credit4: "1234" },
+      providerOptions: {
+        order: { title: "訂單標題", discount: 10 },
+        sendTo: { name: "收件人", addr: "台北" },
+        credit4: "1234",
+      },
     });
     expect(cap.body?.order).toEqual({ orderNo: "ORDER_1", title: "訂單標題", discount: 10 });
     expect(cap.body?.sendTo).toMatchObject({ name: "收件人" });
@@ -213,12 +252,20 @@ describe("issue", () => {
 
   it("rejects an invoice with no ubn / carrier / donation", async () => {
     server.use(loginHandler());
-    await expect(testProvider().issue({ ...b2cInput, carrier: undefined })).rejects.toMatchObject({ code: "VALIDATION" });
+    await expect(testProvider().issue({ ...b2cInput, carrier: undefined })).rejects.toMatchObject({
+      code: "VALIDATION",
+    });
   });
 
   it("maps ezPay's 1015 (no usable 字軌) to NUMBER_EXHAUSTED", async () => {
-    server.use(loginHandler(), http.post(url(EP.issue), () => fail(1015, "無法選擇一組適當的分段字軌來使用。")));
-    await expect(testProvider().issue(b2cInput)).rejects.toMatchObject({ code: "NUMBER_EXHAUSTED", rawCode: "1015" });
+    server.use(
+      loginHandler(),
+      http.post(url(EP.issue), () => fail(1015, "無法選擇一組適當的分段字軌來使用。")),
+    );
+    await expect(testProvider().issue(b2cInput)).rejects.toMatchObject({
+      code: "NUMBER_EXHAUSTED",
+      rawCode: "1015",
+    });
   });
 });
 
@@ -248,18 +295,33 @@ describe("void", () => {
       }),
       http.post(url(EP.void(555)), () => ok({ invID: "555" })),
     );
-    await testProvider().void({ invoiceNumber: "SX1", reason: "x", providerOptions: { invID: 555 } });
+    await testProvider().void({
+      invoiceNumber: "SX1",
+      reason: "x",
+      providerOptions: { invID: 555 },
+    });
     expect(listed).toBe(false);
   });
 
   it("throws NOT_FOUND when the invoice number can't be resolved", async () => {
-    server.use(loginHandler(), http.post(url(EP.list), () => ok({ list: [], entries: 0 })));
-    await expect(testProvider().void({ invoiceNumber: "NOPE", reason: "x" })).rejects.toMatchObject({ code: "NOT_FOUND" });
+    server.use(
+      loginHandler(),
+      http.post(url(EP.list), () => ok({ list: [], entries: 0 })),
+    );
+    await expect(testProvider().void({ invoiceNumber: "NOPE", reason: "x" })).rejects.toMatchObject(
+      { code: "NOT_FOUND" },
+    );
   });
 
   it("rejects a voidReason longer than 20 chars locally", async () => {
     server.use(loginHandler());
-    await expect(testProvider().void({ invoiceNumber: "SX1", reason: "x".repeat(21), providerOptions: { invID: 1 } })).rejects.toMatchObject({ code: "VALIDATION" });
+    await expect(
+      testProvider().void({
+        invoiceNumber: "SX1",
+        reason: "x".repeat(21),
+        providerOptions: { invID: 1 },
+      }),
+    ).rejects.toMatchObject({ code: "VALIDATION" });
   });
 
   it("forwards voidOrder to also void the underlying order", async () => {
@@ -271,7 +333,11 @@ describe("void", () => {
         return ok({ invID: "7" });
       }),
     );
-    await testProvider().void({ invoiceNumber: "SX1", reason: "退貨", providerOptions: { invID: 7, voidOrder: true } });
+    await testProvider().void({
+      invoiceNumber: "SX1",
+      reason: "退貨",
+      providerOptions: { invID: 7, voidOrder: true },
+    });
     expect(body).toEqual({ voidReason: "退貨", voidOrder: true });
   });
 });
@@ -291,18 +357,38 @@ describe("query", () => {
   };
 
   it("resolves by invoice number and maps the view to a unified result", async () => {
-    server.use(loginHandler(), listResolves("SX60721900", 999), http.post(url(EP.view(999)), () => ok(viewResult)));
+    server.use(
+      loginHandler(),
+      listResolves("SX60721900", 999),
+      http.post(url(EP.view(999)), () => ok(viewResult)),
+    );
     const res = await testProvider().query({ invoiceNumber: "SX60721900" });
-    expect(res).toMatchObject({ invoiceNumber: "SX60721900", randomCode: "6611", status: "ISSUED", orderId: "SS2606000001" });
+    expect(res).toMatchObject({
+      invoiceNumber: "SX60721900",
+      randomCode: "6611",
+      status: "ISSUED",
+      orderId: "SS2606000001",
+    });
     expect(res.amount).toEqual({ salesAmount: 100, taxAmount: 5, totalAmount: 105 });
     expect(res.buyer.name).toBe("買受人");
-    expect(res.items[0]).toMatchObject({ description: "商品", quantity: 1, unitPrice: 100, unit: "件" });
+    expect(res.items[0]).toMatchObject({
+      description: "商品",
+      quantity: 1,
+      unitPrice: 100,
+      unit: "件",
+    });
   });
 
   it("maps procState 13 (作廢) and 30 (註銷) to VOIDED", async () => {
     for (const procState of [13, 30]) {
-      server.use(loginHandler(), http.post(url(EP.view(999)), () => ok({ ...viewResult, procState })));
-      const res = await testProvider().query({ invoiceNumber: "SX60721900", providerOptions: { invID: 999 } });
+      server.use(
+        loginHandler(),
+        http.post(url(EP.view(999)), () => ok({ ...viewResult, procState })),
+      );
+      const res = await testProvider().query({
+        invoiceNumber: "SX60721900",
+        providerOptions: { invID: 999 },
+      });
       expect(res.status).toBe("VOIDED");
     }
   });
@@ -331,7 +417,11 @@ describe("allowance", () => {
       items: [{ description: "商品", quantity: 1, unitPrice: 100, amount: 100 }],
       amount: { salesAmount: 100, taxAmount: 5, totalAmount: 105 },
     });
-    expect(res).toMatchObject({ allowanceNumber: "S26SX607219001", invoiceNumber: "SX60721900", totalAmount: 105 });
+    expect(res).toMatchObject({
+      allowanceNumber: "S26SX607219001",
+      invoiceNumber: "SX60721900",
+      totalAmount: 105,
+    });
     expect(allowBody?.prodList).toMatchObject([{ soiID: 236520, qty: 1, amount: 100, tax: 5 }]);
   });
 
@@ -387,19 +477,30 @@ describe("revokeInvoice (extension)", () => {
         return ok({ invID: 999, revokeReason: "打錯", revokeTime: "2026-06-18 09:00:00" });
       }),
     );
-    const res = await testProvider().revokeInvoice("SX60721900", "打錯", { revokeTime: "2026-06-18 09:00:00" });
+    const res = await testProvider().revokeInvoice("SX60721900", "打錯", {
+      revokeTime: "2026-06-18 09:00:00",
+    });
     expect(res.invID).toBe(999);
     expect(body).toEqual({ revokeReason: "打錯", revokeTime: "2026-06-18 09:00:00" });
   });
 
   it("rejects a reason longer than 20 chars", async () => {
     server.use(loginHandler());
-    await expect(testProvider().revokeInvoice("SX1", "x".repeat(21), { providerOptions: { invID: 1 } })).rejects.toMatchObject({ code: "VALIDATION" });
+    await expect(
+      testProvider().revokeInvoice("SX1", "x".repeat(21), { providerOptions: { invID: 1 } }),
+    ).rejects.toMatchObject({ code: "VALIDATION" });
   });
 
   it("maps a state-disallowed revoke (1018) to CONFLICT", async () => {
-    server.use(loginHandler(), http.post(url(EP.invoiceRevoke(1)), () => fail(1018, "發票目前的狀態無法執行作廢、註銷或退回。")));
-    await expect(testProvider().revokeInvoice("SX1", "x", { providerOptions: { invID: 1 } })).rejects.toMatchObject({ code: "CONFLICT", rawCode: "1018" });
+    server.use(
+      loginHandler(),
+      http.post(url(EP.invoiceRevoke(1)), () =>
+        fail(1018, "發票目前的狀態無法執行作廢、註銷或退回。"),
+      ),
+    );
+    await expect(
+      testProvider().revokeInvoice("SX1", "x", { providerOptions: { invID: 1 } }),
+    ).rejects.toMatchObject({ code: "CONFLICT", rawCode: "1018" });
   });
 });
 
@@ -436,8 +537,13 @@ describe("replyInvoice (extension)", () => {
   });
 
   it("maps a state-disallowed confirm (1031) to CONFLICT", async () => {
-    server.use(loginHandler(), http.post(url(EP.invoiceReply(5)), () => fail(1031, "現有狀態不能執行確認開立")));
-    await expect(testProvider().replyInvoice("SX1", "ISSUE", { providerOptions: { invID: 5 } })).rejects.toMatchObject({ code: "CONFLICT", rawCode: "1031" });
+    server.use(
+      loginHandler(),
+      http.post(url(EP.invoiceReply(5)), () => fail(1031, "現有狀態不能執行確認開立")),
+    );
+    await expect(
+      testProvider().replyInvoice("SX1", "ISSUE", { providerOptions: { invID: 5 } }),
+    ).rejects.toMatchObject({ code: "CONFLICT", rawCode: "1031" });
   });
 });
 
@@ -451,9 +557,29 @@ describe("listInvoices (extension)", () => {
         return ok({ list: [{ invNo: "SX60721900" }], entries: 1 });
       }),
     );
-    const res = await testProvider().listInvoices({ period: "202606", prop: "nid", propValue: "53538851", carrierType: 2, voided: false, msgType: 1, withUbn: true, page: 1, pageSize: 50 });
+    const res = await testProvider().listInvoices({
+      period: "202606",
+      prop: "nid",
+      propValue: "53538851",
+      carrierType: 2,
+      voided: false,
+      msgType: 1,
+      withUbn: true,
+      page: 1,
+      pageSize: 50,
+    });
     expect(res).toEqual({ entries: 1, list: [{ invNo: "SX60721900" }] });
-    expect(body).toEqual({ period: "202606", prop: "nid", propValue: "53538851", carrierType: 2, isVoid: 0, msgType: 1, withGUINo: true, _pn: 1, _ps: 50 });
+    expect(body).toEqual({
+      period: "202606",
+      prop: "nid",
+      propValue: "53538851",
+      carrierType: 2,
+      isVoid: 0,
+      msgType: 1,
+      withGUINo: true,
+      _pn: 1,
+      _ps: 50,
+    });
   });
 
   it("uses a fromTime/toTime range when given", async () => {
@@ -465,8 +591,16 @@ describe("listInvoices (extension)", () => {
         return ok({ list: [], entries: 0 });
       }),
     );
-    await testProvider().listInvoices({ fromTime: "2026-01-01 00:00:00", toTime: "2026-06-30 23:59:59", voided: true });
-    expect(body).toEqual({ fromTime: "2026-01-01 00:00:00", toTime: "2026-06-30 23:59:59", isVoid: 1 });
+    await testProvider().listInvoices({
+      fromTime: "2026-01-01 00:00:00",
+      toTime: "2026-06-30 23:59:59",
+      voided: true,
+    });
+    expect(body).toEqual({
+      fromTime: "2026-01-01 00:00:00",
+      toTime: "2026-06-30 23:59:59",
+      isVoid: 1,
+    });
   });
 });
 
@@ -499,21 +633,43 @@ describe("財政部 lookups (extension)", () => {
 
 describe("getInvoicePrintInfo (extension)", () => {
   it("resolves the invID and returns the print payload", async () => {
-    const info = { invNo: "SX60721900", period: "202605", randNo: "6611", barCode: "B", qrCodeL: "L", qrCodeR: "R", sellerNID: "12345678", prodList: [{ title: "商品", qty: 1, sales: 100, saleTax: 5, taxType: 1 }] };
-    server.use(loginHandler(), listResolves("SX60721900", 999), http.post(url(EP.proofInvInfo(999)), () => ok(info)));
+    const info = {
+      invNo: "SX60721900",
+      period: "202605",
+      randNo: "6611",
+      barCode: "B",
+      qrCodeL: "L",
+      qrCodeR: "R",
+      sellerNID: "12345678",
+      prodList: [{ title: "商品", qty: 1, sales: 100, saleTax: 5, taxType: 1 }],
+    };
+    server.use(
+      loginHandler(),
+      listResolves("SX60721900", 999),
+      http.post(url(EP.proofInvInfo(999)), () => ok(info)),
+    );
     const res = await testProvider().getInvoicePrintInfo("SX60721900");
     expect(res).toMatchObject({ invNo: "SX60721900", barCode: "B", qrCodeL: "L", qrCodeR: "R" });
   });
 
   it("maps a state-disallowed print (1312) to CONFLICT", async () => {
-    server.use(loginHandler(), http.post(url(EP.proofInvInfo(1)), () => fail(1312, "發票目前的狀態無法執行列印")));
-    await expect(testProvider().getInvoicePrintInfo("SX1", { invID: 1 })).rejects.toMatchObject({ code: "CONFLICT", rawCode: "1312" });
+    server.use(
+      loginHandler(),
+      http.post(url(EP.proofInvInfo(1)), () => fail(1312, "發票目前的狀態無法執行列印")),
+    );
+    await expect(testProvider().getInvoicePrintInfo("SX1", { invID: 1 })).rejects.toMatchObject({
+      code: "CONFLICT",
+      rawCode: "1312",
+    });
   });
 });
 
 describe("logo settings (extension)", () => {
   it("lists logo sgoIDs", async () => {
-    server.use(loginHandler(), http.post(url(EP.settingsListLogo), () => ok({ list: [{ sgoID: 42 }, { sgoID: 43 }] })));
+    server.use(
+      loginHandler(),
+      http.post(url(EP.settingsListLogo), () => ok({ list: [{ sgoID: 42 }, { sgoID: 43 }] })),
+    );
     await expect(testProvider().listLogos()).resolves.toEqual([42, 43]);
   });
 
@@ -532,8 +688,14 @@ describe("logo settings (extension)", () => {
   });
 
   it("maps an invalid logo id (32) to NOT_FOUND", async () => {
-    server.use(loginHandler(), http.post(url(EP.settingsViewLogo(9)), () => fail(32, "商標識別碼無效")));
-    await expect(testProvider().viewLogo(9)).rejects.toMatchObject({ code: "NOT_FOUND", rawCode: "32" });
+    server.use(
+      loginHandler(),
+      http.post(url(EP.settingsViewLogo(9)), () => fail(32, "商標識別碼無效")),
+    );
+    await expect(testProvider().viewLogo(9)).rejects.toMatchObject({
+      code: "NOT_FOUND",
+      rawCode: "32",
+    });
   });
 
   it("uploads a new logo as multipart (files field) and returns the sgoID", async () => {
@@ -548,15 +710,24 @@ describe("logo settings (extension)", () => {
         return ok({ sgoID: 99 });
       }),
     );
-    const res = await testProvider().uploadLogo({ data: new Uint8Array([0x89, 0x50, 0x4e, 0x47]), contentType: "image/png", filename: "brand.png" });
+    const res = await testProvider().uploadLogo({
+      data: new Uint8Array([0x89, 0x50, 0x4e, 0x47]),
+      contentType: "image/png",
+      filename: "brand.png",
+    });
     expect(res.sgoID).toBe(99);
     expect(contentType).toContain("multipart/form-data");
     expect(hadFile).toBe(true);
   });
 
   it("replaces an existing logo via the sgoID path; maps the limit (1334) to VALIDATION", async () => {
-    server.use(loginHandler(), http.post(url(EP.settingsUploadLogo(7)), () => fail(1334, "可使用的商標數量已達上限")));
-    await expect(testProvider().uploadLogo({ data: new Uint8Array([1]) }, { sgoID: 7 })).rejects.toMatchObject({ code: "VALIDATION", rawCode: "1334" });
+    server.use(
+      loginHandler(),
+      http.post(url(EP.settingsUploadLogo(7)), () => fail(1334, "可使用的商標數量已達上限")),
+    );
+    await expect(
+      testProvider().uploadLogo({ data: new Uint8Array([1]) }, { sgoID: 7 }),
+    ).rejects.toMatchObject({ code: "VALIDATION", rawCode: "1334" });
   });
 });
 
@@ -571,14 +742,25 @@ describe("printInvoice (extension)", () => {
         return file([0x25, 0x50, 0x44, 0x46]);
       }),
     );
-    const res = await testProvider().printInvoice(["SX60721900"], { isCopy: true, format: 25, device: "TM-P20" });
+    const res = await testProvider().printInvoice(["SX60721900"], {
+      isCopy: true,
+      format: 25,
+      device: "TM-P20",
+    });
     expect(body).toEqual({ invList: [999], isCopy: true, format: 25, device: "TM-P20" });
     expect(res.contentType).toContain("pdf");
   });
 
   it("maps a 境外電商 print restriction (1300) to CONFLICT", async () => {
-    server.use(loginHandler(), listResolves("SX1", 5), http.post(url(EP.proofInvPrint), () => fail(1300, "境外電商開立的發票，依法規不可列印。")));
-    await expect(testProvider().printInvoice(["SX1"])).rejects.toMatchObject({ code: "CONFLICT", rawCode: "1300" });
+    server.use(
+      loginHandler(),
+      listResolves("SX1", 5),
+      http.post(url(EP.proofInvPrint), () => fail(1300, "境外電商開立的發票，依法規不可列印。")),
+    );
+    await expect(testProvider().printInvoice(["SX1"])).rejects.toMatchObject({
+      code: "CONFLICT",
+      rawCode: "1300",
+    });
   });
 });
 
@@ -641,8 +823,18 @@ describe("notifyInvoice (extension)", () => {
         return ok({});
       }),
     );
-    await testProvider().notifyInvoice([999], "ISSUE", { format: 25, action: 1, forceToBuyer: true });
-    expect(body).toEqual({ invList: [999], eventType: 1, forceToBuyer: true, format: 25, action: 1 });
+    await testProvider().notifyInvoice([999], "ISSUE", {
+      format: 25,
+      action: 1,
+      forceToBuyer: true,
+    });
+    expect(body).toEqual({
+      invList: [999],
+      eventType: 1,
+      forceToBuyer: true,
+      format: 25,
+      action: 1,
+    });
   });
 
   it("maps the six events to 1/2/4/5/20/30", async () => {
@@ -655,7 +847,8 @@ describe("notifyInvoice (extension)", () => {
       }),
     );
     const p = testProvider();
-    for (const e of ["ISSUE", "CONFIRM", "VOID", "VOID_CONFIRM", "WON", "REQUEST"] as const) await p.notifyInvoice([1], e);
+    for (const e of ["ISSUE", "CONFIRM", "VOID", "VOID_CONFIRM", "WON", "REQUEST"] as const)
+      await p.notifyInvoice([1], e);
     expect(seen).toEqual([1, 2, 4, 5, 20, 30]);
   });
 });
@@ -665,20 +858,40 @@ describe("getAllowanceQuota (extension)", () => {
     server.use(
       loginHandler(),
       listResolves("SX60721900", 999),
-      http.post(url(EP.allowQuota(999)), () => ok({ itemList: [{ soiID: 236552, qty: 3, amount: 300, tax: 15 }] })),
+      http.post(url(EP.allowQuota(999)), () =>
+        ok({ itemList: [{ soiID: 236552, qty: 3, amount: 300, tax: 15 }] }),
+      ),
     );
     const res = await testProvider().getAllowanceQuota("SX60721900");
     expect(res).toEqual([{ soiID: 236552, qty: 3, amount: 300, tax: 15 }]);
   });
 
   it("maps an app without sales entitlement (1026) to AUTH", async () => {
-    server.use(loginHandler(), http.post(url(EP.allowQuota(5)), () => fail(1026, "這個應用程式並未具有銷售功能的使用資格。")));
-    await expect(testProvider().getAllowanceQuota("SX1", { invID: 5 })).rejects.toMatchObject({ code: "AUTH", rawCode: "1026" });
+    server.use(
+      loginHandler(),
+      http.post(url(EP.allowQuota(5)), () =>
+        fail(1026, "這個應用程式並未具有銷售功能的使用資格。"),
+      ),
+    );
+    await expect(testProvider().getAllowanceQuota("SX1", { invID: 5 })).rejects.toMatchObject({
+      code: "AUTH",
+      rawCode: "1026",
+    });
   });
 });
 
 describe("字軌 management (extension)", () => {
-  const track = { inID: 21307, period: "202605", lead: "SX", startNo: 60721900, endNo: 60722399, invType: 7, bizType: 0, isClosed: 0, platform: 1 };
+  const track = {
+    inID: 21307,
+    period: "202605",
+    lead: "SX",
+    startNo: 60721900,
+    endNo: 60722399,
+    invType: 7,
+    bizType: 0,
+    isClosed: 0,
+    platform: 1,
+  };
 
   it("lists 字軌 tracks with the given filters", async () => {
     let body: Record<string, unknown> | undefined;
@@ -689,13 +902,36 @@ describe("字軌 management (extension)", () => {
         return ok({ list: [track], entries: 1 });
       }),
     );
-    const res = await testProvider().listInvoiceTracks({ period: "202605", invType: 7, bizType: 0, forceBiz: true, activeOnly: true, platform: 1, order: "ASC", page: 1, pageSize: 50 });
+    const res = await testProvider().listInvoiceTracks({
+      period: "202605",
+      invType: 7,
+      bizType: 0,
+      forceBiz: true,
+      activeOnly: true,
+      platform: 1,
+      order: "ASC",
+      page: 1,
+      pageSize: 50,
+    });
     expect(res).toEqual([track]);
-    expect(body).toMatchObject({ period: "202605", invType: 7, bizType: 0, forceBiz: true, isActive: 1, platform: 1, dspOrder: 2, _pn: 1, _ps: 50 });
+    expect(body).toMatchObject({
+      period: "202605",
+      invType: 7,
+      bizType: 0,
+      forceBiz: true,
+      isActive: 1,
+      platform: 1,
+      dspOrder: 2,
+      _pn: 1,
+      _ps: 50,
+    });
   });
 
   it("targets the stID path when configured (partner access)", async () => {
-    server.use(loginHandler(), http.post(url(EP.invNumberList(9905)), () => ok({ list: [], entries: 0 })));
+    server.use(
+      loginHandler(),
+      http.post(url(EP.invNumberList(9905)), () => ok({ list: [], entries: 0 })),
+    );
     await expect(testProvider({ stID: 9905 }).listInvoiceTracks()).resolves.toEqual([]);
   });
 
@@ -715,12 +951,20 @@ describe("字軌 management (extension)", () => {
 
   it("rejects an adjust with neither startNo nor endNo", async () => {
     server.use(loginHandler());
-    await expect(testProvider().adjustInvoiceTrack(21307, {})).rejects.toMatchObject({ code: "VALIDATION" });
+    await expect(testProvider().adjustInvoiceTrack(21307, {})).rejects.toMatchObject({
+      code: "VALIDATION",
+    });
   });
 
   it("maps an invalid track id (20) to NOT_FOUND", async () => {
-    server.use(loginHandler(), http.post(url(EP.invNumberAdjustNo(1)), () => fail(20, "字軌分段識別碼無效")));
-    await expect(testProvider().adjustInvoiceTrack(1, { endNo: 60722399 })).rejects.toMatchObject({ code: "NOT_FOUND", rawCode: "20" });
+    server.use(
+      loginHandler(),
+      http.post(url(EP.invNumberAdjustNo(1)), () => fail(20, "字軌分段識別碼無效")),
+    );
+    await expect(testProvider().adjustInvoiceTrack(1, { endNo: 60722399 })).rejects.toMatchObject({
+      code: "NOT_FOUND",
+      rawCode: "20",
+    });
   });
 
   it("sets a track as the default for 有統編 / 無統編", async () => {
@@ -737,8 +981,14 @@ describe("字軌 management (extension)", () => {
   });
 
   it("maps a conflicting default-track use (1320) to CONFLICT", async () => {
-    server.use(loginHandler(), http.post(url(EP.settingsDefaultGUINo(1)), () => fail(1320, "字軌已被指定為 無統編 使用")));
-    await expect(testProvider().setDefaultTrack(1, { forGUINo: true })).rejects.toMatchObject({ code: "CONFLICT", rawCode: "1320" });
+    server.use(
+      loginHandler(),
+      http.post(url(EP.settingsDefaultGUINo(1)), () => fail(1320, "字軌已被指定為 無統編 使用")),
+    );
+    await expect(testProvider().setDefaultTrack(1, { forGUINo: true })).rejects.toMatchObject({
+      code: "CONFLICT",
+      rawCode: "1320",
+    });
   });
 
   it("opens/closes a track (action 0/1)", async () => {
@@ -756,8 +1006,16 @@ describe("字軌 management (extension)", () => {
   });
 
   it("maps an exhausted-track close (1216) to CONFLICT", async () => {
-    server.use(loginHandler(), http.post(url(EP.invNumberClose(1)), () => fail(1216, "號碼已使用完畢的字軌，無法再做開啟或關閉。")));
-    await expect(testProvider().setInvoiceTrackStatus(1, "OPEN")).rejects.toMatchObject({ code: "CONFLICT", rawCode: "1216" });
+    server.use(
+      loginHandler(),
+      http.post(url(EP.invNumberClose(1)), () =>
+        fail(1216, "號碼已使用完畢的字軌，無法再做開啟或關閉。"),
+      ),
+    );
+    await expect(testProvider().setInvoiceTrackStatus(1, "OPEN")).rejects.toMatchObject({
+      code: "CONFLICT",
+      rawCode: "1216",
+    });
   });
 
   it("sets and clears a track's print logo (sgoID, null clears)", async () => {
@@ -783,14 +1041,26 @@ describe("字軌 management (extension)", () => {
         return ok({ inID: 21308, startNo: 60722000, bizType: 1, memo: "後段" });
       }),
     );
-    const res = await testProvider().splitInvoiceTrack(21307, { startNo: 60722000, bizType: 1, memo: "後段" });
+    const res = await testProvider().splitInvoiceTrack(21307, {
+      startNo: 60722000,
+      bizType: 1,
+      memo: "後段",
+    });
     expect(res).toMatchObject({ inID: 21308, startNo: 60722000, bizType: 1 });
     expect(body).toEqual({ startNo: "60722000", bizType: 1, memo: "後段" });
   });
 
   it("maps a split on an open track (1222) to CONFLICT", async () => {
-    server.use(loginHandler(), http.post(url(EP.invNumberSplit(1)), () => fail(1222, "字軌必須在關閉（停止使用）的狀態，才能進行分段作業。")));
-    await expect(testProvider().splitInvoiceTrack(1, { startNo: 60722000 })).rejects.toMatchObject({ code: "CONFLICT", rawCode: "1222" });
+    server.use(
+      loginHandler(),
+      http.post(url(EP.invNumberSplit(1)), () =>
+        fail(1222, "字軌必須在關閉（停止使用）的狀態，才能進行分段作業。"),
+      ),
+    );
+    await expect(testProvider().splitInvoiceTrack(1, { startNo: 60722000 })).rejects.toMatchObject({
+      code: "CONFLICT",
+      rawCode: "1222",
+    });
   });
 
   it("updates a track's bizType / platform / memo", async () => {
@@ -802,14 +1072,26 @@ describe("字軌 management (extension)", () => {
         return ok({ inID: 21307, bizType: 2, platform: 1, memo: "備註" });
       }),
     );
-    const res = await testProvider().updateInvoiceTrack(21307, { bizType: 2, platform: 1, memo: "備註" });
+    const res = await testProvider().updateInvoiceTrack(21307, {
+      bizType: 2,
+      platform: 1,
+      memo: "備註",
+    });
     expect(res).toMatchObject({ inID: 21307, bizType: 2, platform: 1 });
     expect(body).toEqual({ bizType: 2, platform: 1, memo: "備註" });
   });
 
   it("maps a platform-already-set update (1201) to CONFLICT", async () => {
-    server.use(loginHandler(), http.post(url(EP.invNumberUpdate(1)), () => fail(1201, "此字軌已設定過使用平台，無法再次變更使用平台")));
-    await expect(testProvider().updateInvoiceTrack(1, { platform: 100 })).rejects.toMatchObject({ code: "CONFLICT", rawCode: "1201" });
+    server.use(
+      loginHandler(),
+      http.post(url(EP.invNumberUpdate(1)), () =>
+        fail(1201, "此字軌已設定過使用平台，無法再次變更使用平台"),
+      ),
+    );
+    await expect(testProvider().updateInvoiceTrack(1, { platform: 100 })).rejects.toMatchObject({
+      code: "CONFLICT",
+      rawCode: "1201",
+    });
   });
 });
 
@@ -823,7 +1105,12 @@ describe("voidAllowance", () => {
         return ok({ awID: "883" });
       }),
     );
-    const res = await testProvider().voidAllowance({ invoiceNumber: "SX1", allowanceNumber: "S26SX607219001", reason: "測試", providerOptions: { awID: 883 } });
+    const res = await testProvider().voidAllowance({
+      invoiceNumber: "SX1",
+      allowanceNumber: "S26SX607219001",
+      reason: "測試",
+      providerOptions: { awID: 883 },
+    });
     expect(res.allowanceNumber).toBe("S26SX607219001");
     expect(body).toMatchObject({ voidReason: "測試" });
   });
@@ -832,26 +1119,42 @@ describe("voidAllowance", () => {
     let voidedAw: string | undefined;
     server.use(
       loginHandler(),
-      http.post(url(EP.allowanceList), () => ok({ list: [{ awNo: "S26SX607219001", awID: 883 }], entries: 1 })),
+      http.post(url(EP.allowanceList), () =>
+        ok({ list: [{ awNo: "S26SX607219001", awID: 883 }], entries: 1 }),
+      ),
       http.post(url(EP.allowanceVoid(883)), () => {
         voidedAw = "883";
         return ok({ awID: "883" });
       }),
     );
-    const res = await testProvider().voidAllowance({ invoiceNumber: "SX1", allowanceNumber: "S26SX607219001", reason: "x" });
+    const res = await testProvider().voidAllowance({
+      invoiceNumber: "SX1",
+      allowanceNumber: "S26SX607219001",
+      reason: "x",
+    });
     expect(res.allowanceNumber).toBe("S26SX607219001");
     expect(voidedAw).toBe("883");
   });
 
   it("throws NOT_FOUND when the allowance number can't be resolved", async () => {
-    server.use(loginHandler(), http.post(url(EP.allowanceList), () => ok({ list: [], entries: 0 })));
-    await expect(testProvider().voidAllowance({ invoiceNumber: "SX1", allowanceNumber: "NOPE" })).rejects.toMatchObject({ code: "NOT_FOUND" });
+    server.use(
+      loginHandler(),
+      http.post(url(EP.allowanceList), () => ok({ list: [], entries: 0 })),
+    );
+    await expect(
+      testProvider().voidAllowance({ invoiceNumber: "SX1", allowanceNumber: "NOPE" }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 
   it("rejects a reason longer than 20 chars", async () => {
     server.use(loginHandler());
     await expect(
-      testProvider().voidAllowance({ invoiceNumber: "SX1", allowanceNumber: "A", reason: "x".repeat(21), providerOptions: { awID: 1 } }),
+      testProvider().voidAllowance({
+        invoiceNumber: "SX1",
+        allowanceNumber: "A",
+        reason: "x".repeat(21),
+        providerOptions: { awID: 1 },
+      }),
     ).rejects.toMatchObject({ code: "VALIDATION" });
   });
 });

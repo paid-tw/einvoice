@@ -2,7 +2,15 @@ import { Capability, supports } from "@paid-tw/einvoice";
 import { http, HttpResponse } from "msw";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { ECPAY_ENDPOINTS } from "../index.js";
-import { BASE, ecError, ecPlainSuccess, ecSuccess, parseRequest, server, testProvider } from "./server.js";
+import {
+  BASE,
+  ecError,
+  ecPlainSuccess,
+  ecSuccess,
+  parseRequest,
+  server,
+  testProvider,
+} from "./server.js";
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => server.resetHandlers());
@@ -29,7 +37,13 @@ describe("foreign currency (FOREIGN_CURRENCY)", () => {
   });
 
   it("still accepts an explicit TWD currency", async () => {
-    server.use(http.post(url(ECPAY_ENDPOINTS.issue), () => HttpResponse.json(ecSuccess({ InvoiceNo: "JU1", InvoiceDate: "2026-06-17 12:00:00", RandomNumber: "1234" }))));
+    server.use(
+      http.post(url(ECPAY_ENDPOINTS.issue), () =>
+        HttpResponse.json(
+          ecSuccess({ InvoiceNo: "JU1", InvoiceDate: "2026-06-17 12:00:00", RandomNumber: "1234" }),
+        ),
+      ),
+    );
     const res = await testProvider().issue({ ...issueInput, currency: "TWD" });
     expect(res.invoiceNumber).toBe("JU1");
   });
@@ -45,7 +59,13 @@ describe("延遲/觸發開立 two-phase", () => {
       }),
     );
     const res = await testProvider().issuePending(issueInput);
-    expect(data).toMatchObject({ DelayFlag: "2", DelayDay: 0, Tsr: "ORDER_1", PayType: "2", PayAct: "ECPAY" });
+    expect(data).toMatchObject({
+      DelayFlag: "2",
+      DelayDay: 0,
+      Tsr: "ORDER_1",
+      PayType: "2",
+      PayAct: "ECPAY",
+    });
     expect(res.relateNumber).toBe("ORDER_1");
   });
 
@@ -57,14 +77,24 @@ describe("延遲/觸發開立 two-phase", () => {
         return HttpResponse.json(ecSuccess({ OrderNumber: "ORDER_1" }));
       }),
     );
-    await testProvider().issuePending(issueInput, { mode: "SCHEDULE", delayDay: 3, notifyUrl: "https://x.test/n" });
+    await testProvider().issuePending(issueInput, {
+      mode: "SCHEDULE",
+      delayDay: 3,
+      notifyUrl: "https://x.test/n",
+    });
     expect(data).toMatchObject({ DelayFlag: "1", DelayDay: 3, NotifyURL: "https://x.test/n" });
   });
 
   it("rejects an out-of-range delayDay locally (SCHEDULE 1–15, TRIGGER 0–15)", async () => {
-    await expect(testProvider().issuePending(issueInput, { mode: "SCHEDULE", delayDay: 0 })).rejects.toMatchObject({ code: "VALIDATION" });
-    await expect(testProvider().issuePending(issueInput, { mode: "SCHEDULE", delayDay: 16 })).rejects.toMatchObject({ code: "VALIDATION" });
-    await expect(testProvider().issuePending(issueInput, { delayDay: 16 })).rejects.toMatchObject({ code: "VALIDATION" });
+    await expect(
+      testProvider().issuePending(issueInput, { mode: "SCHEDULE", delayDay: 0 }),
+    ).rejects.toMatchObject({ code: "VALIDATION" });
+    await expect(
+      testProvider().issuePending(issueInput, { mode: "SCHEDULE", delayDay: 16 }),
+    ).rejects.toMatchObject({ code: "VALIDATION" });
+    await expect(testProvider().issuePending(issueInput, { delayDay: 16 })).rejects.toMatchObject({
+      code: "VALIDATION",
+    });
   });
 
   it("cancelDelayIssue posts the Tsr; unknown/cancelled → NOT_FOUND; empty → local VALIDATION", async () => {
@@ -83,7 +113,9 @@ describe("延遲/觸發開立 two-phase", () => {
         HttpResponse.json(ecError(5070305, "B2C取消延遲(或觸發)發票 查無可更新交易單號")),
       ),
     );
-    await expect(testProvider().cancelDelayIssue("NOPE")).rejects.toMatchObject({ code: "NOT_FOUND" });
+    await expect(testProvider().cancelDelayIssue("NOPE")).rejects.toMatchObject({
+      code: "NOT_FOUND",
+    });
     await expect(testProvider().cancelDelayIssue("")).rejects.toMatchObject({ code: "VALIDATION" });
   });
 
@@ -102,9 +134,13 @@ describe("延遲/觸發開立 two-phase", () => {
 
   it("editDelayIssue maps an unknown Tsr (4000001) to NOT_FOUND", async () => {
     server.use(
-      http.post(url(ECPAY_ENDPOINTS.editDelayIssue), () => HttpResponse.json(ecError(4000001, "不存在此交易單號"))),
+      http.post(url(ECPAY_ENDPOINTS.editDelayIssue), () =>
+        HttpResponse.json(ecError(4000001, "不存在此交易單號")),
+      ),
     );
-    await expect(testProvider().editDelayIssue(issueInput, { tsr: "NOPE" })).rejects.toMatchObject({ code: "NOT_FOUND" });
+    await expect(testProvider().editDelayIssue(issueInput, { tsr: "NOPE" })).rejects.toMatchObject({
+      code: "NOT_FOUND",
+    });
   });
 
   it("triggerIssue (4000004, DelayDay=0) issues now, sends only Tsr+PayType, queries the number", async () => {
@@ -135,7 +171,9 @@ describe("延遲/觸發開立 two-phase", () => {
 
   it("triggerIssue (4000003, DelayDay>0) reports issued=false with no number (no query)", async () => {
     server.use(
-      http.post(url(ECPAY_ENDPOINTS.triggerIssue), () => HttpResponse.json(ecError(4000003, "延後開立成功"))),
+      http.post(url(ECPAY_ENDPOINTS.triggerIssue), () =>
+        HttpResponse.json(ecError(4000003, "延後開立成功")),
+      ),
       // GetIssue is NOT registered — if triggerIssue queried, the test would error.
     );
     const res = await testProvider().triggerIssue({ relateNumber: "ORDER_1" });
@@ -160,7 +198,9 @@ describe("carrier validation", () => {
 
   it("validateLoveCode returns false for IsExist === 'N'", async () => {
     server.use(
-      http.post(url(ECPAY_ENDPOINTS.checkLoveCode), () => HttpResponse.json(ecSuccess({ IsExist: "N" }))),
+      http.post(url(ECPAY_ENDPOINTS.checkLoveCode), () =>
+        HttpResponse.json(ecSuccess({ IsExist: "N" })),
+      ),
     );
     expect(await testProvider().validateLoveCode("123")).toBe(false);
   });
@@ -168,24 +208,36 @@ describe("carrier validation", () => {
   it("lookupLoveCodeOrganName returns the OrganName when it exists, else undefined", async () => {
     server.use(
       http.post(url(ECPAY_ENDPOINTS.checkLoveCode), () =>
-        HttpResponse.json(ecSuccess({ IsExist: "Y", OrganName: "財團法人ＯＭＧ關懷社會愛心基金會" })),
+        HttpResponse.json(
+          ecSuccess({ IsExist: "Y", OrganName: "財團法人ＯＭＧ關懷社會愛心基金會" }),
+        ),
       ),
     );
-    expect(await testProvider().lookupLoveCodeOrganName("168001")).toBe("財團法人ＯＭＧ關懷社會愛心基金會");
+    expect(await testProvider().lookupLoveCodeOrganName("168001")).toBe(
+      "財團法人ＯＭＧ關懷社會愛心基金會",
+    );
 
     server.use(
-      http.post(url(ECPAY_ENDPOINTS.checkLoveCode), () => HttpResponse.json(ecSuccess({ IsExist: "N" }))),
+      http.post(url(ECPAY_ENDPOINTS.checkLoveCode), () =>
+        HttpResponse.json(ecSuccess({ IsExist: "N" })),
+      ),
     );
     expect(await testProvider().lookupLoveCodeOrganName("000")).toBeUndefined();
   });
 
   it("lookupLoveCodeOrganName rejects a malformed code locally", async () => {
-    await expect(testProvider().lookupLoveCodeOrganName("12")).rejects.toMatchObject({ code: "VALIDATION" });
+    await expect(testProvider().lookupLoveCodeOrganName("12")).rejects.toMatchObject({
+      code: "VALIDATION",
+    });
   });
 
   it("rejects malformed input locally before any request", async () => {
-    await expect(testProvider().validateMobileBarcode("BAD")).rejects.toMatchObject({ code: "VALIDATION" });
-    await expect(testProvider().validateLoveCode("12")).rejects.toMatchObject({ code: "VALIDATION" });
+    await expect(testProvider().validateMobileBarcode("BAD")).rejects.toMatchObject({
+      code: "VALIDATION",
+    });
+    await expect(testProvider().validateLoveCode("12")).rejects.toMatchObject({
+      code: "VALIDATION",
+    });
   });
 });
 
@@ -198,7 +250,14 @@ describe("查詢財政部配號結果 (GetGovInvoiceWordSetting)", () => {
         return HttpResponse.json(
           ecSuccess({
             InvoiceInfo: [
-              { InvoiceTerm: 1, InvType: "07", InvoiceHeader: "GI", InvoiceStart: "10000000", InvoiceEnd: "10000299", Number: 6 },
+              {
+                InvoiceTerm: 1,
+                InvType: "07",
+                InvoiceHeader: "GI",
+                InvoiceStart: "10000000",
+                InvoiceEnd: "10000299",
+                Number: 6,
+              },
             ],
           }),
         );
@@ -213,20 +272,28 @@ describe("查詢財政部配號結果 (GetGovInvoiceWordSetting)", () => {
 
   it("returns an empty list when the response carries no InvoiceInfo", async () => {
     server.use(
-      http.post(url(ECPAY_ENDPOINTS.getGovInvoiceWordSetting), () => HttpResponse.json(ecSuccess({}))),
+      http.post(url(ECPAY_ENDPOINTS.getGovInvoiceWordSetting), () =>
+        HttpResponse.json(ecSuccess({})),
+      ),
     );
     expect(await testProvider().getGovInvoiceWordSetting("115")).toEqual([]);
   });
 
   it("throws NOT_FOUND when there's no allocation (查無資料)", async () => {
     server.use(
-      http.post(url(ECPAY_ENDPOINTS.getGovInvoiceWordSetting), () => HttpResponse.json(ecError(7, "查無資料"))),
+      http.post(url(ECPAY_ENDPOINTS.getGovInvoiceWordSetting), () =>
+        HttpResponse.json(ecError(7, "查無資料")),
+      ),
     );
-    await expect(testProvider().getGovInvoiceWordSetting("116")).rejects.toMatchObject({ code: "NOT_FOUND" });
+    await expect(testProvider().getGovInvoiceWordSetting("116")).rejects.toMatchObject({
+      code: "NOT_FOUND",
+    });
   });
 
   it("rejects a malformed InvoiceYear locally", async () => {
-    await expect(testProvider().getGovInvoiceWordSetting("2026")).rejects.toMatchObject({ code: "VALIDATION" });
+    await expect(testProvider().getGovInvoiceWordSetting("2026")).rejects.toMatchObject({
+      code: "VALIDATION",
+    });
   });
 });
 
@@ -253,7 +320,12 @@ describe("查詢字軌 (GetInvoiceWordSetting)", () => {
       }),
     );
     const res = await testProvider().getInvoiceWordSetting({ invoiceYear: "115" });
-    expect(data).toMatchObject({ InvoiceYear: "115", InvoiceTerm: 0, UseStatus: 0, InvoiceCategory: 1 });
+    expect(data).toMatchObject({
+      InvoiceYear: "115",
+      InvoiceTerm: 0,
+      UseStatus: 0,
+      InvoiceCategory: 1,
+    });
     expect(res).toEqual([
       {
         trackId: "11902",
@@ -278,17 +350,25 @@ describe("查詢字軌 (GetInvoiceWordSetting)", () => {
         return HttpResponse.json(ecSuccess({ InvoiceInfo: [] }));
       }),
     );
-    await testProvider().getInvoiceWordSetting({ invoiceYear: "115", term: 3, useStatus: "PAUSED" });
+    await testProvider().getInvoiceWordSetting({
+      invoiceYear: "115",
+      term: 3,
+      useStatus: "PAUSED",
+    });
     expect(data).toMatchObject({ InvoiceTerm: 3, UseStatus: 4 });
   });
 
   it("returns an empty list when the response carries no InvoiceInfo", async () => {
-    server.use(http.post(url(ECPAY_ENDPOINTS.getInvoiceWordSetting), () => HttpResponse.json(ecSuccess({}))));
+    server.use(
+      http.post(url(ECPAY_ENDPOINTS.getInvoiceWordSetting), () => HttpResponse.json(ecSuccess({}))),
+    );
     expect(await testProvider().getInvoiceWordSetting({ invoiceYear: "115" })).toEqual([]);
   });
 
   it("rejects a malformed InvoiceYear locally", async () => {
-    await expect(testProvider().getInvoiceWordSetting({ invoiceYear: "2026" })).rejects.toMatchObject({
+    await expect(
+      testProvider().getInvoiceWordSetting({ invoiceYear: "2026" }),
+    ).rejects.toMatchObject({
       code: "VALIDATION",
     });
   });
@@ -312,7 +392,9 @@ describe("設定字軌號碼狀態 (UpdateInvoiceWordStatus)", () => {
 
   it("maps an unknown TrackID (查無資料) to NOT_FOUND", async () => {
     server.use(
-      http.post(url(ECPAY_ENDPOINTS.updateInvoiceWordStatus), () => HttpResponse.json(ecError(7, "查無資料"))),
+      http.post(url(ECPAY_ENDPOINTS.updateInvoiceWordStatus), () =>
+        HttpResponse.json(ecError(7, "查無資料")),
+      ),
     );
     await expect(testProvider().setInvoiceWordStatus("9999999", "ENABLE")).rejects.toMatchObject({
       code: "NOT_FOUND",
@@ -342,7 +424,9 @@ describe("統一編號驗證 (GetCompanyNameByTaxID)", () => {
 
   it("treats 查無資料 (RtnCode 7) as proceed: undefined / false, not an error", async () => {
     server.use(
-      http.post(url(ECPAY_ENDPOINTS.getCompanyNameByTaxID), () => HttpResponse.json(ecError(7, "查無資料"))),
+      http.post(url(ECPAY_ENDPOINTS.getCompanyNameByTaxID), () =>
+        HttpResponse.json(ecError(7, "查無資料")),
+      ),
     );
     expect(await testProvider().lookupCompanyName("00000000")).toBeUndefined();
     expect(await testProvider().validateBan("00000000")).toBe(false);
@@ -363,11 +447,16 @@ describe("統一編號驗證 (GetCompanyNameByTaxID)", () => {
         HttpResponse.json(ecError(1200125, "統一編號檢查碼驗證失敗，請再確認")),
       ),
     );
-    await expect(testProvider().validateBan("12345678")).rejects.toMatchObject({ code: "VALIDATION", rawCode: "1200125" });
+    await expect(testProvider().validateBan("12345678")).rejects.toMatchObject({
+      code: "VALIDATION",
+      rawCode: "1200125",
+    });
   });
 
   it("rejects a non 8-digit 統編 locally", async () => {
-    await expect(testProvider().lookupCompanyName("123")).rejects.toMatchObject({ code: "VALIDATION" });
+    await expect(testProvider().lookupCompanyName("123")).rejects.toMatchObject({
+      code: "VALIDATION",
+    });
   });
 });
 
@@ -401,13 +490,19 @@ describe("線上開立折讓 (allowanceOnline)", () => {
       returnUrl: "https://x.test/r",
       customerName: "測試",
     });
-    expect(data).toMatchObject({ AllowanceNotify: "E", NotifyMail: "b@x.com", ReturnURL: "https://x.test/r" });
+    expect(data).toMatchObject({
+      AllowanceNotify: "E",
+      NotifyMail: "b@x.com",
+      ReturnURL: "https://x.test/r",
+    });
     expect(res.allowanceNumber).toBe("2606172158112842");
     expect(res.expiresAt.getTime()).toBeGreaterThan(res.createdAt.getTime());
   });
 
   it("requires a notifyMail locally", async () => {
-    await expect(testProvider().allowanceOnline(input, { notifyMail: "" })).rejects.toMatchObject({ code: "VALIDATION" });
+    await expect(testProvider().allowanceOnline(input, { notifyMail: "" })).rejects.toMatchObject({
+      code: "VALIDATION",
+    });
   });
 
   it("cancelAllowanceOnline posts InvoiceNo+AllowanceNo+Reason; an agreed one (5070250) → CONFLICT", async () => {
@@ -418,7 +513,11 @@ describe("線上開立折讓 (allowanceOnline)", () => {
         return HttpResponse.json(ecSuccess({ IA_Invoice_No: "JU11083085" }));
       }),
     );
-    await testProvider().cancelAllowanceOnline({ invoiceNumber: "JU11083085", allowanceNumber: "A1", reason: "取消" });
+    await testProvider().cancelAllowanceOnline({
+      invoiceNumber: "JU11083085",
+      allowanceNumber: "A1",
+      reason: "取消",
+    });
     expect(data).toMatchObject({ InvoiceNo: "JU11083085", AllowanceNo: "A1", Reason: "取消" });
 
     server.use(
@@ -431,7 +530,11 @@ describe("線上開立折讓 (allowanceOnline)", () => {
     ).rejects.toMatchObject({ code: "CONFLICT", rawCode: "5070250" });
 
     await expect(
-      testProvider().cancelAllowanceOnline({ invoiceNumber: "JU1", allowanceNumber: "A1", reason: "x".repeat(21) }),
+      testProvider().cancelAllowanceOnline({
+        invoiceNumber: "JU1",
+        allowanceNumber: "A1",
+        reason: "x".repeat(21),
+      }),
     ).rejects.toMatchObject({ code: "VALIDATION" });
   });
 });
@@ -457,9 +560,18 @@ describe("查詢作廢折讓明細 (getAllowanceInvalid / GetAllowanceInvalid)",
         );
       }),
     );
-    const res = await testProvider().getAllowanceInvalid({ invoiceNumber: "JU11084023", allowanceNumber: "2026061722338885" });
+    const res = await testProvider().getAllowanceInvalid({
+      invoiceNumber: "JU11084023",
+      allowanceNumber: "2026061722338885",
+    });
     expect(data).toMatchObject({ InvoiceNo: "JU11084023", AllowanceNo: "2026061722338885" });
-    expect(res).toMatchObject({ allowanceNumber: "2026061722338885", invoiceNumber: "JU11084023", reason: "測試作廢折讓原因", uploaded: false, sellerUbn: "53538851" });
+    expect(res).toMatchObject({
+      allowanceNumber: "2026061722338885",
+      invoiceNumber: "JU11084023",
+      reason: "測試作廢折讓原因",
+      uploaded: false,
+      sellerUbn: "53538851",
+    });
     expect(res.buyerUbn).toBeUndefined();
     expect(res.allowanceDate.getFullYear()).toBe(2026);
     expect(res.voidedAt.getFullYear()).toBe(2026);
@@ -491,9 +603,22 @@ describe("查詢作廢發票明細 (getInvalid / GetInvalid)", () => {
         );
       }),
     );
-    const res = await testProvider().getInvalid({ orderId: "ORDER_1", invoiceNumber: "JU11083872", invoiceDate: "2026-06-17" });
-    expect(data).toMatchObject({ RelateNumber: "ORDER_1", InvoiceNo: "JU11083872", InvoiceDate: "2026-06-17" });
-    expect(res).toMatchObject({ invoiceNumber: "JU11083872", reason: "測試作廢原因", uploaded: false, sellerUbn: "53538851" });
+    const res = await testProvider().getInvalid({
+      orderId: "ORDER_1",
+      invoiceNumber: "JU11083872",
+      invoiceDate: "2026-06-17",
+    });
+    expect(data).toMatchObject({
+      RelateNumber: "ORDER_1",
+      InvoiceNo: "JU11083872",
+      InvoiceDate: "2026-06-17",
+    });
+    expect(res).toMatchObject({
+      invoiceNumber: "JU11083872",
+      reason: "測試作廢原因",
+      uploaded: false,
+      sellerUbn: "53538851",
+    });
     expect(res.buyerUbn).toBeUndefined(); // 0000000000
     expect(res.uploadedAt).toBeUndefined();
     expect(res.voidedAt.getFullYear()).toBe(2026);
@@ -521,7 +646,18 @@ describe("查詢折讓明細 (getAllowanceList / GetAllowanceList)", () => {
     IA_Total_Tax_Amount: 105,
     IA_Send_Mail: "",
     IIS_Customer_Name: "",
-    Items: [{ ItemSeq: 1, ItemName: "商品", ItemCount: 1, ItemWord: "式", ItemPrice: 105, ItemTaxType: "1", ItemRateAmt: 5, ItemAmount: 105 }],
+    Items: [
+      {
+        ItemSeq: 1,
+        ItemName: "商品",
+        ItemCount: 1,
+        ItemWord: "式",
+        ItemPrice: 105,
+        ItemTaxType: "1",
+        ItemRateAmt: 5,
+        ItemAmount: 105,
+      },
+    ],
   };
 
   it("SearchType 0: by AllowanceNo, parses the detail + amount split", async () => {
@@ -556,7 +692,11 @@ describe("查詢折讓明細 (getAllowanceList / GetAllowanceList)", () => {
     );
     await testProvider().getAllowanceList({ invoiceNumber: "JU1", date: "2026-06-17" });
     expect(data).toMatchObject({ SearchType: "1", InvoiceNo: "JU1", Date: "2026-06-17" });
-    await testProvider().getAllowanceList({ invoiceNumber: "JU1", date: "2026-06-17", dateType: "ALLOWANCE" });
+    await testProvider().getAllowanceList({
+      invoiceNumber: "JU1",
+      date: "2026-06-17",
+      dateType: "ALLOWANCE",
+    });
     expect(data).toMatchObject({ SearchType: "2" });
   });
 
@@ -565,7 +705,9 @@ describe("查詢折讓明細 (getAllowanceList / GetAllowanceList)", () => {
   });
 
   it("returns an empty list when there's no AllowanceInfo", async () => {
-    server.use(http.post(url(ECPAY_ENDPOINTS.getAllowanceList), () => HttpResponse.json(ecSuccess({}))));
+    server.use(
+      http.post(url(ECPAY_ENDPOINTS.getAllowanceList), () => HttpResponse.json(ecSuccess({}))),
+    );
     expect(await testProvider().getAllowanceList({ allowanceNumber: "X" })).toEqual([]);
   });
 
@@ -602,7 +744,9 @@ describe("查詢多筆發票 (listInvoices / GetIssueList)", () => {
     server.use(
       http.post(url(ECPAY_ENDPOINTS.getIssueList), async ({ request }) => {
         data = parseRequest(await request.text()).data;
-        return HttpResponse.json(ecPlainSuccess({ TotalCount: 3718, ShowingPage: 2, InvoiceData: [ROW] }));
+        return HttpResponse.json(
+          ecPlainSuccess({ TotalCount: 3718, ShowingPage: 2, InvoiceData: [ROW] }),
+        );
       }),
     );
     const res = await testProvider().listInvoices({
@@ -612,7 +756,14 @@ describe("查詢多筆發票 (listInvoices / GetIssueList)", () => {
       page: 2,
       filters: { Query_Invalid: "2" },
     });
-    expect(data).toMatchObject({ BeginDate: "2026-06-17", EndDate: "2026-06-17", NumPerPage: 30, ShowingPage: 2, DataType: "1", Query_Invalid: "2" });
+    expect(data).toMatchObject({
+      BeginDate: "2026-06-17",
+      EndDate: "2026-06-17",
+      NumPerPage: 30,
+      ShowingPage: 2,
+      DataType: "1",
+      Query_Invalid: "2",
+    });
     expect(res.totalCount).toBe(3718);
     expect(res.page).toBe(2);
     expect(res.invoices[0]).toMatchObject({
@@ -629,13 +780,24 @@ describe("查詢多筆發票 (listInvoices / GetIssueList)", () => {
 
   it("rejects an out-of-range numPerPage locally", async () => {
     await expect(
-      testProvider().listInvoices({ beginDate: "2026-06-17", endDate: "2026-06-17", numPerPage: 201 }),
+      testProvider().listInvoices({
+        beginDate: "2026-06-17",
+        endDate: "2026-06-17",
+        numPerPage: 201,
+      }),
     ).rejects.toMatchObject({ code: "VALIDATION" });
   });
 
   it("returns an empty page when there's no InvoiceData", async () => {
-    server.use(http.post(url(ECPAY_ENDPOINTS.getIssueList), () => HttpResponse.json(ecPlainSuccess({ TotalCount: 0 }))));
-    const res = await testProvider().listInvoices({ beginDate: "2026-06-17", endDate: "2026-06-17" });
+    server.use(
+      http.post(url(ECPAY_ENDPOINTS.getIssueList), () =>
+        HttpResponse.json(ecPlainSuccess({ TotalCount: 0 })),
+      ),
+    );
+    const res = await testProvider().listInvoices({
+      beginDate: "2026-06-17",
+      endDate: "2026-06-17",
+    });
     expect(res.invoices).toEqual([]);
   });
 });
@@ -657,7 +819,13 @@ describe("voidWithReissue (VoidWithReIssue / 註銷重開)", () => {
       http.post(url(ECPAY_ENDPOINTS.voidWithReIssue), async ({ request }) => {
         data = parseRequest(await request.text()).data;
         return HttpResponse.json(
-          ecSuccess({ RtnCode: 1, RtnMsg: "開立發票成功", InvoiceNo: "JU11084050", InvoiceDate: "2026-06-17 22:48:54", RandomNumber: "1936" }),
+          ecSuccess({
+            RtnCode: 1,
+            RtnMsg: "開立發票成功",
+            InvoiceNo: "JU11084050",
+            InvoiceDate: "2026-06-17 22:48:54",
+            RandomNumber: "1936",
+          }),
         );
       }),
     );
@@ -670,7 +838,12 @@ describe("voidWithReissue (VoidWithReIssue / 註銷重開)", () => {
     expect(res).toMatchObject({ invoiceNumber: "JU11084050", randomCode: "1936" });
     expect(res.invoiceDate.getFullYear()).toBe(2026);
     expect(data?.VoidModel).toMatchObject({ InvoiceNo: "JU11084050", VoidReason: "測試重開" });
-    expect(data?.IssueModel).toMatchObject({ RelateNumber: "ORDER_1", InvoiceDate: "2026-06-17 22:48:54", CarrierType: "1", SalesAmount: 100 });
+    expect(data?.IssueModel).toMatchObject({
+      RelateNumber: "ORDER_1",
+      InvoiceDate: "2026-06-17 22:48:54",
+      CarrierType: "1",
+      SalesAmount: 100,
+    });
   });
 
   it("formats a Date invoiceDate to Asia/Taipei yyyy-MM-dd HH:mm:ss", async () => {
@@ -678,7 +851,15 @@ describe("voidWithReissue (VoidWithReIssue / 註銷重開)", () => {
     server.use(
       http.post(url(ECPAY_ENDPOINTS.voidWithReIssue), async ({ request }) => {
         data = parseRequest(await request.text()).data;
-        return HttpResponse.json(ecSuccess({ RtnCode: 1, RtnMsg: "開立發票成功", InvoiceNo: "JU1", InvoiceDate: "2026-06-17 14:48:54", RandomNumber: "0001" }));
+        return HttpResponse.json(
+          ecSuccess({
+            RtnCode: 1,
+            RtnMsg: "開立發票成功",
+            InvoiceNo: "JU1",
+            InvoiceDate: "2026-06-17 14:48:54",
+            RandomNumber: "0001",
+          }),
+        );
       }),
     );
     // 2026-06-17T06:48:54Z == 2026-06-17 14:48:54 Asia/Taipei (+08:00)
@@ -693,14 +874,28 @@ describe("voidWithReissue (VoidWithReIssue / 註銷重開)", () => {
 
   it("rejects a VoidReason longer than 20 chars locally", async () => {
     await expect(
-      testProvider().voidWithReissue({ invoiceNumber: "JU1", voidReason: "超過二十個字".repeat(5), invoiceDate: "2026-06-17 00:00:00", reissue }),
+      testProvider().voidWithReissue({
+        invoiceNumber: "JU1",
+        voidReason: "超過二十個字".repeat(5),
+        invoiceDate: "2026-06-17 00:00:00",
+        reissue,
+      }),
     ).rejects.toMatchObject({ code: "VALIDATION" });
   });
 
   it("maps 查無發票資料 (unknown invoice) to NOT_FOUND", async () => {
-    server.use(http.post(url(ECPAY_ENDPOINTS.voidWithReIssue), () => HttpResponse.json(ecError(2, "查無發票資料，請重新確認"))));
+    server.use(
+      http.post(url(ECPAY_ENDPOINTS.voidWithReIssue), () =>
+        HttpResponse.json(ecError(2, "查無發票資料，請重新確認")),
+      ),
+    );
     await expect(
-      testProvider().voidWithReissue({ invoiceNumber: "JU00000000", voidReason: "x", invoiceDate: "2026-06-17 00:00:00", reissue }),
+      testProvider().voidWithReissue({
+        invoiceNumber: "JU00000000",
+        voidReason: "x",
+        invoiceDate: "2026-06-17 00:00:00",
+        reissue,
+      }),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 });
@@ -711,10 +906,15 @@ describe("getPrintUrl (InvoicePrint / 發票列印)", () => {
     server.use(
       http.post(url(ECPAY_ENDPOINTS.invoicePrint), async ({ request }) => {
         data = parseRequest(await request.text()).data;
-        return HttpResponse.json(ecSuccess({ RtnCode: 1, RtnMsg: "成功", InvoiceHtml: "https://print.example/aa" }));
+        return HttpResponse.json(
+          ecSuccess({ RtnCode: 1, RtnMsg: "成功", InvoiceHtml: "https://print.example/aa" }),
+        );
       }),
     );
-    const u = await testProvider().getPrintUrl({ invoiceNumber: "JU11084038", invoiceDate: "2026-06-17" });
+    const u = await testProvider().getPrintUrl({
+      invoiceNumber: "JU11084038",
+      invoiceDate: "2026-06-17",
+    });
     expect(u).toBe("https://print.example/aa");
     expect(data).toMatchObject({ InvoiceNo: "JU11084038", InvoiceDate: "2026-06-17" });
     expect(data?.PrintStyle).toBeUndefined();
@@ -727,10 +927,17 @@ describe("getPrintUrl (InvoicePrint / 發票列印)", () => {
     server.use(
       http.post(url(ECPAY_ENDPOINTS.invoicePrint), async ({ request }) => {
         data = parseRequest(await request.text()).data;
-        return HttpResponse.json(ecSuccess({ RtnCode: 1, RtnMsg: "成功", InvoiceHtml: "https://print.example/bb" }));
+        return HttpResponse.json(
+          ecSuccess({ RtnCode: 1, RtnMsg: "成功", InvoiceHtml: "https://print.example/bb" }),
+        );
       }),
     );
-    await testProvider().getPrintUrl({ invoiceNumber: "JU1", style: "DOUBLE", showDetail: false, reprint: true });
+    await testProvider().getPrintUrl({
+      invoiceNumber: "JU1",
+      style: "DOUBLE",
+      showDetail: false,
+      reprint: true,
+    });
     expect(data).toMatchObject({ PrintStyle: 2, IsShowingDetail: 2, IsReprintInvoice: "Y" });
     expect(data?.InvoiceDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
@@ -740,20 +947,37 @@ describe("getPrintUrl (InvoicePrint / 發票列印)", () => {
     server.use(
       http.post(url(ECPAY_ENDPOINTS.invoicePrint), async ({ request }) => {
         data = parseRequest(await request.text()).data;
-        return HttpResponse.json(ecSuccess({ RtnCode: 1, RtnMsg: "成功", InvoiceHtml: "https://print.example/cc" }));
+        return HttpResponse.json(
+          ecSuccess({ RtnCode: 1, RtnMsg: "成功", InvoiceHtml: "https://print.example/cc" }),
+        );
       }),
     );
-    await testProvider().getPrintUrl({ invoiceNumber: "JU1", invoiceDate: "2026/06/17", style: "B2B_A4", showDetail: true });
+    await testProvider().getPrintUrl({
+      invoiceNumber: "JU1",
+      invoiceDate: "2026/06/17",
+      style: "B2B_A4",
+      showDetail: true,
+    });
     expect(data).toMatchObject({ PrintStyle: 4, IsShowingDetail: 1 });
   });
 
   it("returns an empty string when ECPay omits InvoiceHtml", async () => {
-    server.use(http.post(url(ECPAY_ENDPOINTS.invoicePrint), () => HttpResponse.json(ecSuccess({ RtnCode: 1, RtnMsg: "成功" }))));
-    expect(await testProvider().getPrintUrl({ invoiceNumber: "JU1", invoiceDate: "2026-06-17" })).toBe("");
+    server.use(
+      http.post(url(ECPAY_ENDPOINTS.invoicePrint), () =>
+        HttpResponse.json(ecSuccess({ RtnCode: 1, RtnMsg: "成功" })),
+      ),
+    );
+    expect(
+      await testProvider().getPrintUrl({ invoiceNumber: "JU1", invoiceDate: "2026-06-17" }),
+    ).toBe("");
   });
 
   it("maps a carrier/donation or unknown invoice (查無資料) to NOT_FOUND", async () => {
-    server.use(http.post(url(ECPAY_ENDPOINTS.invoicePrint), () => HttpResponse.json(ecError(100, "查無資料"))));
+    server.use(
+      http.post(url(ECPAY_ENDPOINTS.invoicePrint), () =>
+        HttpResponse.json(ecError(100, "查無資料")),
+      ),
+    );
     await expect(
       testProvider().getPrintUrl({ invoiceNumber: "JU00000000", invoiceDate: "2026-06-17" }),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
@@ -766,7 +990,9 @@ describe("sendNotification (InvoiceNotify / 發送發票通知)", () => {
     server.use(
       http.post(url(ECPAY_ENDPOINTS.invoiceNotify), async ({ request }) => {
         data = parseRequest(await request.text()).data;
-        return HttpResponse.json(ecSuccess({ RtnCode: 1, RtnMsg: "發送通知成功", MerchantID: "2000132" }));
+        return HttpResponse.json(
+          ecSuccess({ RtnCode: 1, RtnMsg: "發送通知成功", MerchantID: "2000132" }),
+        );
       }),
     );
     await expect(
@@ -794,7 +1020,9 @@ describe("sendNotification (InvoiceNotify / 發送發票通知)", () => {
     server.use(
       http.post(url(ECPAY_ENDPOINTS.invoiceNotify), async ({ request }) => {
         data = parseRequest(await request.text()).data;
-        return HttpResponse.json(ecSuccess({ RtnCode: 1, RtnMsg: "發送通知成功", MerchantID: "2000132" }));
+        return HttpResponse.json(
+          ecSuccess({ RtnCode: 1, RtnMsg: "發送通知成功", MerchantID: "2000132" }),
+        );
       }),
     );
     await testProvider().sendNotification({
@@ -820,7 +1048,9 @@ describe("sendNotification (InvoiceNotify / 發送發票通知)", () => {
     server.use(
       http.post(url(ECPAY_ENDPOINTS.invoiceNotify), async ({ request }) => {
         data = parseRequest(await request.text()).data;
-        return HttpResponse.json(ecSuccess({ RtnCode: 1, RtnMsg: "發送通知成功", MerchantID: "2000132" }));
+        return HttpResponse.json(
+          ecSuccess({ RtnCode: 1, RtnMsg: "發送通知成功", MerchantID: "2000132" }),
+        );
       }),
     );
     await testProvider().sendNotification({
@@ -831,26 +1061,53 @@ describe("sendNotification (InvoiceNotify / 發送發票通知)", () => {
       email: "b@x.com",
     });
     expect(data).toMatchObject({ InvoiceTag: "II", Notify: "A", Notified: "A" });
-    await testProvider().sendNotification({ invoiceNumber: "JU1", tag: "AWARD", method: "EMAIL", recipient: "CUSTOMER", email: "b@x.com" });
+    await testProvider().sendNotification({
+      invoiceNumber: "JU1",
+      tag: "AWARD",
+      method: "EMAIL",
+      recipient: "CUSTOMER",
+      email: "b@x.com",
+    });
     expect(data).toMatchObject({ InvoiceTag: "AW" });
   });
 
   it("rejects with NOT_FOUND when notifying a non-winning invoice (AW)", async () => {
-    server.use(http.post(url(ECPAY_ENDPOINTS.invoiceNotify), () => HttpResponse.json(ecError(2, "查無發票中獎資料，請確認!"))));
+    server.use(
+      http.post(url(ECPAY_ENDPOINTS.invoiceNotify), () =>
+        HttpResponse.json(ecError(2, "查無發票中獎資料，請確認!")),
+      ),
+    );
     await expect(
-      testProvider().sendNotification({ invoiceNumber: "JU1", tag: "AWARD", method: "EMAIL", recipient: "CUSTOMER", email: "b@x.com" }),
+      testProvider().sendNotification({
+        invoiceNumber: "JU1",
+        tag: "AWARD",
+        method: "EMAIL",
+        recipient: "CUSTOMER",
+        email: "b@x.com",
+      }),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 
   it("requires email or phone (local validation)", async () => {
     await expect(
-      testProvider().sendNotification({ invoiceNumber: "JU1", tag: "ISSUE", method: "EMAIL", recipient: "CUSTOMER" }),
+      testProvider().sendNotification({
+        invoiceNumber: "JU1",
+        tag: "ISSUE",
+        method: "EMAIL",
+        recipient: "CUSTOMER",
+      }),
     ).rejects.toMatchObject({ code: "VALIDATION" });
   });
 
   it("requires allowanceNumber for allowance tags (local validation)", async () => {
     await expect(
-      testProvider().sendNotification({ invoiceNumber: "JU1", tag: "ALLOWANCE", method: "EMAIL", recipient: "CUSTOMER", email: "b@x.com" }),
+      testProvider().sendNotification({
+        invoiceNumber: "JU1",
+        tag: "ALLOWANCE",
+        method: "EMAIL",
+        recipient: "CUSTOMER",
+        email: "b@x.com",
+      }),
     ).rejects.toMatchObject({ code: "VALIDATION" });
   });
 
@@ -872,7 +1129,9 @@ describe("sendNotification (InvoiceNotify / 發送發票通知)", () => {
     server.use(
       http.post(url(ECPAY_ENDPOINTS.invoiceNotify), async ({ request }) => {
         data = parseRequest(await request.text()).data;
-        return HttpResponse.json(ecSuccess({ RtnCode: 1, RtnMsg: "發送通知成功", MerchantID: "2000132" }));
+        return HttpResponse.json(
+          ecSuccess({ RtnCode: 1, RtnMsg: "發送通知成功", MerchantID: "2000132" }),
+        );
       }),
     );
     await testProvider().sendNotification({
@@ -887,10 +1146,19 @@ describe("sendNotification (InvoiceNotify / 發送發票通知)", () => {
   });
 
   it("skips local validation when validatePayload is false", async () => {
-    server.use(http.post(url(ECPAY_ENDPOINTS.invoiceNotify), () => HttpResponse.json(ecError(2, "查無發票中獎資料，請確認!"))));
+    server.use(
+      http.post(url(ECPAY_ENDPOINTS.invoiceNotify), () =>
+        HttpResponse.json(ecError(2, "查無發票中獎資料，請確認!")),
+      ),
+    );
     // No email/phone, no AllowanceNo — local guards are bypassed, the request reaches ECPay.
     await expect(
-      testProvider({ validatePayload: false }).sendNotification({ invoiceNumber: "JU1", tag: "ALLOWANCE", method: "EMAIL", recipient: "CUSTOMER" }),
+      testProvider({ validatePayload: false }).sendNotification({
+        invoiceNumber: "JU1",
+        tag: "ALLOWANCE",
+        method: "EMAIL",
+        recipient: "CUSTOMER",
+      }),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 });

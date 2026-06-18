@@ -12,7 +12,12 @@ import { createEzreceiptProvider } from "../provider.js";
 const env = process.env;
 const live =
   env.EZRECEIPT_LIVE === "1" &&
-  Boolean(env.EZRECEIPT_APPCODE && env.EZRECEIPT_APPKEY && env.EZRECEIPT_ACCNAME && env.EZRECEIPT_PASSWORD);
+  Boolean(
+    env.EZRECEIPT_APPCODE &&
+    env.EZRECEIPT_APPKEY &&
+    env.EZRECEIPT_ACCNAME &&
+    env.EZRECEIPT_PASSWORD,
+  );
 
 const LIVE_OPTS = { retry: 2 } as const;
 
@@ -83,17 +88,31 @@ describe.skipIf(!live)("ezReceipt live (test env) — variants", LIVE_OPTS, () =
   };
 
   it("issues a B2B invoice (issueTo 統編)", async () => {
-    const res = await p.issue({ ...base, orderId: order(), buyer: { ubn: "53538851", name: "歐付寶測試", address: "台北市" } });
+    const res = await p.issue({
+      ...base,
+      orderId: order(),
+      buyer: { ubn: "53538851", name: "歐付寶測試", address: "台北市" },
+    });
     expect(res.invoiceNumber).toMatch(/^[A-Z]{2}\d{8}$/);
   });
 
   it("issues a mobile-barcode invoice", async () => {
-    const res = await p.issue({ ...base, orderId: order(), buyer: {}, carrier: { type: "MOBILE_BARCODE", code: "/ABC1234" } });
+    const res = await p.issue({
+      ...base,
+      orderId: order(),
+      buyer: {},
+      carrier: { type: "MOBILE_BARCODE", code: "/ABC1234" },
+    });
     expect(res.invoiceNumber).toMatch(/^[A-Z]{2}\d{8}$/);
   });
 
   it("issues a mobile-barcode invoice annotated with a 統編 (carrier + issueTo)", async () => {
-    const res = await p.issue({ ...base, orderId: order(), buyer: { name: "歐付寶測試", ubn: "53538851" }, carrier: { type: "MOBILE_BARCODE", code: "/ABC1234" } });
+    const res = await p.issue({
+      ...base,
+      orderId: order(),
+      buyer: { name: "歐付寶測試", ubn: "53538851" },
+      carrier: { type: "MOBILE_BARCODE", code: "/ABC1234" },
+    });
     expect(res.invoiceNumber).toMatch(/^[A-Z]{2}\d{8}$/);
     const q = await p.query({ invoiceNumber: res.invoiceNumber });
     expect(q.buyer.ubn).toBe("53538851");
@@ -116,7 +135,14 @@ describe.skipIf(!live)("ezReceipt live (test env) — variants", LIVE_OPTS, () =
 
   it("reports each line's remaining allowance quota (extension)", async () => {
     const m = member();
-    const inv = await p.issue({ ...base, orderId: order(), buyer: { name: "x", email: m }, items: [{ description: "商品", quantity: 3, unitPrice: 100, amount: 300 }], amount: { salesAmount: 300, taxAmount: 15, totalAmount: 315 }, carrier: { type: "MEMBER", code: m } });
+    const inv = await p.issue({
+      ...base,
+      orderId: order(),
+      buyer: { name: "x", email: m },
+      items: [{ description: "商品", quantity: 3, unitPrice: 100, amount: 300 }],
+      amount: { salesAmount: 300, taxAmount: 15, totalAmount: 315 },
+      carrier: { type: "MEMBER", code: m },
+    });
     const quota = await p.getAllowanceQuota(inv.invoiceNumber);
     expect(quota.length).toBeGreaterThan(0);
     expect(quota[0]!.amount).toBe(300);
@@ -125,9 +151,20 @@ describe.skipIf(!live)("ezReceipt live (test env) — variants", LIVE_OPTS, () =
 
   it("lists issued invoices by period, and filters by invNo via prop (extension)", async () => {
     const m = member();
-    const inv = await p.issue({ ...base, orderId: order(), buyer: { name: "x", email: m }, carrier: { type: "MEMBER", code: m } });
+    const inv = await p.issue({
+      ...base,
+      orderId: order(),
+      buyer: { name: "x", email: m },
+      carrier: { type: "MEMBER", code: m },
+    });
     // 期別 = bimonthly code (odd start month): June → 202605, not 202606.
-    const [y, mo] = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Taipei", year: "numeric", month: "2-digit" }).format(inv.invoiceDate).split("-");
+    const [y, mo] = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Taipei",
+      year: "numeric",
+      month: "2-digit",
+    })
+      .format(inv.invoiceDate)
+      .split("-");
     const period = `${y}${String(Number(mo) % 2 === 0 ? Number(mo) - 1 : Number(mo)).padStart(2, "0")}`;
     const all = await p.listInvoices({ period });
     expect(all.entries).toBeGreaterThan(0);
@@ -137,7 +174,12 @@ describe.skipIf(!live)("ezReceipt live (test env) — variants", LIVE_OPTS, () =
 
   it("returns the print info (barcode + QR codes) for an invoice (extension)", async () => {
     const m = member();
-    const inv = await p.issue({ ...base, orderId: order(), buyer: { name: "x", email: m }, carrier: { type: "MEMBER", code: m } });
+    const inv = await p.issue({
+      ...base,
+      orderId: order(),
+      buyer: { name: "x", email: m },
+      carrier: { type: "MEMBER", code: m },
+    });
     const info = await p.getInvoicePrintInfo(inv.invoiceNumber);
     expect(info.invNo).toBe(inv.invoiceNumber);
     expect(info.barCode).toBeTruthy();
@@ -148,7 +190,12 @@ describe.skipIf(!live)("ezReceipt live (test env) — variants", LIVE_OPTS, () =
 
   it("downloads an invoice print PDF (binary proof endpoint, extension)", async () => {
     const m = member();
-    const inv = await p.issue({ ...base, orderId: order(), buyer: { name: "x", email: m }, carrier: { type: "MEMBER", code: m } });
+    const inv = await p.issue({
+      ...base,
+      orderId: order(),
+      buyer: { name: "x", email: m },
+      carrier: { type: "MEMBER", code: m },
+    });
     const pdf = await p.printInvoice([inv.invoiceNumber], { format: 25 });
     expect(pdf.contentType.toLowerCase()).toContain("pdf");
     expect(Array.from(pdf.data.slice(0, 4))).toEqual([0x25, 0x50, 0x44, 0x46]); // %PDF
@@ -156,8 +203,18 @@ describe.skipIf(!live)("ezReceipt live (test env) — variants", LIVE_OPTS, () =
 
   it("downloads an allowance print PDF (binary proof endpoint, extension)", async () => {
     const m = member();
-    const inv = await p.issue({ ...base, orderId: order(), buyer: { name: "x", email: m }, carrier: { type: "MEMBER", code: m } });
-    const al = await p.allowance({ invoiceNumber: inv.invoiceNumber, allowanceId: order(), items: [{ description: "商品", quantity: 1, unitPrice: 100, amount: 100 }], amount: { salesAmount: 100, taxAmount: 5, totalAmount: 105 } });
+    const inv = await p.issue({
+      ...base,
+      orderId: order(),
+      buyer: { name: "x", email: m },
+      carrier: { type: "MEMBER", code: m },
+    });
+    const al = await p.allowance({
+      invoiceNumber: inv.invoiceNumber,
+      allowanceId: order(),
+      items: [{ description: "商品", quantity: 1, unitPrice: 100, amount: 100 }],
+      amount: { salesAmount: 100, taxAmount: 5, totalAmount: 105 },
+    });
     const pdf = await p.printAllowance([(al.raw as { awID: number }).awID], { format: 2 });
     expect(pdf.contentType.toLowerCase()).toContain("pdf");
     expect(Array.from(pdf.data.slice(0, 4))).toEqual([0x25, 0x50, 0x44, 0x46]); // %PDF
@@ -165,7 +222,9 @@ describe.skipIf(!live)("ezReceipt live (test env) — variants", LIVE_OPTS, () =
 
   it("validates carriers and looks up a 統編 against 財政部 (extension)", async () => {
     expect(await p.lookupBusiness("53538851")).toEqual(
-      expect.arrayContaining([expect.objectContaining({ nid: "53538851", name: expect.stringContaining("歐付寶") })]),
+      expect.arrayContaining([
+        expect.objectContaining({ nid: "53538851", name: expect.stringContaining("歐付寶") }),
+      ]),
     );
     expect(typeof (await p.checkMobileCode("/ABC1234"))).toBe("boolean");
     expect(typeof (await p.checkCharity("25885"))).toBe("boolean");

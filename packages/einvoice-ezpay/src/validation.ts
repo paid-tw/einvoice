@@ -19,7 +19,10 @@ export const ezpayIssuePayloadSchema = z
       .regex(/^[A-Za-z0-9_]+$/, "MerchantOrderNo allows only letters, digits and _"),
     Category: z.enum(["B2B", "B2C"]),
     BuyerName: z.string().min(1, "BuyerName is required").max(60, "BuyerName must be ≤60 chars"),
-    BuyerUBN: z.string().regex(/^\d{8}$/, "BuyerUBN must be 8 digits").optional(),
+    BuyerUBN: z
+      .string()
+      .regex(/^\d{8}$/, "BuyerUBN must be 8 digits")
+      .optional(),
     BuyerAddress: z.string().max(100, "BuyerAddress must be ≤100 chars").optional(),
     BuyerEmail: z
       .string()
@@ -29,7 +32,10 @@ export const ezpayIssuePayloadSchema = z
       .or(z.literal("")),
     CarrierType: z.enum(["0", "1", "2"]).optional(),
     CarrierNum: z.string().max(50).optional(),
-    LoveCode: z.string().regex(/^\d{3,7}$/, "LoveCode must be 3–7 digits").optional(),
+    LoveCode: z
+      .string()
+      .regex(/^\d{3,7}$/, "LoveCode must be 3–7 digits")
+      .optional(),
     PrintFlag: z.enum(["Y", "N"]),
     TaxType: z.enum(["1", "2", "3", "9"]),
     TaxRate: intLike,
@@ -215,10 +221,14 @@ export const ezpayAllowancePayloadSchema = z
   })
   .passthrough()
   .superRefine((p, ctx) => {
-    refineEqualItemSegments(["ItemName", "ItemCount", "ItemUnit", "ItemPrice", "ItemAmt", "ItemTaxAmt"])(
-      p,
-      ctx,
-    );
+    refineEqualItemSegments([
+      "ItemName",
+      "ItemCount",
+      "ItemUnit",
+      "ItemPrice",
+      "ItemAmt",
+      "ItemTaxAmt",
+    ])(p, ctx);
     // ItemUnit: 中文2字 / 英數6字 ⇒ ≤6 UTF-8 bytes per segment.
     for (const seg of String(p.ItemUnit ?? "").split("|")) {
       if (utf8Len(seg) > 6) {
@@ -236,7 +246,10 @@ export const ezpayAllowancePayloadSchema = z
 export const ezpayAllowanceTouchPayloadSchema = z
   .object({
     AllowanceStatus: z.enum(["C", "D"]),
-    AllowanceNo: z.string().min(1, "AllowanceNo is required").max(25, "AllowanceNo must be ≤25 chars"),
+    AllowanceNo: z
+      .string()
+      .min(1, "AllowanceNo is required")
+      .max(25, "AllowanceNo must be ≤25 chars"),
     MerchantOrderNo: merchantOrderNoField,
     TotalAmt: nonNegInt,
   })
@@ -245,7 +258,10 @@ export const ezpayAllowanceTouchPayloadSchema = z
 // --- allowanceInvalid (作廢折讓) ----------------------------------------------
 export const ezpayVoidAllowancePayloadSchema = z
   .object({
-    AllowanceNo: z.string().min(1, "AllowanceNo is required").max(25, "AllowanceNo must be ≤25 chars"),
+    AllowanceNo: z
+      .string()
+      .min(1, "AllowanceNo is required")
+      .max(25, "AllowanceNo must be ≤25 chars"),
     InvalidReason: invalidReasonSchema,
   })
   .passthrough();
@@ -255,7 +271,10 @@ export const ezpaySearchPayloadSchema = z
   .object({
     SearchType: z.enum(["0", "1"]).optional(),
     InvoiceNumber: z.string().max(10).optional().or(z.literal("")),
-    RandomNum: z.string().regex(/^\d{4}$/, "RandomNum must be 4 digits").optional(),
+    RandomNum: z
+      .string()
+      .regex(/^\d{4}$/, "RandomNum must be 4 digits")
+      .optional(),
     MerchantOrderNo: z.string().max(20).optional().or(z.literal("")),
     TotalAmt: z.coerce.number().int().nonnegative().optional(),
     DisplayFlag: z.enum(["", "1"]).optional(),
@@ -266,15 +285,31 @@ export const ezpaySearchPayloadSchema = z
     if (type === "1") {
       // 以訂單編號 + 發票金額查詢.
       if (!p.MerchantOrderNo)
-        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "MerchantOrderNo is required for SearchType 1", path: ["MerchantOrderNo"] });
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "MerchantOrderNo is required for SearchType 1",
+          path: ["MerchantOrderNo"],
+        });
       if (p.TotalAmt === undefined)
-        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "TotalAmt is required for SearchType 1", path: ["TotalAmt"] });
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "TotalAmt is required for SearchType 1",
+          path: ["TotalAmt"],
+        });
     } else {
       // 以發票號碼 + 隨機碼查詢.
       if (!p.InvoiceNumber)
-        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "InvoiceNumber is required for SearchType 0", path: ["InvoiceNumber"] });
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "InvoiceNumber is required for SearchType 0",
+          path: ["InvoiceNumber"],
+        });
       if (!p.RandomNum)
-        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "RandomNum is required for SearchType 0", path: ["RandomNum"] });
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "RandomNum is required for SearchType 0",
+          path: ["RandomNum"],
+        });
     }
   });
 

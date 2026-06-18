@@ -9,7 +9,12 @@ describe("InvoiceError", () => {
   });
 
   it("serializes its normalized fields via toJSON / JSON.stringify", () => {
-    const e = new InvoiceError("bad", { provider: "ecpay", code: "VALIDATION", rawCode: "10100073", rawMessage: "格式錯誤" });
+    const e = new InvoiceError("bad", {
+      provider: "ecpay",
+      code: "VALIDATION",
+      rawCode: "10100073",
+      rawMessage: "格式錯誤",
+    });
     expect(e.toJSON()).toEqual({
       name: "InvoiceError",
       provider: "ecpay",

@@ -36,7 +36,11 @@ export const ecpayIssuePayloadSchema = z
     CustomerPhone: z.string().max(20).optional().or(z.literal("")),
     Print: z.enum(["0", "1"]),
     Donation: z.enum(["0", "1", "2"]),
-    LoveCode: z.string().regex(/^\d{3,7}$/, "LoveCode must be 3–7 digits").optional().or(z.literal("")),
+    LoveCode: z
+      .string()
+      .regex(/^\d{3,7}$/, "LoveCode must be 3–7 digits")
+      .optional()
+      .or(z.literal("")),
     CarrierType: z.enum(["", "1", "2", "3"]),
     CarrierNum: z.string().max(64).optional().or(z.literal("")),
     TaxType: z.enum(["1", "2", "3", "4", "9"]),
@@ -61,7 +65,10 @@ export const ecpayIssuePayloadSchema = z
     if (String(p.vat ?? "1") !== "0") {
       const itemsTotal = p.Items.reduce((sum, it) => sum + Number(it.ItemAmount), 0);
       if (Math.round(itemsTotal) !== Number(p.SalesAmount))
-        fail(`SalesAmount (${p.SalesAmount}) must equal round(Σ ItemAmount) (${itemsTotal})`, "SalesAmount");
+        fail(
+          `SalesAmount (${p.SalesAmount}) must equal round(Σ ItemAmount) (${itemsTotal})`,
+          "SalesAmount",
+        );
     }
 
     // 捐贈 needs a love code. (A carrier may coexist — the invoice sits in the
@@ -78,10 +85,12 @@ export const ecpayIssuePayloadSchema = z
 
     if (p.CustomerIdentifier) {
       // B2B (統編) without printing must store the invoice in a carrier (5000028).
-      if (p.Print === "0" && !p.CarrierType) fail("A non-printed B2B invoice must use a carrier", "CarrierType");
+      if (p.Print === "0" && !p.CarrierType)
+        fail("A non-printed B2B invoice must use a carrier", "CarrierType");
     } else {
       // B2C carrier invoices are electronic — they cannot print (5000015).
-      if (p.CarrierType && p.Print === "1") fail("Print must be 0 for a B2C carrier invoice", "Print");
+      if (p.CarrierType && p.Print === "1")
+        fail("Print must be 0 for a B2C carrier invoice", "Print");
     }
 
     // 零稅率 (TaxType 2 / 9) requires the customs-clearance mark (5000007).

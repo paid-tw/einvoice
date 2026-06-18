@@ -21,7 +21,11 @@ export function testProvider(overrides: Record<string, unknown> = {}) {
 
 /** Parse a captured request: MerchantID + the decrypted Data payload. */
 export function parseRequest(text: string) {
-  const body = JSON.parse(text) as { MerchantID: string; RqHeader: { Timestamp: number }; Data: string };
+  const body = JSON.parse(text) as {
+    MerchantID: string;
+    RqHeader: { Timestamp: number };
+    Data: string;
+  };
   return {
     merchantId: body.MerchantID,
     timestamp: body.RqHeader?.Timestamp,

@@ -30,18 +30,30 @@ export function assertValidCrossBorderIssue(input: IssueInvoiceInput): void {
 
   // --- capability rejections (structurally unrepresentable) ----------------
   if (input.buyer.ubn) {
-    throw fail("ezPay cross-border invoices are B2C only; a 統一編號 (buyer.ubn) is not supported", InvoiceErrorCode.UNSUPPORTED);
+    throw fail(
+      "ezPay cross-border invoices are B2C only; a 統一編號 (buyer.ubn) is not supported",
+      InvoiceErrorCode.UNSUPPORTED,
+    );
   }
   if (input.carrier) {
-    throw fail("ezPay cross-border uses an e-mail carrier only; buyer.carrier is not supported", InvoiceErrorCode.UNSUPPORTED);
+    throw fail(
+      "ezPay cross-border uses an e-mail carrier only; buyer.carrier is not supported",
+      InvoiceErrorCode.UNSUPPORTED,
+    );
   }
   if (input.donation) {
-    throw fail("ezPay cross-border invoices cannot be donated; donation is not supported", InvoiceErrorCode.UNSUPPORTED);
+    throw fail(
+      "ezPay cross-border invoices cannot be donated; donation is not supported",
+      InvoiceErrorCode.UNSUPPORTED,
+    );
   }
   // Cross-border has no per-item tax type field, so a genuinely mixed-rate
   // invoice (items declaring differing taxTypes) can't be represented.
   if (new Set(input.items.map((i) => i.taxType).filter(Boolean)).size > 1) {
-    throw fail("ezPay cross-border invoices do not support mixed tax rates", InvoiceErrorCode.UNSUPPORTED);
+    throw fail(
+      "ezPay cross-border invoices do not support mixed tax rates",
+      InvoiceErrorCode.UNSUPPORTED,
+    );
   }
 
   // --- structural / format -------------------------------------------------
@@ -63,9 +75,15 @@ export function assertValidCrossBorderIssue(input: IssueInvoiceInput): void {
 
   // --- amounts -------------------------------------------------------------
   const { salesAmount, taxAmount, totalAmount } = input.amount;
-  for (const [name, v] of [["salesAmount", salesAmount], ["taxAmount", taxAmount], ["totalAmount", totalAmount]] as const) {
+  for (const [name, v] of [
+    ["salesAmount", salesAmount],
+    ["taxAmount", taxAmount],
+    ["totalAmount", totalAmount],
+  ] as const) {
     if (!isValidAmount(v, foreign)) {
-      throw fail(`amount.${name} must be ${foreign ? "a number with ≤2 decimals" : "an integer"} for currency ${currency}`);
+      throw fail(
+        `amount.${name} must be ${foreign ? "a number with ≤2 decimals" : "an integer"} for currency ${currency}`,
+      );
     }
   }
   if (Math.abs(salesAmount + taxAmount - totalAmount) > EPS) {
@@ -75,10 +93,14 @@ export function assertValidCrossBorderIssue(input: IssueInvoiceInput): void {
   let itemSum = 0;
   for (const item of input.items) {
     if (!isValidAmount(item.unitPrice, foreign) || !isValidAmount(item.amount, foreign)) {
-      throw fail(`item "${item.description}" price/amount must be ${foreign ? "≤2-decimal numbers" : "integers"} for currency ${currency}`);
+      throw fail(
+        `item "${item.description}" price/amount must be ${foreign ? "≤2-decimal numbers" : "integers"} for currency ${currency}`,
+      );
     }
     if (Math.abs(item.quantity * item.unitPrice - item.amount) > EPS) {
-      throw fail(`item "${item.description}": amount must equal quantity × unitPrice (tax-inclusive)`);
+      throw fail(
+        `item "${item.description}": amount must equal quantity × unitPrice (tax-inclusive)`,
+      );
     }
     itemSum += item.amount;
   }

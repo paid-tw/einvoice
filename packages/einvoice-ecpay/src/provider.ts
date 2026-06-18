@@ -247,7 +247,10 @@ export class EcpayProvider implements InvoiceProvider {
       VoidModel: { InvoiceNo: input.invoiceNumber, VoidReason: input.voidReason },
       IssueModel: {
         ...this.buildIssueData(parsed),
-        InvoiceDate: typeof input.invoiceDate === "string" ? input.invoiceDate : taipeiDateTime(input.invoiceDate),
+        InvoiceDate:
+          typeof input.invoiceDate === "string"
+            ? input.invoiceDate
+            : taipeiDateTime(input.invoiceDate),
       },
     });
     return {
@@ -391,7 +394,9 @@ export class EcpayProvider implements InvoiceProvider {
     // GetIssue returns IIS_-prefixed fields; SalesAmount is the 含稅 total.
     const total = Number(result.IIS_Sales_Amount ?? 0);
     const tax = Number(result.IIS_Tax_Amount ?? 0);
-    const items = Array.isArray(result.Items) ? (result.Items as Array<Record<string, unknown>>) : [];
+    const items = Array.isArray(result.Items)
+      ? (result.Items as Array<Record<string, unknown>>)
+      : [];
     return {
       invoiceNumber: String(result.IIS_Number ?? parsed.invoiceNumber ?? ""),
       invoiceDate: parseEcpayDate(result.IIS_Create_Date),
@@ -445,11 +450,18 @@ export class EcpayProvider implements InvoiceProvider {
     const tag = NOTIFY_TAG[input.tag];
     if (this.config.validatePayload !== false) {
       const fail = (msg: string) =>
-        new InvoiceError(msg, { provider: "ecpay", code: InvoiceErrorCode.VALIDATION, rawMessage: msg });
+        new InvoiceError(msg, {
+          provider: "ecpay",
+          code: InvoiceErrorCode.VALIDATION,
+          rawMessage: msg,
+        });
       if (!input.email && !input.phone) throw fail("email or phone is required");
       if (["A", "AI", "OA"].includes(tag) && !input.allowanceNumber)
         throw fail("allowanceNumber is required for allowance notifications");
-      if (input.tag === "ONLINE_ALLOWANCE" && (input.method !== "EMAIL" || input.recipient !== "CUSTOMER"))
+      if (
+        input.tag === "ONLINE_ALLOWANCE" &&
+        (input.method !== "EMAIL" || input.recipient !== "CUSTOMER")
+      )
         throw fail("ONLINE_ALLOWANCE must use EMAIL + CUSTOMER");
     }
     await ecpayRequest(this.config, ENDPOINTS.invoiceNotify, {
@@ -507,7 +519,10 @@ export class EcpayProvider implements InvoiceProvider {
     invoiceNumber: string;
     invoiceDate: string;
   }): Promise<InvalidDetail> {
-    if (this.config.validatePayload !== false && (!input.orderId || !input.invoiceNumber || !input.invoiceDate)) {
+    if (
+      this.config.validatePayload !== false &&
+      (!input.orderId || !input.invoiceNumber || !input.invoiceDate)
+    ) {
       throw new InvoiceError("orderId, invoiceNumber and invoiceDate are all required", {
         provider: "ecpay",
         code: InvoiceErrorCode.VALIDATION,
@@ -550,7 +565,8 @@ export class EcpayProvider implements InvoiceProvider {
       throw new InvoiceError("Provide allowanceNumber, or invoiceNumber + date", {
         provider: "ecpay",
         code: InvoiceErrorCode.VALIDATION,
-        rawMessage: "GetAllowanceList needs SearchType 0 (allowanceNumber) or 1/2 (invoiceNumber + date)",
+        rawMessage:
+          "GetAllowanceList needs SearchType 0 (allowanceNumber) or 1/2 (invoiceNumber + date)",
       });
     } else {
       data = { SearchType: "0", AllowanceNo: "" };
@@ -574,13 +590,15 @@ export class EcpayProvider implements InvoiceProvider {
       customerName: stringOrUndef(a.IIS_Customer_Name),
       notifyMail: stringOrUndef(a.IA_Send_Mail),
       notifyPhone: stringOrUndef(a.IA_Send_Phone),
-      items: (Array.isArray(a.Items) ? (a.Items as Array<Record<string, unknown>>) : []).map((it) => ({
-        description: String(it.ItemName ?? ""),
-        quantity: Number(it.ItemCount ?? 0),
-        unitPrice: Number(it.ItemPrice ?? 0),
-        amount: Number(it.ItemAmount ?? 0),
-        unit: stringOrUndef(it.ItemWord),
-      })),
+      items: (Array.isArray(a.Items) ? (a.Items as Array<Record<string, unknown>>) : []).map(
+        (it) => ({
+          description: String(it.ItemName ?? ""),
+          quantity: Number(it.ItemCount ?? 0),
+          unitPrice: Number(it.ItemPrice ?? 0),
+          amount: Number(it.ItemAmount ?? 0),
+          unit: stringOrUndef(it.ItemWord),
+        }),
+      ),
       raw: a,
     }));
   }
@@ -706,7 +724,9 @@ export class EcpayProvider implements InvoiceProvider {
       { UnifiedBusinessNo: ban },
       { successCodes: [7, 9000001] },
     );
-    return Number(result.RtnCode) === 1 && result.CompanyName ? String(result.CompanyName) : undefined;
+    return Number(result.RtnCode) === 1 && result.CompanyName
+      ? String(result.CompanyName)
+      : undefined;
   }
 
   /**
@@ -816,11 +836,14 @@ export class EcpayProvider implements InvoiceProvider {
     // ECPay's B2C 2.0 API has no foreign-currency field (no FOREIGN_CURRENCY
     // capability), so reject a non-TWD currency rather than silently dropping it.
     if (this.config.validatePayload !== false && parsed.currency && parsed.currency !== "TWD") {
-      throw new InvoiceError(`ECPay does not support foreign-currency invoices; currency must be TWD (got ${parsed.currency})`, {
-        provider: "ecpay",
-        code: InvoiceErrorCode.UNSUPPORTED,
-        rawMessage: "FOREIGN_CURRENCY is not supported",
-      });
+      throw new InvoiceError(
+        `ECPay does not support foreign-currency invoices; currency must be TWD (got ${parsed.currency})`,
+        {
+          provider: "ecpay",
+          code: InvoiceErrorCode.UNSUPPORTED,
+          rawMessage: "FOREIGN_CURRENCY is not supported",
+        },
+      );
     }
     const category = parsed.category ?? deriveCategory(parsed.buyer);
     const carrier = parsed.carrier;

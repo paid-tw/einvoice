@@ -32,10 +32,14 @@ describe("ezpayTouchIssuePayloadSchema (invoice_touch_issue)", () => {
   it("accepts a valid trigger", () => expect(ok(ezpayTouchIssuePayloadSchema, base)).toBe(true));
   it("requires InvoiceTransNo ≤20", () => {
     expect(ok(ezpayTouchIssuePayloadSchema, { ...base, InvoiceTransNo: "" })).toBe(false);
-    expect(ok(ezpayTouchIssuePayloadSchema, { ...base, InvoiceTransNo: "9".repeat(21) })).toBe(false);
+    expect(ok(ezpayTouchIssuePayloadSchema, { ...base, InvoiceTransNo: "9".repeat(21) })).toBe(
+      false,
+    );
   });
   it("rejects a MerchantOrderNo with illegal chars and a negative TotalAmt", () => {
-    expect(ok(ezpayTouchIssuePayloadSchema, { ...base, MerchantOrderNo: "bad order!" })).toBe(false);
+    expect(ok(ezpayTouchIssuePayloadSchema, { ...base, MerchantOrderNo: "bad order!" })).toBe(
+      false,
+    );
     expect(ok(ezpayTouchIssuePayloadSchema, { ...base, TotalAmt: -1 })).toBe(false);
   });
 });
@@ -53,7 +57,8 @@ describe("ezpayAllowancePayloadSchema (allowance_issue)", () => {
     TotalAmt: 105,
     Status: "1",
   };
-  it("accepts a valid single-item allowance", () => expect(ok(ezpayAllowancePayloadSchema, base)).toBe(true));
+  it("accepts a valid single-item allowance", () =>
+    expect(ok(ezpayAllowancePayloadSchema, base)).toBe(true));
   it("Status must be 0 or 1", () => {
     expect(ok(ezpayAllowancePayloadSchema, { ...base, Status: "2" })).toBe(false);
     expect(ok(ezpayAllowancePayloadSchema, { ...base, Status: "0" })).toBe(true);
@@ -85,40 +90,68 @@ describe("ezpayAllowancePayloadSchema (allowance_issue)", () => {
 });
 
 describe("ezpayAllowanceTouchPayloadSchema (allowance_touch_issue)", () => {
-  const base = { AllowanceStatus: "C", AllowanceNo: "A26061710261630", MerchantOrderNo: "ORDER_1", TotalAmt: 105 };
+  const base = {
+    AllowanceStatus: "C",
+    AllowanceNo: "A26061710261630",
+    MerchantOrderNo: "ORDER_1",
+    TotalAmt: 105,
+  };
   it("accepts C and D", () => {
     expect(ok(ezpayAllowanceTouchPayloadSchema, base)).toBe(true);
     expect(ok(ezpayAllowanceTouchPayloadSchema, { ...base, AllowanceStatus: "D" })).toBe(true);
   });
   it("rejects an invalid AllowanceStatus and an oversized AllowanceNo (≤25)", () => {
     expect(ok(ezpayAllowanceTouchPayloadSchema, { ...base, AllowanceStatus: "X" })).toBe(false);
-    expect(ok(ezpayAllowanceTouchPayloadSchema, { ...base, AllowanceNo: "A".repeat(26) })).toBe(false);
+    expect(ok(ezpayAllowanceTouchPayloadSchema, { ...base, AllowanceNo: "A".repeat(26) })).toBe(
+      false,
+    );
   });
 });
 
 describe("ezpayVoidAllowancePayloadSchema (allowanceInvalid)", () => {
   const base = { AllowanceNo: "A26061710261630", InvalidReason: "重複折讓" };
-  it("accepts a valid void-allowance", () => expect(ok(ezpayVoidAllowancePayloadSchema, base)).toBe(true));
+  it("accepts a valid void-allowance", () =>
+    expect(ok(ezpayVoidAllowancePayloadSchema, base)).toBe(true));
   it("requires AllowanceNo ≤25 and InvalidReason ≤20 bytes", () => {
     expect(ok(ezpayVoidAllowancePayloadSchema, { ...base, AllowanceNo: "" })).toBe(false);
-    expect(ok(ezpayVoidAllowancePayloadSchema, { ...base, InvalidReason: "七個中文字超過" })).toBe(false);
+    expect(ok(ezpayVoidAllowancePayloadSchema, { ...base, InvalidReason: "七個中文字超過" })).toBe(
+      false,
+    );
   });
 });
 
 describe("ezpaySearchPayloadSchema (invoice_search)", () => {
   it("SearchType 0 (default) requires InvoiceNumber + RandomNum", () => {
-    expect(ok(ezpaySearchPayloadSchema, { SearchType: "0", InvoiceNumber: "BB00000001", RandomNum: "4253" })).toBe(true);
-    expect(ok(ezpaySearchPayloadSchema, { InvoiceNumber: "BB00000001", RandomNum: "4253" })).toBe(true); // default 0
-    expect(ok(ezpaySearchPayloadSchema, { SearchType: "0", InvoiceNumber: "BB00000001" })).toBe(false); // no RandomNum
+    expect(
+      ok(ezpaySearchPayloadSchema, {
+        SearchType: "0",
+        InvoiceNumber: "BB00000001",
+        RandomNum: "4253",
+      }),
+    ).toBe(true);
+    expect(ok(ezpaySearchPayloadSchema, { InvoiceNumber: "BB00000001", RandomNum: "4253" })).toBe(
+      true,
+    ); // default 0
+    expect(ok(ezpaySearchPayloadSchema, { SearchType: "0", InvoiceNumber: "BB00000001" })).toBe(
+      false,
+    ); // no RandomNum
     expect(ok(ezpaySearchPayloadSchema, { SearchType: "0", RandomNum: "4253" })).toBe(false); // no InvoiceNumber
   });
   it("RandomNum must be exactly 4 digits", () => {
-    expect(ok(ezpaySearchPayloadSchema, { InvoiceNumber: "BB00000001", RandomNum: "42" })).toBe(false);
-    expect(ok(ezpaySearchPayloadSchema, { InvoiceNumber: "BB00000001", RandomNum: "abcd" })).toBe(false);
+    expect(ok(ezpaySearchPayloadSchema, { InvoiceNumber: "BB00000001", RandomNum: "42" })).toBe(
+      false,
+    );
+    expect(ok(ezpaySearchPayloadSchema, { InvoiceNumber: "BB00000001", RandomNum: "abcd" })).toBe(
+      false,
+    );
   });
   it("SearchType 1 requires MerchantOrderNo + TotalAmt", () => {
-    expect(ok(ezpaySearchPayloadSchema, { SearchType: "1", MerchantOrderNo: "ORDER_1", TotalAmt: 105 })).toBe(true);
-    expect(ok(ezpaySearchPayloadSchema, { SearchType: "1", MerchantOrderNo: "ORDER_1" })).toBe(false); // no TotalAmt
+    expect(
+      ok(ezpaySearchPayloadSchema, { SearchType: "1", MerchantOrderNo: "ORDER_1", TotalAmt: 105 }),
+    ).toBe(true);
+    expect(ok(ezpaySearchPayloadSchema, { SearchType: "1", MerchantOrderNo: "ORDER_1" })).toBe(
+      false,
+    ); // no TotalAmt
     expect(ok(ezpaySearchPayloadSchema, { SearchType: "1", TotalAmt: 105 })).toBe(false); // no order no
   });
 });

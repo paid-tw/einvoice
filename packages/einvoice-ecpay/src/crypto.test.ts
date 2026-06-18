@@ -45,7 +45,11 @@ describe("encryptData / decryptData", () => {
 
   it("decodes a response whose date carries a + for the space (PHP urlencode)", () => {
     // Mirrors the live stage response where InvoiceDate came back url-encoded.
-    const encoded = encryptData({ InvoiceNo: "JU11082055", InvoiceDate: "2026-06-17 12:11:17" }, KEY, IV);
+    const encoded = encryptData(
+      { InvoiceNo: "JU11082055", InvoiceDate: "2026-06-17 12:11:17" },
+      KEY,
+      IV,
+    );
     const decoded = decryptData<{ InvoiceDate: string }>(encoded, KEY, IV);
     expect(decoded.InvoiceDate).toBe("2026-06-17 12:11:17"); // space, not +
   });
@@ -56,9 +60,11 @@ describe("encryptData / decryptData", () => {
 describe("official ECPay test vectors", () => {
   const PAYLOAD = { Name: "Test", ID: "A123456789" };
   const URLENCODED = "%7B%22Name%22%3A%22Test%22%2C%22ID%22%3A%22A123456789%22%7D";
-  const CIPHER = "uvI4yrErM37XNQkXGAgRgJAgHn2t72jahaMZzYhWL1HmvH4WV18VJDP2i9pTbC+tby5nxVExLLFyAkbjbS2Dvg==";
+  const CIPHER =
+    "uvI4yrErM37XNQkXGAgRgJAgHn2t72jahaMZzYhWL1HmvH4WV18VJDP2i9pTbC+tby5nxVExLLFyAkbjbS2Dvg==";
   // The doc's lowercase-hex variant encrypts differently but decrypts to the same JSON.
-  const CIPHER_LOWERHEX = "ZD/z07UvdmL3aYz0tsVo+bFXF5VldNcns6ezyfea777KOmLiizrUNDYe+v1bh2QTT4AySf1NICgXxWXB6f7c6A==";
+  const CIPHER_LOWERHEX =
+    "ZD/z07UvdmL3aYz0tsVo+bFXF5VldNcns6ezyfea777KOmLiizrUNDYe+v1bh2QTT4AySf1NICgXxWXB6f7c6A==";
 
   it("urlencodes with uppercase hex exactly as the spec shows", () => {
     expect(phpUrlEncode(JSON.stringify(PAYLOAD))).toBe(URLENCODED);

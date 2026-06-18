@@ -29,22 +29,13 @@ export function parseInput<T>(schema: z.ZodType<T>, input: unknown, provider: st
   });
 }
 
-export const taxTypeSchema = z.enum([
-  "TAXABLE",
-  "ZERO_RATED",
-  "TAX_FREE",
-  "SPECIAL",
-]);
+export const taxTypeSchema = z.enum(["TAXABLE", "ZERO_RATED", "TAX_FREE", "SPECIAL"]);
 
 export const priceModeSchema = z.enum(["TAX_INCLUSIVE", "TAX_EXCLUSIVE"]);
 
 export const invoiceCategorySchema = z.enum(["B2B", "B2C"]);
 
-export const carrierTypeSchema = z.enum([
-  "MOBILE_BARCODE",
-  "CITIZEN_CERTIFICATE",
-  "MEMBER",
-]);
+export const carrierTypeSchema = z.enum(["MOBILE_BARCODE", "CITIZEN_CERTIFICATE", "MEMBER"]);
 
 /** 統一編號 (UBN): 8 digits with a valid checksum. */
 export const ubnSchema = z
@@ -72,11 +63,7 @@ export const carrierSchema = z
         path: ["code"],
       });
     }
-    if (
-      c.type === "CITIZEN_CERTIFICATE" &&
-      c.code &&
-      !/^[A-Z0-9]{16}$/.test(c.code)
-    ) {
+    if (c.type === "CITIZEN_CERTIFICATE" && c.code && !/^[A-Z0-9]{16}$/.test(c.code)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "自然人憑證 must be 16 alphanumeric chars",

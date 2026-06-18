@@ -6,4 +6,12 @@ export { EzreceiptClient, mapEzreceiptError, hashPassword } from "./client.js";
 export type { EzreceiptEnvelope } from "./client.js";
 export { createEzreceiptProvider, EzreceiptProvider } from "./provider.js";
 export { ezreceiptTaxType } from "./mapping.js";
-export type { AllowanceQuotaItem, BusinessInfo, InvoicePrintInfo, InvoiceTrack, InvoiceTrackUsage, ListInvoicesInput, ListInvoiceTracksInput } from "./types.js";
+export type {
+  AllowanceQuotaItem,
+  BusinessInfo,
+  InvoicePrintInfo,
+  InvoiceTrack,
+  InvoiceTrackUsage,
+  ListInvoicesInput,
+  ListInvoiceTracksInput,
+} from "./types.js";

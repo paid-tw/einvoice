@@ -1,6 +1,12 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { buildQuery, decryptPostData, encryptPostData, makeCheckCode, makeCheckValue } from "./crypto.js";
+import {
+  buildQuery,
+  decryptPostData,
+  encryptPostData,
+  makeCheckCode,
+  makeCheckValue,
+} from "./crypto.js";
 
 // The example HashKey/HashIV from the official ezPay manual appendix.
 const KEY = "abcdefghijklmnopqrstuvwxyzabcdef"; // 32
@@ -38,7 +44,12 @@ describe("makeCheckValue (carrier-validation API)", () => {
 
 describe("encryptPostData", () => {
   it("AES-256-CBC round-trips through decrypt (PKCS7-to-32)", () => {
-    const params = { RespondType: "JSON", Version: "1.5", MerchantOrderNo: "ORDER-1", BuyerName: "王大品" };
+    const params = {
+      RespondType: "JSON",
+      Version: "1.5",
+      MerchantOrderNo: "ORDER-1",
+      BuyerName: "王大品",
+    };
     const hex = encryptPostData(params, KEY, IV);
     expect(hex).toMatch(/^[0-9a-f]+$/); // lowercase hex
     expect(decryptPostData(hex, KEY, IV)).toBe(buildQuery(params));
@@ -58,10 +69,14 @@ describe("encryptPostData", () => {
 
 describe("key/IV length guards", () => {
   it("rejects a wrong-length key with a clear message", () => {
-    expect(() => encryptPostData({ a: "1" }, "tooshort", IV)).toThrow(/ezPay HashKey must be 32 bytes.*got 8/);
+    expect(() => encryptPostData({ a: "1" }, "tooshort", IV)).toThrow(
+      /ezPay HashKey must be 32 bytes.*got 8/,
+    );
   });
 
   it("rejects a wrong-length IV with a clear message", () => {
-    expect(() => encryptPostData({ a: "1" }, KEY, "x")).toThrow(/ezPay HashIV must be 16 bytes.*got 1/);
+    expect(() => encryptPostData({ a: "1" }, KEY, "x")).toThrow(
+      /ezPay HashIV must be 16 bytes.*got 1/,
+    );
   });
 });

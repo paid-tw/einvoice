@@ -19,11 +19,17 @@ export function testProvider(overrides: Partial<EzreceiptConfig> = {}) {
 }
 
 /** A success envelope `{ code: 0, message, value }`. */
-export const ok = (value: unknown, message = "Ok") => HttpResponse.json({ code: 0, message, value });
+export const ok = (value: unknown, message = "Ok") =>
+  HttpResponse.json({ code: 0, message, value });
 
 /** A login success envelope (carries the `token`). */
 export const okToken = (token = "tok_test") =>
-  HttpResponse.json({ code: 0, message: "Ok", value: { accName: "A123" }, token: { token, validTo: 9_999_999_999_999 } });
+  HttpResponse.json({
+    code: 0,
+    message: "Ok",
+    value: { accName: "A123" },
+    token: { token, validTo: 9_999_999_999_999 },
+  });
 
 /** An error envelope `{ code, message }` (code is the COIMOTION numeric code). */
 export const fail = (code: number, message = "err") => HttpResponse.json({ code, message });
@@ -33,7 +39,8 @@ export const file = (bytes: number[] = [0x25, 0x50, 0x44, 0x46], contentType = "
   new HttpResponse(new Uint8Array(bytes), { headers: { "content-type": contentType } });
 
 /** The default login handler — most flows need a token first. */
-export const loginHandler = (token = "tok_test") => http.post(url("/admin/user/login"), () => okToken(token));
+export const loginHandler = (token = "tok_test") =>
+  http.post(url("/admin/user/login"), () => okToken(token));
 
 /** A handler for `invoice/list { invNo }` resolving to a single invID. */
 export const listResolves = (invNo: string, invID: number) =>

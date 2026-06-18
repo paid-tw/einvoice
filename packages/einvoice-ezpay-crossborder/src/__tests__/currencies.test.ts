@@ -35,32 +35,58 @@ describe("EZPAY_CB_CURRENCIES (附件三)", () => {
 });
 
 describe("issue — every supported currency (附件三)", () => {
-  it.each(EZPAY_CB_CURRENCIES)("issues a %s invoice with the right amount formatting", async (currency) => {
-    let data: Record<string, string> | undefined;
-    server.use(
-      http.post(url(EZPAY_CB_ENDPOINTS.issue.path), async ({ request }) => {
-        data = parseRequest(await request.text());
-        return HttpResponse.json(ceIssueSuccess({ MerchantID: "3500001", MerchantOrderNo: "CCY", InvoiceNumber: "CC00000099", RandomNum: "0001", TotalAmt: "21", CreateTime: "2026-06-17 12:00:00" }));
-      }),
-    );
-    const res = await testProvider().issue(inputFor(currency));
-    expect(res.invoiceNumber).toBe("CC00000099");
-    expect(data?.Currency).toBe(currency);
-    if (currency === "TWD") {
-      // integer amounts, no exchange annotation needed
-      expect(data).toMatchObject({ Amt: "20", TaxAmt: "1", TotalAmt: "21", ExchangeRate: "1" });
-    } else {
-      // foreign → 2-decimal amounts
-      expect(data).toMatchObject({ Amt: "20.00", TaxAmt: "1.00", TotalAmt: "21.00", ItemPrice: "21.00", ItemAmt: "21.00" });
-    }
-  });
+  it.each(EZPAY_CB_CURRENCIES)(
+    "issues a %s invoice with the right amount formatting",
+    async (currency) => {
+      let data: Record<string, string> | undefined;
+      server.use(
+        http.post(url(EZPAY_CB_ENDPOINTS.issue.path), async ({ request }) => {
+          data = parseRequest(await request.text());
+          return HttpResponse.json(
+            ceIssueSuccess({
+              MerchantID: "3500001",
+              MerchantOrderNo: "CCY",
+              InvoiceNumber: "CC00000099",
+              RandomNum: "0001",
+              TotalAmt: "21",
+              CreateTime: "2026-06-17 12:00:00",
+            }),
+          );
+        }),
+      );
+      const res = await testProvider().issue(inputFor(currency));
+      expect(res.invoiceNumber).toBe("CC00000099");
+      expect(data?.Currency).toBe(currency);
+      if (currency === "TWD") {
+        // integer amounts, no exchange annotation needed
+        expect(data).toMatchObject({ Amt: "20", TaxAmt: "1", TotalAmt: "21", ExchangeRate: "1" });
+      } else {
+        // foreign → 2-decimal amounts
+        expect(data).toMatchObject({
+          Amt: "20.00",
+          TaxAmt: "1.00",
+          TotalAmt: "21.00",
+          ItemPrice: "21.00",
+          ItemAmt: "21.00",
+        });
+      }
+    },
+  );
 });
 
 describe("issue — a currency outside 附件三", () => {
-  it.each(["INR", "BRL", "RUB", "MXN", "ZZZ"])("maps ezPay's INV10002 rejection of %s to VALIDATION", async (currency) => {
-    server.use(
-      http.post(url(EZPAY_CB_ENDPOINTS.issue.path), () => HttpResponse.json(ceError("INV10002", "欄位資料格式錯誤-Currency"))),
-    );
-    await expect(testProvider().issue(inputFor(currency))).rejects.toMatchObject({ code: "VALIDATION", rawCode: "INV10002" });
-  });
+  it.each(["INR", "BRL", "RUB", "MXN", "ZZZ"])(
+    "maps ezPay's INV10002 rejection of %s to VALIDATION",
+    async (currency) => {
+      server.use(
+        http.post(url(EZPAY_CB_ENDPOINTS.issue.path), () =>
+          HttpResponse.json(ceError("INV10002", "欄位資料格式錯誤-Currency")),
+        ),
+      );
+      await expect(testProvider().issue(inputFor(currency))).rejects.toMatchObject({
+        code: "VALIDATION",
+        rawCode: "INV10002",
+      });
+    },
+  );
 });

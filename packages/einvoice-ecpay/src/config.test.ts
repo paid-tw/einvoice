@@ -12,7 +12,9 @@ describe("resolveBaseUrl", () => {
     expect(resolveBaseUrl({ ...base, mode: "PRODUCTION" })).toBe(ECPAY_BASE_URL.PRODUCTION);
   });
   it("an explicit baseUrl overrides the mode", () => {
-    expect(resolveBaseUrl({ ...base, mode: "PRODUCTION", baseUrl: "https://x.test" })).toBe("https://x.test");
+    expect(resolveBaseUrl({ ...base, mode: "PRODUCTION", baseUrl: "https://x.test" })).toBe(
+      "https://x.test",
+    );
   });
 });
 

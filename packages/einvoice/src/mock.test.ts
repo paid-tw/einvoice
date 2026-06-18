@@ -9,9 +9,7 @@ function sampleInput(overrides: Partial<IssueInvoiceInput> = {}): IssueInvoiceIn
   return {
     orderId: "order-1",
     buyer: { email: "buyer@example.com" },
-    items: [
-      { description: "訂閱方案", quantity: 1, unitPrice: 1000, amount: 1000 },
-    ],
+    items: [{ description: "訂閱方案", quantity: 1, unitPrice: 1000, amount: 1000 }],
     amount,
     taxType: "TAXABLE",
     priceMode: "TAX_EXCLUSIVE",

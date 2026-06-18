@@ -38,10 +38,9 @@ export function aesEncrypt(plaintext: string, hashKey: string, hashIV: string): 
 export function aesDecrypt(base64: string, hashKey: string, hashIV: string): string {
   assertKeyIv(hashKey, hashIV);
   const decipher = createDecipheriv("aes-128-cbc", hashKey, hashIV);
-  return Buffer.concat([
-    decipher.update(Buffer.from(base64, "base64")),
-    decipher.final(),
-  ]).toString("utf8");
+  return Buffer.concat([decipher.update(Buffer.from(base64, "base64")), decipher.final()]).toString(
+    "utf8",
+  );
 }
 
 /** Encode a request `Data` payload: object → urlencoded JSON → AES → Base64. */

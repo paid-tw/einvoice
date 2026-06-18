@@ -42,7 +42,11 @@ export function encryptPostData(
 ): string {
   assertKeyIv(hashKey, hashIV);
   const padded = pkcs7Pad(Buffer.from(buildQuery(params), "utf8"));
-  const cipher = createCipheriv("aes-256-cbc", Buffer.from(hashKey, "utf8"), Buffer.from(hashIV, "utf8"));
+  const cipher = createCipheriv(
+    "aes-256-cbc",
+    Buffer.from(hashKey, "utf8"),
+    Buffer.from(hashIV, "utf8"),
+  );
   cipher.setAutoPadding(false);
   return Buffer.concat([cipher.update(padded), cipher.final()]).toString("hex");
 }
@@ -50,7 +54,11 @@ export function encryptPostData(
 /** Decrypt a `PostData_` hex string (mainly for tests / debugging). */
 export function decryptPostData(hex: string, hashKey: string, hashIV: string): string {
   assertKeyIv(hashKey, hashIV);
-  const decipher = createDecipheriv("aes-256-cbc", Buffer.from(hashKey, "utf8"), Buffer.from(hashIV, "utf8"));
+  const decipher = createDecipheriv(
+    "aes-256-cbc",
+    Buffer.from(hashKey, "utf8"),
+    Buffer.from(hashIV, "utf8"),
+  );
   decipher.setAutoPadding(false);
   const out = Buffer.concat([decipher.update(Buffer.from(hex, "hex")), decipher.final()]);
   // strip PKCS7

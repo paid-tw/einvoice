@@ -79,7 +79,11 @@ describe.skipIf(!live)("Amego live lifecycle", LIVE_OPTS, () => {
   });
 
   it("lists allowances, then queries the first one (allowance.list → allowance.query)", async () => {
-    const list = await provider.allowances.list({ startDate: 20260601, endDate: 20260630, limit: 20 });
+    const list = await provider.allowances.list({
+      startDate: 20260601,
+      endDate: 20260630,
+      limit: 20,
+    });
     expect(list.code).toBe(0);
     const rows = list.data as Array<{ allowance_number: string }>;
     if (rows.length === 0) return; // no allowances in range — nothing to query
@@ -156,7 +160,12 @@ describe.skipIf(!live)("Amego live lifecycle", LIVE_OPTS, () => {
   });
 
   it("prints the invoice (invoice.print → data.base64_data, ESC/POS for printer_type 2)", async () => {
-    const res = await provider.invoice.print({ invoiceNumber, printerType: 2, printInvoiceType: 1, printInvoiceDetail: 1 });
+    const res = await provider.invoice.print({
+      invoiceNumber,
+      printerType: 2,
+      printInvoiceType: 1,
+      printInvoiceDetail: 1,
+    });
     expect(res.code).toBe(0);
     expect(typeof (res.data as { base64_data?: string }).base64_data).toBe("string");
     expect((res.data as { base64_data: string }).base64_data.length).toBeGreaterThan(0);
@@ -192,7 +201,9 @@ describe.skipIf(!mutate)("Amego live — custom numbering (consumes a booklet)",
       PrintMark: "Y",
       BuyerIdentifier: "0000000000",
       BuyerName: "消費者",
-      ProductItem: [{ Description: "自訂配號測試", Quantity: 1, UnitPrice: 105, Amount: 105, TaxType: 1 }],
+      ProductItem: [
+        { Description: "自訂配號測試", Quantity: 1, UnitPrice: 105, Amount: 105, TaxType: 1 },
+      ],
       SalesAmount: 105,
       FreeTaxSalesAmount: 0,
       ZeroTaxSalesAmount: 0,
@@ -246,22 +257,38 @@ describe.skipIf(!live)("Amego live — server rejects invalid values", LIVE_OPTS
 
   it("print endpoints: PascalCase is a field error, snake_case reaches print logic", async () => {
     // invoice_print: old PascalCase → 31 (type 查詢類型不存在); corrected → not a field error
-    const invOld = await provider.raw("/json/invoice_print", { InvoiceNumber: "AA26513024", PrinterType: 2 }).catch((e) => e);
+    const invOld = await provider
+      .raw("/json/invoice_print", { InvoiceNumber: "AA26513024", PrinterType: 2 })
+      .catch((e) => e);
     expect(invOld.rawCode).toBe("31");
-    const invNew = await provider.raw("/json/invoice_print", { type: "invoice", invoice_number: "AA26513024", printer_type: 2 }).catch((e) => e);
+    const invNew = await provider
+      .raw("/json/invoice_print", {
+        type: "invoice",
+        invoice_number: "AA26513024",
+        printer_type: 2,
+      })
+      .catch((e) => e);
     expect(invNew.rawCode).not.toBe("31");
     // allowance_print: old PascalCase → 33 (allowance_number 不可為空); corrected → not that
-    const alwOld = await provider.raw("/json/allowance_print", { AllowanceNumber: "ALW1781650040", PrinterType: 2 }).catch((e) => e);
+    const alwOld = await provider
+      .raw("/json/allowance_print", { AllowanceNumber: "ALW1781650040", PrinterType: 2 })
+      .catch((e) => e);
     expect(alwOld.rawCode).toBe("33");
-    const alwNew = await provider.raw("/json/allowance_print", { allowance_number: "ALW1781650040", printer_type: 2 }).catch((e) => e);
+    const alwNew = await provider
+      .raw("/json/allowance_print", { allowance_number: "ALW1781650040", printer_type: 2 })
+      .catch((e) => e);
     expect(alwNew.rawCode).not.toBe("33");
   });
 
   it("f0501 (void invoice): object → 3050112, nonexistent → 3050125 NOT_FOUND, empty → 3050111", async () => {
-    const wrong = await provider.raw("/json/f0501", { CancelInvoiceNumber: "ZZ00000000" }).catch((e) => e);
+    const wrong = await provider
+      .raw("/json/f0501", { CancelInvoiceNumber: "ZZ00000000" })
+      .catch((e) => e);
     expect(wrong.rawCode).toBe("3050112");
     expect(wrong.code).toBe("VALIDATION");
-    const missing = await provider.raw("/json/f0501", [{ CancelInvoiceNumber: "ZZ00000000" }]).catch((e) => e);
+    const missing = await provider
+      .raw("/json/f0501", [{ CancelInvoiceNumber: "ZZ00000000" }])
+      .catch((e) => e);
     expect(missing.rawCode).toBe("3050125");
     expect(missing.code).toBe("NOT_FOUND");
     const empty = await provider.raw("/json/f0501", [{ CancelInvoiceNumber: "" }]).catch((e) => e);
@@ -270,8 +297,27 @@ describe.skipIf(!live)("Amego live — server rejects invalid values", LIVE_OPTS
   });
 
   it("g0401 (open allowance) rejects bad fields with 4040xxx (string codes)", async () => {
-    const item = { OriginalInvoiceNumber: "AA26513024", OriginalInvoiceDate: 20260617, OriginalDescription: "商品", Quantity: 1, UnitPrice: "100", Amount: "100", Tax: 5, TaxType: 1 };
-    const rec = (o: Record<string, unknown> = {}) => ({ AllowanceNumber: `GA${Date.now()}`, AllowanceDate: "20260617", AllowanceType: "2", BuyerIdentifier: "0000000000", BuyerName: "消費者", ProductItem: [item], TaxAmount: "5", TotalAmount: "100", ...o });
+    const item = {
+      OriginalInvoiceNumber: "AA26513024",
+      OriginalInvoiceDate: 20260617,
+      OriginalDescription: "商品",
+      Quantity: 1,
+      UnitPrice: "100",
+      Amount: "100",
+      Tax: 5,
+      TaxType: 1,
+    };
+    const rec = (o: Record<string, unknown> = {}) => ({
+      AllowanceNumber: `GA${Date.now()}`,
+      AllowanceDate: "20260617",
+      AllowanceType: "2",
+      BuyerIdentifier: "0000000000",
+      BuyerName: "消費者",
+      ProductItem: [item],
+      TaxAmount: "5",
+      TotalAmount: "100",
+      ...o,
+    });
     // object instead of array
     const arr = await provider.raw("/json/g0401", rec()).catch((e) => e);
     expect(arr.rawCode).toBe("4040112");
@@ -280,15 +326,21 @@ describe.skipIf(!live)("Amego live — server rejects invalid values", LIVE_OPTS
     expect(at.rawCode).toBe("4040123");
     expect(at.code).toBe("VALIDATION");
     // Tax not an integer
-    const tax = await provider.raw("/json/g0401", [rec({ ProductItem: [{ ...item, Tax: 5.5 }] })]).catch((e) => e);
+    const tax = await provider
+      .raw("/json/g0401", [rec({ ProductItem: [{ ...item, Tax: 5.5 }] })])
+      .catch((e) => e);
     expect(tax.rawCode).toBe("4040139");
   });
 
   it("g0501 (void allowance) returns string codes: object → 4050112, nonexistent → 4050134 NOT_FOUND", async () => {
-    const wrong = await provider.raw("/json/g0501", { CancelAllowanceNumber: "ZZNONEXIST0001" }).catch((e) => e);
+    const wrong = await provider
+      .raw("/json/g0501", { CancelAllowanceNumber: "ZZNONEXIST0001" })
+      .catch((e) => e);
     expect(wrong.rawCode).toBe("4050112");
     expect(wrong.code).toBe("VALIDATION");
-    const missing = await provider.raw("/json/g0501", [{ CancelAllowanceNumber: "ZZNONEXIST0001" }]).catch((e) => e);
+    const missing = await provider
+      .raw("/json/g0501", [{ CancelAllowanceNumber: "ZZNONEXIST0001" }])
+      .catch((e) => e);
     expect(missing.rawCode).toBe("4050134");
     expect(missing.code).toBe("NOT_FOUND");
   });
@@ -326,13 +378,16 @@ describe.skipIf(!live)("Amego live — server rejects invalid values", LIVE_OPTS
 
   it("rejects a zero-rated invoice missing the customs mark (3040179)", async () => {
     const err = await provider
-      .raw("/json/f0401", base({
-        ProductItem: [{ ...item, UnitPrice: "100", Amount: "100", TaxType: "2" }],
-        SalesAmount: "0",
-        ZeroTaxSalesAmount: "100",
-        TaxType: "2",
-        TotalAmount: "100",
-      }))
+      .raw(
+        "/json/f0401",
+        base({
+          ProductItem: [{ ...item, UnitPrice: "100", Amount: "100", TaxType: "2" }],
+          SalesAmount: "0",
+          ZeroTaxSalesAmount: "100",
+          TaxType: "2",
+          TotalAmount: "100",
+        }),
+      )
       .catch((e) => e);
     expect(err.rawCode).toBe("3040179");
   });

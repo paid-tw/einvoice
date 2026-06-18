@@ -14,9 +14,7 @@ const post = () => ezpayRequest(config, EZPAY_ENDPOINTS.issue.path, { RespondTyp
 
 describe("ezpayRequest transport errors", () => {
   it("wraps a non-JSON response as a PROVIDER error", async () => {
-    server.use(
-      http.post(url, () => new HttpResponse("<html>500</html>", { status: 500 })),
-    );
+    server.use(http.post(url, () => new HttpResponse("<html>500</html>", { status: 500 })));
     const err = await post().catch((e) => e);
     expect(err.code).toBe("PROVIDER");
     expect(err.rawCode).toBe("500");
@@ -48,7 +46,9 @@ describe("ezpayRequest transport errors", () => {
   });
 
   it("honors a configured request timeout", async () => {
-    server.use(http.post(url, () => HttpResponse.json({ Status: "SUCCESS", Message: "ok", Result: "{}" })));
+    server.use(
+      http.post(url, () => HttpResponse.json({ Status: "SUCCESS", Message: "ok", Result: "{}" })),
+    );
     const res = await ezpayRequest({ ...config, timeoutMs: 5000 }, EZPAY_ENDPOINTS.issue.path, {
       RespondType: "JSON",
     });
