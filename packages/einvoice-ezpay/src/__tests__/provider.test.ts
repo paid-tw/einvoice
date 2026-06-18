@@ -124,6 +124,20 @@ describe("issue (invoice_issue)", () => {
     ).rejects.toMatchObject({ code: "VALIDATION", provider: "ezpay" });
   });
 
+  it("emits debug trace events end-to-end when a logger is configured", async () => {
+    const events: Array<{ phase: string; provider: string; status?: number }> = [];
+    server.use(
+      http.post(url(EZPAY_ENDPOINTS.issue), () =>
+        HttpResponse.json(ezSuccess(withCheckCode(ISSUE_OK))),
+      ),
+    );
+    await testProvider({
+      debug: (e: { phase: string; provider: string; status?: number }) => events.push(e),
+    }).issue(issueInput());
+    expect(events.map((e) => e.phase)).toEqual(["request", "response"]);
+    expect(events[1]).toMatchObject({ provider: "ezpay", status: 200 });
+  });
+
   it("sends B2B fields (Category, BuyerUBN) for a 統編 buyer", async () => {
     let p: Record<string, string> | undefined;
     server.use(

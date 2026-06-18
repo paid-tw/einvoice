@@ -12,6 +12,8 @@
  * the original transaction; the amount fields stay TWD.
  */
 
+import type { InvoiceDebugLogger } from "./debug.js";
+
 // ---------------------------------------------------------------------------
 // Enums / unions
 // ---------------------------------------------------------------------------
@@ -279,4 +281,6 @@ export interface BaseProviderConfig {
   timeoutMs?: number;
   /** Inject a custom fetch (testing, custom agents, edge runtimes). */
   fetch?: typeof fetch;
+  /** Opt-in request tracing — see {@link InvoiceDebugLogger}. */
+  debug?: InvoiceDebugLogger;
 }

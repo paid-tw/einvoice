@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { InvoiceError, InvoiceErrorCode } from "@paid-tw/einvoice";
+import { InvoiceError, InvoiceErrorCode, tracedFetch } from "@paid-tw/einvoice";
 import { type AmegoConfig, resolveBaseUrl, resolveRetry } from "./config.js";
 
 /**
@@ -41,10 +41,14 @@ export async function fetchServerTime(config: AmegoConfig): Promise<AmegoTimeRes
   const doFetch = config.fetch ?? fetch;
   let res: Response;
   try {
-    res = await doFetch(`${baseUrl}/json/time`, {
-      method: "GET",
-      signal: config.timeoutMs ? AbortSignal.timeout(config.timeoutMs) : undefined,
-    });
+    res = await tracedFetch(
+      { provider: "amego", debug: config.debug, fetch: doFetch },
+      `${baseUrl}/json/time`,
+      {
+        method: "GET",
+        signal: config.timeoutMs ? AbortSignal.timeout(config.timeoutMs) : undefined,
+      },
+    );
   } catch (cause) {
     throw new InvoiceError("Amego time request failed", {
       provider: "amego",
@@ -104,12 +108,16 @@ async function doRequest(
 
   let res: Response;
   try {
-    res = await doFetch(`${baseUrl}${path}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body,
-      signal: config.timeoutMs ? AbortSignal.timeout(config.timeoutMs) : undefined,
-    });
+    res = await tracedFetch(
+      { provider: "amego", debug: config.debug, fetch: doFetch },
+      `${baseUrl}${path}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body,
+        signal: config.timeoutMs ? AbortSignal.timeout(config.timeoutMs) : undefined,
+      },
+    );
   } catch (cause) {
     throw new InvoiceError("Amego request failed", {
       provider: "amego",

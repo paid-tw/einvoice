@@ -1,4 +1,4 @@
-import { InvoiceError, InvoiceErrorCode } from "@paid-tw/einvoice";
+import { InvoiceError, InvoiceErrorCode, tracedFetch } from "@paid-tw/einvoice";
 import { type EcpayConfig, resolveBaseUrl } from "./config.js";
 import { decryptData, encryptData } from "./crypto.js";
 
@@ -57,12 +57,16 @@ export async function ecpayRequest(
 
   let res: Response;
   try {
-    res = await doFetch(`${baseUrl}${path}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body,
-      signal: config.timeoutMs ? AbortSignal.timeout(config.timeoutMs) : undefined,
-    });
+    res = await tracedFetch(
+      { provider: "ecpay", debug: config.debug, fetch: doFetch },
+      `${baseUrl}${path}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body,
+        signal: config.timeoutMs ? AbortSignal.timeout(config.timeoutMs) : undefined,
+      },
+    );
   } catch (cause) {
     throw new InvoiceError("ECPay request failed", {
       provider: "ecpay",

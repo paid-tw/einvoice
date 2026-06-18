@@ -4,6 +4,7 @@ export * from "./errors.js";
 export * from "./capabilities.js";
 export * from "./schemas.js";
 export * from "./utils.js";
+export * from "./debug.js";
 export { isValidUbn } from "./ubn.js";
 export type { UbnOptions } from "./ubn.js";
 export { isValidMobileBarcode } from "./mobile-barcode.js";

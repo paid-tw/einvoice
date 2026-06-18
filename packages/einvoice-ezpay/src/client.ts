@@ -1,4 +1,4 @@
-import { InvoiceError, InvoiceErrorCode } from "@paid-tw/einvoice";
+import { InvoiceError, InvoiceErrorCode, tracedFetch } from "@paid-tw/einvoice";
 import { type EzpayConfig, resolveBaseUrl } from "./config.js";
 import { decryptPostData, encryptPostData, makeCheckValue } from "./crypto.js";
 
@@ -43,12 +43,16 @@ export async function ezpayRequest(
 
   let res: Response;
   try {
-    res = await doFetch(`${baseUrl}${path}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body,
-      signal: config.timeoutMs ? AbortSignal.timeout(config.timeoutMs) : undefined,
-    });
+    res = await tracedFetch(
+      { provider: "ezpay", debug: config.debug, fetch: doFetch },
+      `${baseUrl}${path}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body,
+        signal: config.timeoutMs ? AbortSignal.timeout(config.timeoutMs) : undefined,
+      },
+    );
   } catch (cause) {
     throw new InvoiceError("ezPay request failed", {
       provider: "ezpay",
@@ -123,12 +127,16 @@ export async function ezpayCarrierCheck(
 
   let res: Response;
   try {
-    res = await doFetch(`${baseUrl}${path}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body,
-      signal: config.timeoutMs ? AbortSignal.timeout(config.timeoutMs) : undefined,
-    });
+    res = await tracedFetch(
+      { provider: "ezpay", debug: config.debug, fetch: doFetch },
+      `${baseUrl}${path}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body,
+        signal: config.timeoutMs ? AbortSignal.timeout(config.timeoutMs) : undefined,
+      },
+    );
   } catch (cause) {
     throw new InvoiceError("ezPay carrier-check request failed", {
       provider: "ezpay",

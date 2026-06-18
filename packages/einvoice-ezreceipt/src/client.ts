@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { InvoiceError, InvoiceErrorCode } from "@paid-tw/einvoice";
+import { InvoiceError, InvoiceErrorCode, tracedFetch } from "@paid-tw/einvoice";
 import { type EzreceiptConfig, resolveBaseUrl } from "./config.js";
 import { ENDPOINTS } from "./endpoints.js";
 
@@ -260,12 +260,16 @@ export class EzreceiptClient {
     if (this.config.stID != null) headers["x-deva-stid"] = String(this.config.stID);
 
     try {
-      return await doFetch(`${resolveBaseUrl(this.config)}${path}`, {
-        method: "POST",
-        headers,
-        body: isForm ? (body as FormData) : JSON.stringify(body ?? {}),
-        signal: this.config.timeoutMs ? AbortSignal.timeout(this.config.timeoutMs) : undefined,
-      });
+      return await tracedFetch(
+        { provider: "ezreceipt", debug: this.config.debug, fetch: doFetch },
+        `${resolveBaseUrl(this.config)}${path}`,
+        {
+          method: "POST",
+          headers,
+          body: isForm ? (body as FormData) : JSON.stringify(body ?? {}),
+          signal: this.config.timeoutMs ? AbortSignal.timeout(this.config.timeoutMs) : undefined,
+        },
+      );
     } catch (cause) {
       throw new InvoiceError("ezReceipt request failed", {
         provider: "ezreceipt",
