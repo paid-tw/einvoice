@@ -113,6 +113,36 @@ export interface ListInvoiceTracksInput {
   pageSize?: number;
 }
 
+/** Filters for {@link EzreceiptProvider.listInvoices}. period (or fromTime/toTime) is required by the API. */
+export interface ListInvoicesInput {
+  /**
+   * 期別 YYYYMM — a BIMONTHLY code starting on an ODD month (01=Jan–Feb,
+   * 03=Mar–Apr, 05=May–Jun, …); e.g. June 2026 → `"202605"`, not `"202606"`.
+   * Defaults to the current period; ignored when fromTime is set.
+   */
+  period?: string;
+  /** Issue-time range start `YYYY-MM-DD HH:mm:ss` (overrides period). */
+  fromTime?: string;
+  /** Issue-time range end `YYYY-MM-DD HH:mm:ss`. */
+  toTime?: string;
+  /** Field to filter on; append `%` to propValue for a partial match. */
+  prop?: "invNo" | "nid" | "orderNo" | "boNo" | "devNo" | "winNo" | "accName" | "extID" | "storeName" | "storeNID" | "carrierInfo" | "buyerName";
+  /** Value for {@link prop}. */
+  propValue?: string;
+  /** 1 會員 / 2 手機條碼 / 3 自然人憑證 / 5 捐贈 / 10 紙本 / 20 境外. */
+  carrierType?: 1 | 2 | 3 | 5 | 10 | 20;
+  /** Only voided (true) / only non-voided (false). */
+  voided?: boolean;
+  /** 1 存證 / 2 交換. */
+  msgType?: 1 | 2;
+  /** Has 統編 (true) / no 統編 (false). */
+  withUbn?: boolean;
+  /** Page number (1-based). */
+  page?: number;
+  /** Page size (default 10). */
+  pageSize?: number;
+}
+
 /** One line's remaining creditable (折讓) quota from {@link EzreceiptProvider.getAllowanceQuota}. */
 export interface AllowanceQuotaItem {
   /** 原發票品項識別碼 (soiID) — use it in an allowance's prodList. */
@@ -287,6 +317,28 @@ export class EzreceiptProvider implements InvoiceProvider {
       })),
       raw: r,
     };
+  }
+
+  /**
+   * 條列發票 — list issued invoices for reconciliation/reporting. The API needs a
+   * `period` (or a fromTime/toTime range); it can't reach back more than 5 years.
+   * Returns the raw invoice rows plus the total `entries` count (for paging).
+   */
+  async listInvoices(input: ListInvoicesInput = {}): Promise<{ entries: number; list: Record<string, unknown>[] }> {
+    const r = await this.client.request<{ entries?: number; list?: Record<string, unknown>[] }>(ENDPOINTS.list, {
+      ...(input.period ? { period: input.period } : {}),
+      ...(input.fromTime ? { fromTime: input.fromTime } : {}),
+      ...(input.toTime ? { toTime: input.toTime } : {}),
+      ...(input.prop ? { prop: input.prop } : {}),
+      ...(input.propValue != null ? { propValue: input.propValue } : {}),
+      ...(input.carrierType ? { carrierType: input.carrierType } : {}),
+      ...(input.voided != null ? { isVoid: input.voided ? 1 : 0 } : {}),
+      ...(input.msgType ? { msgType: input.msgType } : {}),
+      ...(input.withUbn != null ? { withGUINo: input.withUbn } : {}),
+      ...(input.page ? { _pn: input.page } : {}),
+      ...(input.pageSize ? { _ps: input.pageSize } : {}),
+    });
+    return { entries: Number(r.entries ?? 0), list: r.list ?? [] };
   }
 
   /**

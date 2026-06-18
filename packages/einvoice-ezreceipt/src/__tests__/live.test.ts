@@ -116,6 +116,18 @@ describe.skipIf(!live)("ezReceipt live (test env) — variants", LIVE_OPTS, () =
     expect(quota[0]!.tax).toBe(15);
   });
 
+  it("lists issued invoices by period, and filters by invNo via prop (extension)", async () => {
+    const m = member();
+    const inv = await p.issue({ ...base, orderId: order(), buyer: { name: "x", email: m }, carrier: { type: "MEMBER", code: m } });
+    // 期別 = bimonthly code (odd start month): June → 202605, not 202606.
+    const [y, mo] = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Taipei", year: "numeric", month: "2-digit" }).format(inv.invoiceDate).split("-");
+    const period = `${y}${String(Number(mo) % 2 === 0 ? Number(mo) - 1 : Number(mo)).padStart(2, "0")}`;
+    const all = await p.listInvoices({ period });
+    expect(all.entries).toBeGreaterThan(0);
+    const one = await p.listInvoices({ prop: "invNo", propValue: inv.invoiceNumber });
+    expect(one.list.some((r) => r.invNo === inv.invoiceNumber)).toBe(true);
+  });
+
   it("lists the merchant's 字軌 tracks (extension)", async () => {
     const tracks = await p.listInvoiceTracks();
     expect(Array.isArray(tracks)).toBe(true);

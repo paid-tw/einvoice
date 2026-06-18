@@ -335,6 +335,35 @@ describe("allowance", () => {
   });
 });
 
+describe("listInvoices (extension)", () => {
+  it("maps the filters and returns rows + entries", async () => {
+    let body: Record<string, unknown> | undefined;
+    server.use(
+      loginHandler(),
+      http.post(url(EP.list), async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>;
+        return ok({ list: [{ invNo: "SX60721900" }], entries: 1 });
+      }),
+    );
+    const res = await testProvider().listInvoices({ period: "202606", prop: "nid", propValue: "53538851", carrierType: 2, voided: false, msgType: 1, withUbn: true, page: 1, pageSize: 50 });
+    expect(res).toEqual({ entries: 1, list: [{ invNo: "SX60721900" }] });
+    expect(body).toEqual({ period: "202606", prop: "nid", propValue: "53538851", carrierType: 2, isVoid: 0, msgType: 1, withGUINo: true, _pn: 1, _ps: 50 });
+  });
+
+  it("uses a fromTime/toTime range when given", async () => {
+    let body: Record<string, unknown> | undefined;
+    server.use(
+      loginHandler(),
+      http.post(url(EP.list), async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>;
+        return ok({ list: [], entries: 0 });
+      }),
+    );
+    await testProvider().listInvoices({ fromTime: "2026-01-01 00:00:00", toTime: "2026-06-30 23:59:59", voided: true });
+    expect(body).toEqual({ fromTime: "2026-01-01 00:00:00", toTime: "2026-06-30 23:59:59", isVoid: 1 });
+  });
+});
+
 describe("getAllowanceQuota (extension)", () => {
   it("resolves the invID and returns each line's remaining creditable quota", async () => {
     server.use(
