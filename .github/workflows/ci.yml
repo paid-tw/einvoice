@@ -21,6 +21,9 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm -r build
       - run: pnpm typecheck
+      # Validate each package's published exports/types (catches a CJS/ESM types
+      # condition mismatch that builds + tests don't — runs against dist/).
+      - run: pnpm check:exports
       # Live suites are gated behind ECPAY_LIVE / EZPAY_LIVE / AMEGO_LIVE and
       # are skipped here — CI runs only the offline (MSW) tests.
       - run: pnpm test

@@ -19,13 +19,16 @@
     "changeset": "changeset",
     "version": "changeset version",
     "release": "pnpm build && changeset publish",
-    "clean": "pnpm -r exec rm -rf dist node_modules .turbo && rm -rf node_modules"
+    "clean": "pnpm -r exec rm -rf dist node_modules .turbo && rm -rf node_modules",
+    "check:exports": "pnpm -r --filter \"./packages/*\" exec publint --strict"
   },
   "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.3",
     "@changesets/cli": "^2.27.9",
     "@types/node": "^20",
     "@vitest/coverage-v8": "^2.1.0",
     "msw": "^2",
+    "publint": "^0.3.21",
     "tsup": "^8.3.0",
     "typescript": "^5.6.0",
     "vitest": "^2.1.0"
