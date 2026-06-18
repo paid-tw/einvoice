@@ -1,5 +1,14 @@
 # @paid-tw/einvoice-ezpay
 
+## 0.3.2
+
+### Patch Changes
+
+- A wrong-length `HashKey` / `HashIV` now throws a clear error naming the field and the actual byte count, instead of an opaque Node `createCipheriv` error (ECPay AES-128 → 16/16 bytes, ezPay AES-256 → 32/16).
+- Input validation now rejects with a normalized `InvoiceError` (code `VALIDATION`, with the provider name and the offending field/message) instead of leaking a raw `ZodError` — matching the contract that every operation rejects with an `InvoiceError`.
+- Updated dependencies
+  - @paid-tw/einvoice@0.3.2
+
 ## 0.3.1
 
 ### Patch Changes

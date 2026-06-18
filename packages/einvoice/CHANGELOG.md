@@ -1,5 +1,13 @@
 # @paid-tw/einvoice
 
+## 0.3.2
+
+### Patch Changes
+
+- - Enforce amount consistency (`salesAmount + taxAmount === totalAmount`) on **allowances** as well as invoices — `amountSummarySchema` now checks it, so `allowance()` rejects an inconsistent amount instead of sending it to the provider.
+  - Add `InvoiceError.toJSON()` so structured logging keeps the normalized fields (`code` / `rawCode` / `rawMessage`); a plain `JSON.stringify(error)` used to drop them.
+  - Add and export shared helpers: `parseInput`, `parseTaipeiDate`, `taipeiDateTime`, `taxTypeToCode`.
+
 ## 0.3.1
 
 ### Patch Changes
