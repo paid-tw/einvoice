@@ -31,7 +31,7 @@
     }
   },
   "scripts": {
-    "build": "tsup",
+    "build": "tsdown",
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit"
   },
