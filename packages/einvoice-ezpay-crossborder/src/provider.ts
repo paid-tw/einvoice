@@ -3,7 +3,11 @@ import {
   InvoiceError,
   InvoiceErrorCode,
   InvoiceStatus,
+  parseInput,
   parseTaipeiDate,
+  queryInvoiceInputSchema,
+  voidAllowanceInputSchema,
+  voidInvoiceInputSchema,
   type AllowanceInput,
   type AllowanceResult,
   type InvoiceItem,
@@ -86,6 +90,9 @@ export class EzpayCrossBorderProvider implements InvoiceProvider {
 
   /** 即時開立發票 (Status=1). */
   async issue(input: IssueInvoiceInput): Promise<IssueInvoiceResult> {
+    // NB: issue/allowance use a cross-border-specific validator instead of the
+    // shared issueInvoiceInputSchema — foreign-currency sales carry 2-decimal
+    // amounts, which the core amountSummarySchema (integer-only) would reject.
     if (this.config.validatePayload !== false) assertValidCrossBorderIssue(input);
     const res = await ezpayRequest(this.config, CB_ENDPOINTS.issue.path, this.buildIssuePostData(input, "1"));
     const r = res.result;
@@ -144,6 +151,7 @@ export class EzpayCrossBorderProvider implements InvoiceProvider {
 
   /** 作廢發票. `reason` ≤ 6 中文字 / 20 英數字. */
   async void(input: VoidInvoiceInput): Promise<VoidInvoiceResult> {
+    parseInput(voidInvoiceInputSchema, input, "ezpay-crossborder");
     if (this.config.validatePayload !== false && (input.reason ?? "").length > 20) {
       throw fail("作廢原因 (reason) must be ≤20 chars");
     }
@@ -203,6 +211,7 @@ export class EzpayCrossBorderProvider implements InvoiceProvider {
 
   /** 作廢已確認折讓. `reason` ≤ 6 中文字 / 20 英數字. */
   async voidAllowance(input: VoidAllowanceInput): Promise<VoidAllowanceResult> {
+    parseInput(voidAllowanceInputSchema, input, "ezpay-crossborder");
     if (this.config.validatePayload !== false && (input.reason ?? "").length > 20) {
       throw fail("作廢原因 (reason) must be ≤20 chars");
     }
@@ -221,6 +230,7 @@ export class EzpayCrossBorderProvider implements InvoiceProvider {
    * `orderId` (情境二, needs `providerOptions.totalAmount` + optional `currency`).
    */
   async query(input: QueryInvoiceInput): Promise<QueryInvoiceResult> {
+    parseInput(queryInvoiceInputSchema, input, "ezpay-crossborder");
     const opts = (input.providerOptions ?? {}) as Record<string, unknown>;
     const base = { RespondType: "JSON", Version: CB_ENDPOINTS.search.version, TimeStamp: ezpayTimestamp() };
     let postData: Record<string, string | number | undefined>;

@@ -132,6 +132,19 @@ describe("issue", () => {
     expect(twd.body?.currency).toBeUndefined();
   });
 
+  it("rejects invalid input via the shared schema as a normalized InvoiceError (allowance)", async () => {
+    // allowance/void/voidAllowance/query adopt the shared schemas; an
+    // inconsistent amount is rejected by parseInput before any network call.
+    await expect(
+      testProvider().allowance({
+        invoiceNumber: "AB12345678",
+        allowanceId: "A1",
+        items: [{ description: "退貨", quantity: 1, unitPrice: 100, amount: 100 }],
+        amount: { salesAmount: 100, taxAmount: 5, totalAmount: 999 },
+      }),
+    ).rejects.toMatchObject({ code: "VALIDATION", provider: "ezreceipt" });
+  });
+
   it("passes invoiceTime (from date), zero-rated fields, and self-assigned number through", async () => {
     const cap: { body?: Record<string, unknown> } = {};
     server.use(loginHandler(), issueCapture(cap));

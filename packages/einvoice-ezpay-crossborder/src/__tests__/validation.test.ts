@@ -68,6 +68,17 @@ describe("assertValidCrossBorderIssue — format/amount (VALIDATION)", () => {
   it("rejects items not summing to total", () => expectCode({ ...valid(), items: [{ description: "商品", quantity: 1, unitPrice: 50, amount: 50 }] }, "VALIDATION"));
 });
 
+describe("shared schema adoption (void / voidAllowance / query)", () => {
+  it("rejects invalid query input as a normalized InvoiceError (parseInput)", async () => {
+    // query/void/voidAllowance use the shared schemas; issue/allowance stay
+    // custom (foreign-currency decimal amounts conflict with the integer schema).
+    await expect(testProvider().query({})).rejects.toMatchObject({
+      code: "VALIDATION",
+      provider: "ezpay-crossborder",
+    });
+  });
+});
+
 describe("validatePayload: false", () => {
   it("skips local validation and lets the request reach ezPay", async () => {
     server.use(http.post(`${BASE}${EZPAY_CB_ENDPOINTS.issue.path}`, () => HttpResponse.json(ceIssueSuccess({ MerchantID: "3500001", InvoiceNumber: "CC1", RandomNum: "0001", TotalAmt: "105", CreateTime: "2026-06-17 00:00:00" }))));

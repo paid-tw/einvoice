@@ -3,8 +3,13 @@ import {
   InvoiceError,
   InvoiceErrorCode,
   InvoiceStatus,
+  allowanceInputSchema,
+  parseInput,
   parseTaipeiDate,
+  queryInvoiceInputSchema,
   taipeiDateTime,
+  voidAllowanceInputSchema,
+  voidInvoiceInputSchema,
   type AllowanceInput,
   type AllowanceResult,
   type InvoiceProvider,
@@ -67,6 +72,10 @@ export class EzreceiptProvider implements InvoiceProvider {
 
   /** 開立發票 — all-in-one (creates the order from `prodList` + issues). */
   async issue(input: IssueInvoiceInput): Promise<IssueInvoiceResult> {
+    // NB: issue intentionally does NOT run the shared issueInvoiceInputSchema —
+    // ezReceipt accepts a member id via `buyer.email` (carrierInfo fallback), so a
+    // non-email value is valid here and the schema's `.email()` check would reject
+    // it. void / allowance / voidAllowance / query DO use the shared schemas.
     const r = await this.client.request<Record<string, unknown>>(ENDPOINTS.issue, this.buildIssueBody(input));
     return {
       invoiceNumber: String(r.invNo ?? ""),
@@ -81,6 +90,7 @@ export class EzreceiptProvider implements InvoiceProvider {
 
   /** 作廢發票. `reason` ≤ 20 chars. Needs the invID (via `providerOptions.invID`). */
   async void(input: VoidInvoiceInput): Promise<VoidInvoiceResult> {
+    parseInput(voidInvoiceInputSchema, input, "ezreceipt");
     if (this.config.validatePayload !== false && (input.reason ?? "").length > 20) {
       throw fail("作廢原因 (voidReason) must be ≤20 chars");
     }
@@ -99,6 +109,7 @@ export class EzreceiptProvider implements InvoiceProvider {
    * invoice unless supplied). `amount` is the tax-exclusive credit per line.
    */
   async allowance(input: AllowanceInput): Promise<AllowanceResult> {
+    parseInput(allowanceInputSchema, input, "ezreceipt");
     const opts = (input.providerOptions ?? {}) as { invID?: number; itemTax?: number[]; allowTime?: string; needConfirm?: boolean };
     const invID = await this.resolveInvID(input.invoiceNumber, input.providerOptions);
     // The invoice line ids (soiID) come from a view; the create call keys off
@@ -131,6 +142,7 @@ export class EzreceiptProvider implements InvoiceProvider {
    * `providerOptions.awID` (from the allowance result's `raw.awID`).
    */
   async voidAllowance(input: VoidAllowanceInput): Promise<VoidAllowanceResult> {
+    parseInput(voidAllowanceInputSchema, input, "ezreceipt");
     if (this.config.validatePayload !== false && (input.reason ?? "").length > 20) {
       throw fail("作廢原因 (voidReason) must be ≤20 chars");
     }
@@ -141,6 +153,7 @@ export class EzreceiptProvider implements InvoiceProvider {
 
   /** 查詢發票. By the internal `invID` (`providerOptions.invID`) or invoice number. */
   async query(input: QueryInvoiceInput): Promise<QueryInvoiceResult> {
+    parseInput(queryInvoiceInputSchema, input, "ezreceipt");
     const invID = await this.resolveInvID(input.invoiceNumber, input.providerOptions);
     const r = await this.client.request<Record<string, unknown>>(ENDPOINTS.view(invID), {});
     const sales = Number(r.salesAmount ?? 0);
