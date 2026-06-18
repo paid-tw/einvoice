@@ -29,6 +29,9 @@ jobs:
       # Validate each package's published exports/types (catches a CJS/ESM types
       # condition mismatch that builds + tests don't — runs against dist/).
       - run: pnpm check:exports
+      # Run the suite with coverage + the regression-ratchet thresholds. The test
+      # matrix below runs the same suite for runtime compat (no coverage).
+      - run: pnpm test:coverage
 
   # Run the offline (MSW) suite across the supported runtime range (engines floor
   # >=18 through the current release). Tests resolve workspace packages to source

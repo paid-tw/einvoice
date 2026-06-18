@@ -19,8 +19,24 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       include: ["packages/*/src/**/*.ts"],
-      exclude: ["packages/*/src/**/*.test.ts", "packages/*/src/**/__tests__/**"],
+      exclude: [
+        "packages/*/src/**/*.test.ts",
+        "packages/*/src/**/__tests__/**",
+        // Type-only modules (interfaces / type aliases) — no executable code, so
+        // v8 reports them as 0% and they would distort the thresholds below.
+        "packages/einvoice/src/provider.ts",
+        "packages/einvoice-ezreceipt/src/types.ts",
+      ],
       reporter: ["text", "html"],
+      // A regression ratchet, set a few points below the current numbers — it
+      // guards the existing coverage, it is not a target to chase. Branch is the
+      // weak metric (defensive parsing of untyped provider JSON in the adapters).
+      thresholds: {
+        statements: 98,
+        branches: 80,
+        functions: 98,
+        lines: 98,
+      },
     },
   },
 });
