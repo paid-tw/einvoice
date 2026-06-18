@@ -1,5 +1,11 @@
 # @paid-tw/einvoice-ezpay-crossborder
 
+## 0.1.4
+
+### Patch Changes
+
+- Adopt the shared input schemas where they fit, so validation errors are normalized to `InvoiceError` (code `VALIDATION`) like the other adapters. ezReceipt wires `void` / `allowance` / `voidAllowance` / `query`; ezPay cross-border wires `void` / `voidAllowance` / `query`. `issue` (both) and crossborder `allowance` keep their provider-specific validators (ezReceipt accepts a member id via `buyer.email`; cross-border carries 2-decimal foreign-currency amounts).
+
 ## 0.1.3
 
 ### Patch Changes
