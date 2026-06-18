@@ -4,9 +4,13 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   resolve: {
     alias: {
-      // Resolve the core package to its source so tests don't require a build.
+      // Resolve workspace packages to their source so tests never require a
+      // build (ezPay is also imported by the cross-border adapter).
       "@paid-tw/einvoice": fileURLToPath(
         new URL("./packages/einvoice/src/index.ts", import.meta.url),
+      ),
+      "@paid-tw/einvoice-ezpay": fileURLToPath(
+        new URL("./packages/einvoice-ezpay/src/index.ts", import.meta.url),
       ),
     },
   },

@@ -6,14 +6,38 @@ on:
   pull_request:
 
 jobs:
+  # Build + typecheck + validate published exports/types. tsdown (the bundler)
+  # needs a current Node, and tsc's cross-package resolution needs the built
+  # dist, so this runs once on a modern Node — separate from the runtime floor.
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r build
+      - run: pnpm typecheck
+      # Validate each package's published exports/types (catches a CJS/ESM types
+      # condition mismatch that builds + tests don't — runs against dist/).
+      - run: pnpm check:exports
+
+  # Run the offline (MSW) suite across the supported runtime range (engines floor
+  # >=18 through the current release). Tests resolve workspace packages to source
+  # via the vitest alias, so no build is needed and a version-specific runtime bug
+  # surfaces here. Live suites are gated behind *_LIVE env vars and stay skipped.
   test:
     runs-on: ubuntu-latest
     name: test (Node ${{ matrix.node-version }})
     strategy:
       fail-fast: false
       matrix:
-        # Cover the engines floor (>=18) through the current release, so a
-        # version-specific runtime bug surfaces in CI rather than downstream.
         node-version: ['18', '20', '22', '24']
     steps:
       - uses: actions/checkout@v4
@@ -26,11 +50,4 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
-      - run: pnpm -r build
-      - run: pnpm typecheck
-      # Validate each package's published exports/types (catches a CJS/ESM types
-      # condition mismatch that builds + tests don't — runs against dist/).
-      - run: pnpm check:exports
-      # Live suites are gated behind ECPAY_LIVE / EZPAY_LIVE / AMEGO_LIVE and
-      # are skipped here — CI runs only the offline (MSW) tests.
       - run: pnpm test
