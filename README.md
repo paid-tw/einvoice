@@ -61,10 +61,20 @@ console.log(result.invoiceNumber); // 例如 "AB12345678"
 
 ### 不需憑證即可測試
 
-```ts
-import { MockProvider } from "@paid-tw/einvoice";
+`MockProvider` 跑與真實轉接器相同的驗證，但不發送網路請求。它也模擬狀態機（作廢後
+不可再作廢 / 折讓）、依宣告的 capabilities 拒絕不支援的操作，並可用 `failNext()`
+注入一次性錯誤來測試你的錯誤處理：
 
-const invoices = new MockProvider(); // 相同的驗證，但不發送網路請求
+```ts
+import { Capability, InvoiceError, MockProvider } from "@paid-tw/einvoice";
+
+const invoices = new MockProvider(); // 預設宣告全部 capabilities
+
+// 模擬「不支援外幣」的供應商 —— 非 TWD 的 currency 會被拒（UNSUPPORTED）
+const domestic = new MockProvider({ capabilities: [Capability.ISSUE, Capability.VOID] });
+
+// 注入一次性失敗，驗證呼叫端的錯誤處理
+invoices.failNext(new InvoiceError("網路逾時", { provider: "mock", code: "NETWORK" }));
 ```
 
 ### 功能偵測

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { InvoiceError } from "./errors.js";
+import { Capability } from "./capabilities.js";
+import { InvoiceError, InvoiceErrorCode } from "./errors.js";
 import { MockProvider } from "./mock.js";
 import { composeTaxExclusive } from "./utils.js";
 import type { IssueInvoiceInput } from "./types.js";
@@ -99,5 +100,47 @@ describe("MockProvider", () => {
     await expect(provider.query({ orderId: "nope" })).rejects.toMatchObject({
       code: "NOT_FOUND",
     });
+  });
+
+  it("failNext injects a one-shot error, then resumes", async () => {
+    const provider = new MockProvider();
+    provider.failNext(
+      new InvoiceError("network down", { provider: "mock", code: InvoiceErrorCode.NETWORK }),
+    );
+    await expect(provider.issue(sampleInput())).rejects.toMatchObject({ code: "NETWORK" });
+    // cleared after one use — the next call succeeds
+    const result = await provider.issue(sampleInput());
+    expect(result.status).toBe("ISSUED");
+  });
+
+  it("rejects a non-TWD currency unless FOREIGN_CURRENCY is declared", async () => {
+    const domestic = new MockProvider({ capabilities: [Capability.ISSUE] });
+    await expect(
+      domestic.issue(sampleInput({ currency: "USD", exchangeRate: 31.5 })),
+    ).rejects.toMatchObject({ code: "UNSUPPORTED" });
+    // the default mock declares FOREIGN_CURRENCY → accepts it
+    const ok = await new MockProvider().issue(sampleInput({ currency: "USD", exchangeRate: 31.5 }));
+    expect(ok.status).toBe("ISSUED");
+  });
+
+  it("rejects an allowance against a voided invoice with CONFLICT", async () => {
+    const provider = new MockProvider();
+    const { invoiceNumber } = await provider.issue(sampleInput());
+    await provider.void({ invoiceNumber, reason: "退款" });
+    await expect(
+      provider.allowance({
+        invoiceNumber,
+        allowanceId: "ALW-2",
+        items: [{ description: "退款", quantity: 1, unitPrice: 1000, amount: 1000 }],
+        amount: composeTaxExclusive(1000),
+      }),
+    ).rejects.toMatchObject({ code: "CONFLICT" });
+  });
+
+  it("rejects voiding an unknown allowance with NOT_FOUND", async () => {
+    const provider = new MockProvider();
+    await expect(
+      provider.voidAllowance({ invoiceNumber: "MK00000000", allowanceNumber: "AL99999999" }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 });

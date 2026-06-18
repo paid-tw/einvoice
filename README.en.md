@@ -63,10 +63,21 @@ on the `InvoiceProvider` interface, not the adapter.
 
 ### Testing without credentials
 
-```ts
-import { MockProvider } from "@paid-tw/einvoice";
+`MockProvider` runs the same validation as a real adapter without any network. It
+also models the state machine (no re-void / no allowance on a voided invoice),
+gates on its declared capabilities, and exposes `failNext()` to inject a one-shot
+error so you can exercise your error handling:
 
-const invoices = new MockProvider(); // same validation, no network
+```ts
+import { Capability, InvoiceError, MockProvider } from "@paid-tw/einvoice";
+
+const invoices = new MockProvider(); // declares every capability by default
+
+// Simulate a domestic-only provider — a non-TWD currency is rejected (UNSUPPORTED)
+const domestic = new MockProvider({ capabilities: [Capability.ISSUE, Capability.VOID] });
+
+// Inject a one-shot failure to test the caller's error path
+invoices.failNext(new InvoiceError("network timeout", { provider: "mock", code: "NETWORK" }));
 ```
 
 ### Feature detection
