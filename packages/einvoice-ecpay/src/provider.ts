@@ -20,6 +20,7 @@ import {
   type VoidInvoiceResult,
   allowanceInputSchema,
   issueInvoiceInputSchema,
+  parseInput,
   queryInvoiceInputSchema,
   taipeiDateTime,
   taxTypeToCode,
@@ -85,7 +86,7 @@ export class EcpayProvider implements InvoiceProvider {
   // -------------------------------------------------------------------------
 
   async issue(input: IssueInvoiceInput): Promise<IssueInvoiceResult> {
-    const parsed = issueInvoiceInputSchema.parse(input);
+    const parsed = parseInput(issueInvoiceInputSchema, input, "ecpay");
     const data = this.buildIssueData(parsed);
     const result = await ecpayRequest(this.config, ENDPOINTS.issue, data);
     return {
@@ -111,7 +112,7 @@ export class EcpayProvider implements InvoiceProvider {
     input: IssueInvoiceInput,
     options: IssuePendingOptions = {},
   ): Promise<{ relateNumber: string; raw: EcpayResult }> {
-    const parsed = issueInvoiceInputSchema.parse(input);
+    const parsed = parseInput(issueInvoiceInputSchema, input, "ecpay");
     const opts = (parsed.providerOptions ?? {}) as Record<string, unknown>;
     const schedule = options.mode === "SCHEDULE";
     const delayDay = options.delayDay ?? (schedule ? 1 : 0);
@@ -145,7 +146,7 @@ export class EcpayProvider implements InvoiceProvider {
     input: IssueInvoiceInput,
     options: { tsr?: string; notifyUrl?: string } = {},
   ): Promise<{ relateNumber: string; raw: EcpayResult }> {
-    const parsed = issueInvoiceInputSchema.parse(input);
+    const parsed = parseInput(issueInvoiceInputSchema, input, "ecpay");
     const result = await ecpayRequest(this.config, ENDPOINTS.editDelayIssue, {
       ...this.buildIssueData(parsed),
       Tsr: options.tsr ?? parsed.orderId,
@@ -207,7 +208,7 @@ export class EcpayProvider implements InvoiceProvider {
    * allowance(s) first.
    */
   async void(input: VoidInvoiceInput): Promise<VoidInvoiceResult> {
-    const parsed = voidInvoiceInputSchema.parse(input);
+    const parsed = parseInput(voidInvoiceInputSchema, input, "ecpay");
     const opts = (parsed.providerOptions ?? {}) as Record<string, unknown>;
     if (this.config.validatePayload !== false && parsed.reason.length > 20) {
       throw new InvoiceError("Reason must be ≤20 chars", {
@@ -234,7 +235,7 @@ export class EcpayProvider implements InvoiceProvider {
    * can't be re-voided yet.
    */
   async voidWithReissue(input: VoidReissueInput): Promise<VoidReissueResult> {
-    const parsed = issueInvoiceInputSchema.parse(input.reissue);
+    const parsed = parseInput(issueInvoiceInputSchema, input.reissue, "ecpay");
     if (this.config.validatePayload !== false && (input.voidReason ?? "").length > 20) {
       throw new InvoiceError("VoidReason must be ≤20 chars", {
         provider: "ecpay",
@@ -265,7 +266,7 @@ export class EcpayProvider implements InvoiceProvider {
    * `providerOptions: { allowanceNotify: "E" | "S" | "A", notifyMail, notifyPhone }`.
    */
   async allowance(input: AllowanceInput): Promise<AllowanceResult> {
-    const parsed = allowanceInputSchema.parse(input);
+    const parsed = parseInput(allowanceInputSchema, input, "ecpay");
     const opts = (parsed.providerOptions ?? {}) as Record<string, unknown>;
     const result = await ecpayRequest(this.config, ENDPOINTS.allowance, {
       InvoiceNo: parsed.invoiceNumber,
@@ -298,7 +299,7 @@ export class EcpayProvider implements InvoiceProvider {
     input: AllowanceInput,
     options: { notifyMail: string; returnUrl?: string; customerName?: string; reason?: string },
   ): Promise<OnlineAllowanceResult> {
-    const parsed = allowanceInputSchema.parse(input);
+    const parsed = parseInput(allowanceInputSchema, input, "ecpay");
     const opts = (parsed.providerOptions ?? {}) as Record<string, unknown>;
     if (this.config.validatePayload !== false && !options.notifyMail) {
       throw new InvoiceError("notifyMail is required for an online allowance", {
@@ -334,7 +335,7 @@ export class EcpayProvider implements InvoiceProvider {
    * (NOT_FOUND).
    */
   async voidAllowance(input: VoidAllowanceInput): Promise<VoidAllowanceResult> {
-    const parsed = voidAllowanceInputSchema.parse(input);
+    const parsed = parseInput(voidAllowanceInputSchema, input, "ecpay");
     const reason = parsed.reason ?? "作廢折讓";
     if (this.config.validatePayload !== false && reason.length > 20) {
       throw new InvoiceError("Reason must be ≤20 chars", {
@@ -358,7 +359,7 @@ export class EcpayProvider implements InvoiceProvider {
    * For a confirmed/paper allowance use {@link EcpayProvider.voidAllowance}.
    */
   async cancelAllowanceOnline(input: VoidAllowanceInput): Promise<VoidAllowanceResult> {
-    const parsed = voidAllowanceInputSchema.parse(input);
+    const parsed = parseInput(voidAllowanceInputSchema, input, "ecpay");
     const reason = parsed.reason ?? "取消折讓";
     if (this.config.validatePayload !== false && reason.length > 20) {
       throw new InvoiceError("Reason must be ≤20 chars", {
@@ -376,7 +377,7 @@ export class EcpayProvider implements InvoiceProvider {
   }
 
   async query(input: QueryInvoiceInput): Promise<QueryInvoiceResult> {
-    const parsed = queryInvoiceInputSchema.parse(input);
+    const parsed = parseInput(queryInvoiceInputSchema, input, "ecpay");
     const opts = (parsed.providerOptions ?? {}) as Record<string, unknown>;
     // GetIssue takes either RelateNumber (情境一) or InvoiceNo + InvoiceDate (情境二).
     const data =

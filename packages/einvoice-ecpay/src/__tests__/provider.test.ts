@@ -159,11 +159,10 @@ describe("issue (Issue)", () => {
 });
 
 describe("void / allowance / voidAllowance", () => {
-  it("rejects an allowance with an inconsistent amount before the network (shared schema guard)", async () => {
+  it("rejects an allowance with an inconsistent amount as a normalized InvoiceError", async () => {
     // amountSummarySchema enforces salesAmount + taxAmount === totalAmount for
-    // allowances too — this must reject (without any HTTP call). NOTE: the
-    // allowance path surfaces the schema's ZodError directly (unlike issue,
-    // which wraps validation in InvoiceError via assertValidIssuePayload).
+    // allowances too. parseInput normalizes the Zod failure into an
+    // InvoiceError(VALIDATION) (not a raw ZodError) — before any HTTP call.
     await expect(
       testProvider().allowance({
         invoiceNumber: "JU11082062",
@@ -172,7 +171,7 @@ describe("void / allowance / voidAllowance", () => {
         amount: { salesAmount: 100, taxAmount: 50, totalAmount: 999 },
         providerOptions: { invoiceDate: "2026-06-17" },
       }),
-    ).rejects.toThrow(/totalAmount must equal salesAmount/);
+    ).rejects.toMatchObject({ code: "VALIDATION", provider: "ecpay" });
   });
 
   it("void posts InvoiceNo + InvoiceDate + Reason", async () => {

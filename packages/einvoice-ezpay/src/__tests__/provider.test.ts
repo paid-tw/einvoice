@@ -103,6 +103,12 @@ describe("issue (invoice_issue)", () => {
     }
   });
 
+  it("rejects invalid input as a normalized InvoiceError (parseInput, not a raw ZodError)", async () => {
+    await expect(
+      testProvider().issue(issueInput({ amount: { salesAmount: 100, taxAmount: 5, totalAmount: 999 } })),
+    ).rejects.toMatchObject({ code: "VALIDATION", provider: "ezpay" });
+  });
+
   it("sends B2B fields (Category, BuyerUBN) for a 統編 buyer", async () => {
     let p: Record<string, string> | undefined;
     server.use(

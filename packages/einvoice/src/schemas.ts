@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { InvoiceError, InvoiceErrorCode } from "./errors.js";
 import { isValidMobileBarcode } from "./mobile-barcode.js";
 import { isValidUbn } from "./ubn.js";
 
@@ -6,6 +7,27 @@ import { isValidUbn } from "./ubn.js";
  * Runtime validation for the unified inputs. Adapters call these before mapping
  * to the wire format, so every provider rejects bad input consistently.
  */
+
+/**
+ * Parse a unified input through its schema, normalizing a Zod failure into an
+ * {@link InvoiceError} with code `VALIDATION`. Adapters use this instead of
+ * `schema.parse(...)` so that — per the SDK contract — every operation rejects
+ * with an `InvoiceError` (never a raw `ZodError`). The first issue's path +
+ * message becomes the error message; the full issue list is preserved on `raw`.
+ */
+export function parseInput<T>(schema: z.ZodType<T>, input: unknown, provider: string): T {
+  const result = schema.safeParse(input);
+  if (result.success) return result.data;
+  const issue = result.error.issues[0];
+  const path = issue?.path.length ? `${issue.path.join(".")}: ` : "";
+  throw new InvoiceError(`${path}${issue?.message ?? "Invalid input"}`, {
+    provider,
+    code: InvoiceErrorCode.VALIDATION,
+    rawMessage: result.error.message,
+    raw: result.error.issues,
+    cause: result.error,
+  });
+}
 
 export const taxTypeSchema = z.enum([
   "TAXABLE",

@@ -22,6 +22,7 @@ import {
   type VoidInvoiceResult,
   allowanceInputSchema,
   issueInvoiceInputSchema,
+  parseInput,
   queryInvoiceInputSchema,
   voidAllowanceInputSchema,
   voidInvoiceInputSchema,
@@ -82,7 +83,7 @@ export class AmegoProvider implements InvoiceProvider {
   // -------------------------------------------------------------------------
 
   async issue(input: IssueInvoiceInput): Promise<IssueInvoiceResult> {
-    const parsed = issueInvoiceInputSchema.parse(input);
+    const parsed = parseInput(issueInvoiceInputSchema, input, "amego");
     const category = parsed.category ?? deriveCategory(parsed.buyer);
     const priceExclusive = parsed.priceMode === "TAX_EXCLUSIVE";
 
@@ -138,7 +139,7 @@ export class AmegoProvider implements InvoiceProvider {
   }
 
   async void(input: VoidInvoiceInput): Promise<VoidInvoiceResult> {
-    const parsed = voidInvoiceInputSchema.parse(input);
+    const parsed = parseInput(voidInvoiceInputSchema, input, "amego");
     // f0501 takes an ARRAY of { CancelInvoiceNumber }.
     const res = await amegoRequest(this.config, ENDPOINTS.void, [
       { CancelInvoiceNumber: parsed.invoiceNumber },
@@ -151,7 +152,7 @@ export class AmegoProvider implements InvoiceProvider {
   }
 
   async allowance(input: AllowanceInput): Promise<AllowanceResult> {
-    const parsed = allowanceInputSchema.parse(input);
+    const parsed = parseInput(allowanceInputSchema, input, "amego");
     const opts = (parsed.providerOptions ?? {}) as Record<string, unknown>;
     const taxRate = typeof opts.taxRate === "number" ? opts.taxRate : 0.05;
 
@@ -206,7 +207,7 @@ export class AmegoProvider implements InvoiceProvider {
   }
 
   async voidAllowance(input: VoidAllowanceInput): Promise<VoidAllowanceResult> {
-    const parsed = voidAllowanceInputSchema.parse(input);
+    const parsed = parseInput(voidAllowanceInputSchema, input, "amego");
     // g0501 takes an ARRAY of { CancelAllowanceNumber }.
     const res = await amegoRequest(this.config, ENDPOINTS.voidAllowance, [
       { CancelAllowanceNumber: parsed.allowanceNumber },
@@ -215,7 +216,7 @@ export class AmegoProvider implements InvoiceProvider {
   }
 
   async query(input: QueryInvoiceInput): Promise<QueryInvoiceResult> {
-    const parsed = queryInvoiceInputSchema.parse(input);
+    const parsed = parseInput(queryInvoiceInputSchema, input, "amego");
     // invoice_query supports both invoice-number and order-id lookups via the
     // `type` discriminator (verified live).
     const payload = parsed.invoiceNumber

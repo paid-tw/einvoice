@@ -20,6 +20,7 @@ import {
   type VoidInvoiceResult,
   allowanceInputSchema,
   issueInvoiceInputSchema,
+  parseInput,
   queryInvoiceInputSchema,
   taxTypeToCode,
   voidAllowanceInputSchema,
@@ -226,7 +227,7 @@ export class EzpayProvider implements InvoiceProvider {
   }
 
   async issue(input: IssueInvoiceInput): Promise<IssueInvoiceResult> {
-    const parsed = issueInvoiceInputSchema.parse(input);
+    const parsed = parseInput(issueInvoiceInputSchema, input, "ezpay");
     const postData = this.buildIssuePostData(parsed, "1"); // 即時開立
     const { result, raw } = await ezpayRequest(this.config, ENDPOINTS.issue.path, postData);
     this.verifyIssueCheckCode(result);
@@ -247,7 +248,7 @@ export class EzpayProvider implements InvoiceProvider {
    * `invoiceTransNo` to actually issue it.
    */
   async issuePending(input: IssueInvoiceInput): Promise<EzpayPendingInvoice> {
-    const parsed = issueInvoiceInputSchema.parse(input);
+    const parsed = parseInput(issueInvoiceInputSchema, input, "ezpay");
     const postData = this.buildIssuePostData(parsed, "0"); // 等待觸發開立
     const { result, raw } = await ezpayRequest(this.config, ENDPOINTS.issue.path, postData);
     this.verifyIssueCheckCode(result);
@@ -289,7 +290,7 @@ export class EzpayProvider implements InvoiceProvider {
   }
 
   async void(input: VoidInvoiceInput): Promise<VoidInvoiceResult> {
-    const parsed = voidInvoiceInputSchema.parse(input);
+    const parsed = parseInput(voidInvoiceInputSchema, input, "ezpay");
     const postData = {
       RespondType: this.respondType(),
       Version: ENDPOINTS.void.version,
@@ -304,7 +305,7 @@ export class EzpayProvider implements InvoiceProvider {
   }
 
   async allowance(input: AllowanceInput): Promise<AllowanceResult> {
-    const parsed = allowanceInputSchema.parse(input);
+    const parsed = parseInput(allowanceInputSchema, input, "ezpay");
     const opts = (parsed.providerOptions ?? {}) as Record<string, unknown>;
     const taxRate = typeof opts.taxRate === "number" ? opts.taxRate : 0.05;
     // ezPay keys an allowance off the invoice number + the invoice's order no.
@@ -339,7 +340,7 @@ export class EzpayProvider implements InvoiceProvider {
   }
 
   async voidAllowance(input: VoidAllowanceInput): Promise<VoidAllowanceResult> {
-    const parsed = voidAllowanceInputSchema.parse(input);
+    const parsed = parseInput(voidAllowanceInputSchema, input, "ezpay");
     const postData = {
       RespondType: this.respondType(),
       Version: ENDPOINTS.voidAllowance.version,
@@ -385,7 +386,7 @@ export class EzpayProvider implements InvoiceProvider {
   private buildSearchPostData(
     input: QueryInvoiceInput,
   ): Record<string, string | number | undefined> {
-    const parsed = queryInvoiceInputSchema.parse(input);
+    const parsed = parseInput(queryInvoiceInputSchema, input, "ezpay");
     const opts = (parsed.providerOptions ?? {}) as Record<string, unknown>;
     // ezPay supports two lookups: by invoice number + random code (SearchType 0),
     // or by order number + total amount (SearchType 1).
@@ -419,7 +420,7 @@ export class EzpayProvider implements InvoiceProvider {
   }
 
   async query(input: QueryInvoiceInput): Promise<QueryInvoiceResult> {
-    const parsed = queryInvoiceInputSchema.parse(input);
+    const parsed = parseInput(queryInvoiceInputSchema, input, "ezpay");
     const fullPostData = this.buildSearchPostData(input);
     const { result, raw } = await ezpayRequest(this.config, ENDPOINTS.search.path, fullPostData);
 

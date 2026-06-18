@@ -29,6 +29,12 @@ function issueInput(overrides: Partial<IssueInvoiceInput> = {}): IssueInvoiceInp
 }
 
 describe("issue (f0401)", () => {
+  it("rejects invalid input as a normalized InvoiceError (parseInput, not a raw ZodError)", async () => {
+    await expect(
+      testProvider().issue(issueInput({ amount: { salesAmount: 100, taxAmount: 5, totalAmount: 999 } })),
+    ).rejects.toMatchObject({ code: "VALIDATION", provider: "amego" });
+  });
+
   it("signs the request and maps invoice_time → Date, random_number → randomCode", async () => {
     let captured: ReturnType<typeof parseBody> | undefined;
     server.use(

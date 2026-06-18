@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { allowanceInputSchema, carrierSchema, issueInvoiceInputSchema } from "./schemas.js";
+import { InvoiceError } from "./errors.js";
+import { allowanceInputSchema, carrierSchema, issueInvoiceInputSchema, parseInput } from "./schemas.js";
 import type { IssueInvoiceInput } from "./types.js";
 
 const valid: IssueInvoiceInput = {
@@ -81,6 +82,27 @@ describe("allowanceInputSchema (shared amountSummarySchema invariant)", () => {
     });
     expect(r.success).toBe(false);
     expect(r.error?.issues[0]?.path).toEqual(["amount", "totalAmount"]);
+  });
+});
+
+describe("parseInput", () => {
+  it("returns the parsed data on success", () => {
+    expect(parseInput(issueInvoiceInputSchema, valid, "amego")).toMatchObject({ orderId: "o1" });
+  });
+
+  it("throws an InvoiceError(VALIDATION) — not a ZodError — on failure", () => {
+    let thrown: unknown;
+    try {
+      parseInput(issueInvoiceInputSchema, { ...valid, amount: { salesAmount: 100, taxAmount: 5, totalAmount: 999 } }, "ecpay");
+    } catch (e) {
+      thrown = e;
+    }
+    expect(thrown).toBeInstanceOf(InvoiceError);
+    const err = thrown as InvoiceError;
+    expect(err.code).toBe("VALIDATION");
+    expect(err.provider).toBe("ecpay");
+    expect(err.message).toMatch(/totalAmount/);
+    expect(Array.isArray(err.raw)).toBe(true); // the Zod issues are preserved
   });
 });
 
