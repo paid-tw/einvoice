@@ -15,7 +15,7 @@
     "typecheck": "pnpm -r --filter './packages/*' typecheck",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "tsc -b --noEmit || true",
+    "lint": "pnpm typecheck",
     "changeset": "changeset",
     "version": "changeset version",
     "release": "pnpm build && changeset publish",
