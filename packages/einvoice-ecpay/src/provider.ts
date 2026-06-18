@@ -22,6 +22,7 @@ import {
   issueInvoiceInputSchema,
   queryInvoiceInputSchema,
   taipeiDateTime,
+  taxTypeToCode,
   voidAllowanceInputSchema,
   voidInvoiceInputSchema,
 } from "@paid-tw/einvoice";
@@ -865,18 +866,8 @@ export function createEcpayProvider(config: EcpayConfig): EcpayProvider {
 
 // --- helpers ---------------------------------------------------------------
 
-/** Unified TaxType → ECPay TaxType (1 應稅 / 2 零稅率 / 3 免稅 / 9 混合). */
-export function ecpayTaxType(taxType: TaxType): string {
-  switch (taxType) {
-    case "TAXABLE":
-    case "SPECIAL":
-      return "1";
-    case "ZERO_RATED":
-      return "2";
-    case "TAX_FREE":
-      return "3";
-  }
-}
+/** Unified TaxType → ECPay TaxType (1 應稅 / 2 零稅率 / 3 免稅; 9 混合 handled per-item). */
+export const ecpayTaxType = taxTypeToCode;
 
 /** Build the ECPay `Items` array from unified items. */
 function toEcpayItems(

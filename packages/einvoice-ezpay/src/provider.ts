@@ -21,6 +21,7 @@ import {
   allowanceInputSchema,
   issueInvoiceInputSchema,
   queryInvoiceInputSchema,
+  taxTypeToCode,
   voidAllowanceInputSchema,
   voidInvoiceInputSchema,
 } from "@paid-tw/einvoice";
@@ -497,18 +498,8 @@ function carrierFields(carrier?: Carrier): Record<string, string | undefined> {
   return { CarrierType: CARRIER_TYPE[carrier.type], CarrierNum: carrier.code };
 }
 
-/** Unified TaxType → ezPay TaxType (1 應稅 / 2 零稅率 / 3 免稅 / 9 混合). */
-export function ezpayTaxType(taxType: TaxType): string {
-  switch (taxType) {
-    case "TAXABLE":
-    case "SPECIAL":
-      return "1";
-    case "ZERO_RATED":
-      return "2";
-    case "TAX_FREE":
-      return "3";
-  }
-}
+/** Unified TaxType → ezPay TaxType (1 應稅 / 2 零稅率 / 3 免稅; 9 混合 handled per-item). */
+export const ezpayTaxType = taxTypeToCode;
 
 /** ezPay TaxRate is a percentage without `%` (e.g. 5); zero/free → 0. */
 export function ezpayTaxRate(taxType: TaxType, taxRate?: number): number {

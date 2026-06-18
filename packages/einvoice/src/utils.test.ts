@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { composeTaxExclusive, deriveCategory, parseTaipeiDate, splitTaxInclusive, taipeiDateTime } from "./utils.js";
+import { composeTaxExclusive, deriveCategory, parseTaipeiDate, splitTaxInclusive, taipeiDateTime, taxTypeToCode } from "./utils.js";
 
 describe("amount helpers", () => {
   it("composeTaxExclusive adds 5% tax", () => {
@@ -50,5 +50,14 @@ describe("Taipei date helpers", () => {
   it("taipeiDateTime round-trips with parseTaipeiDate", () => {
     const s = "2026-12-25 23:59:59";
     expect(taipeiDateTime(parseTaipeiDate(s))).toBe(s);
+  });
+});
+
+describe("taxTypeToCode", () => {
+  it("maps every TaxType to its MIG code (SPECIAL → 應稅)", () => {
+    expect(taxTypeToCode("TAXABLE")).toBe("1");
+    expect(taxTypeToCode("SPECIAL")).toBe("1");
+    expect(taxTypeToCode("ZERO_RATED")).toBe("2");
+    expect(taxTypeToCode("TAX_FREE")).toBe("3");
   });
 });

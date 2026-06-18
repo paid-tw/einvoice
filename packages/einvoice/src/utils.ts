@@ -1,5 +1,22 @@
-import type { InvoiceCategory } from "./types.js";
+import type { InvoiceCategory, TaxType } from "./types.js";
 import { InvoiceCategory as Category } from "./types.js";
+
+/**
+ * Unified TaxType → the MIG numeric tax-type code shared by the value-added
+ * centres: `"1"` 應稅 / `"2"` 零稅率 / `"3"` 免稅. SPECIAL (特種稅額) issues as 應稅
+ * with a separate trCode, so it maps to `"1"` here too.
+ */
+export function taxTypeToCode(taxType: TaxType): string {
+  switch (taxType) {
+    case "TAXABLE":
+    case "SPECIAL":
+      return "1";
+    case "ZERO_RATED":
+      return "2";
+    case "TAX_FREE":
+      return "3";
+  }
+}
 
 /** Derive B2B vs B2C from the buyer's 統一編號. */
 export function deriveCategory(buyer: { ubn?: string }): InvoiceCategory {
