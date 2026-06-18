@@ -8,6 +8,13 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    name: test (Node ${{ matrix.node-version }})
+    strategy:
+      fail-fast: false
+      matrix:
+        # Cover the engines floor (>=18) through the current release, so a
+        # version-specific runtime bug surfaces in CI rather than downstream.
+        node-version: ['18', '20', '22', '24']
     steps:
       - uses: actions/checkout@v4
 
@@ -15,7 +22,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: ${{ matrix.node-version }}
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
