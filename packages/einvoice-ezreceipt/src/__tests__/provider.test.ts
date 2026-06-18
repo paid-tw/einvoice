@@ -154,6 +154,37 @@ describe("issue", () => {
     expect((cap.body?.prodList as Array<{ taxType: number }>)[0]?.taxType).toBe(2);
   });
 
+  it("records the orderId as order.orderNo and passes sendTo / credit4 / order overrides", async () => {
+    const cap: { body?: Record<string, unknown> } = {};
+    server.use(loginHandler(), issueCapture(cap));
+    await testProvider().issue({
+      ...b2cInput,
+      providerOptions: { order: { title: "訂單標題", discount: 10 }, sendTo: { name: "收件人", addr: "台北" }, credit4: "1234" },
+    });
+    expect(cap.body?.order).toEqual({ orderNo: "ORDER_1", title: "訂單標題", discount: 10 });
+    expect(cap.body?.sendTo).toMatchObject({ name: "收件人" });
+    expect(cap.body?.credit4).toBe("1234");
+  });
+
+  it("flags a negative-priced line as a discount (mcType 100) and passes issueTo.isNonprofit", async () => {
+    const cap: { body?: Record<string, unknown> } = {};
+    server.use(loginHandler(), issueCapture(cap));
+    await testProvider().issue({
+      ...b2cInput,
+      buyer: { ubn: "53538851", name: "機關", address: "台北" },
+      carrier: undefined,
+      items: [
+        { description: "商品", quantity: 1, unitPrice: 100, amount: 100 },
+        { description: "折扣", quantity: 1, unitPrice: -20, amount: -20 },
+      ],
+      providerOptions: { isNonprofit: true },
+    });
+    const prodList = cap.body?.prodList as Array<Record<string, unknown>>;
+    expect(prodList[0]?.mcType).toBeUndefined();
+    expect(prodList[1]?.mcType).toBe(100);
+    expect(cap.body?.issueTo).toMatchObject({ nid: "53538851", isNonprofit: true });
+  });
+
   it("rejects an invoice with no ubn / carrier / donation", async () => {
     server.use(loginHandler());
     await expect(testProvider().issue({ ...b2cInput, carrier: undefined })).rejects.toMatchObject({ code: "VALIDATION" });

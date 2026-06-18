@@ -137,7 +137,11 @@ function parseDate(value: unknown): Date {
   return new Date(`${y}-${mo}-${d}T${hh}:${mi}:${ss}+08:00`);
 }
 
-/** Format a Date as `YYYY-MM-DD HH:mm:ss` in Asia/Taipei (for `invoiceTime`). */
+/**
+ * Format a Date as `YYYY-MM-DD HH:mm:ss` in Asia/Taipei (for `invoiceTime`).
+ * The `"sv-SE"` locale is intentional — Swedish formats dates ISO-style
+ * (`YYYY-MM-DD HH:mm:ss`), the exact shape ezReceipt expects.
+ */
 function taipeiDateTime(date: Date): string {
   return new Intl.DateTimeFormat("sv-SE", {
     timeZone: "Asia/Taipei",
@@ -441,10 +445,15 @@ export class EzreceiptProvider implements InvoiceProvider {
     const invoiceTime = input.date ? taipeiDateTime(input.date) : (opts.invoiceTime as string | undefined);
     const body: Record<string, unknown> = {
       prodList: input.items.map((item) => toProdItem(item, input)),
+      // Record the caller's orderId as the order number (reconciliation); extend
+      // with title/discount/xportFee via providerOptions.order.
+      order: { orderNo: input.orderId, ...((opts.order as Record<string, unknown>) ?? {}) },
       trCode: opts.trCode ?? 0,
       msgType: opts.msgType ?? 1,
       ...(input.currency && input.currency !== "TWD" ? { currency: input.currency } : {}),
       ...(input.remark ? { remarks: input.remark } : {}),
+      ...(opts.sendTo ? { sendTo: opts.sendTo } : {}),
+      ...(opts.credit4 ? { credit4: opts.credit4 } : {}),
       // Self-assigned number / 註銷重開 (invNo + autoInvNo); else the platform picks.
       ...(opts.invNo ? { invNo: opts.invNo } : {}),
       ...(opts.autoInvNo != null ? { autoInvNo: opts.autoInvNo } : {}),
@@ -457,7 +466,12 @@ export class EzreceiptProvider implements InvoiceProvider {
       ...(opts.accCode ? { accCode: opts.accCode } : {}),
     };
     if (input.buyer.ubn) {
-      body.issueTo = { nid: input.buyer.ubn, title: input.buyer.name, addr: input.buyer.address };
+      body.issueTo = {
+        nid: input.buyer.ubn,
+        title: input.buyer.name,
+        addr: input.buyer.address,
+        ...(opts.isNonprofit != null ? { isNonprofit: opts.isNonprofit } : {}),
+      };
     } else if (input.donation) {
       body.carrier = { carrierType: 5, charity: input.donation.npoban };
     } else if (input.carrier) {
@@ -481,6 +495,9 @@ function toProdItem(item: InvoiceItem, input: IssueInvoiceInput): Record<string,
     taxType: ezreceiptTaxType(item.taxType ?? input.taxType),
     ...(item.unit ? { unit: item.unit } : {}),
     ...(item.remark ? { remarks: item.remark } : {}),
+    // A negative-priced line must be flagged as a discount (mcType 100); otherwise
+    // the API rejects the sub-zero price (1057/1062).
+    ...(item.unitPrice < 0 || item.amount < 0 ? { mcType: 100 } : {}),
   };
 }
 

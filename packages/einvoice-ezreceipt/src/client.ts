@@ -73,6 +73,7 @@ export function mapEzreceiptError(code: number): InvoiceErrorCode {
     case 1042:
     case 1043:
     case 1045:
+    case 1055:
     case 1068:
     case 1073:
     case 1074:

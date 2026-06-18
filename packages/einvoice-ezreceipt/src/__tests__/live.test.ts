@@ -125,6 +125,23 @@ describe.skipIf(!live)("ezReceipt live (test env) — variants", LIVE_OPTS, () =
     }
   });
 
+  it("issues an invoice with a discount line (negative price → mcType 100)", async () => {
+    const m = member();
+    const res = await p.issue({
+      orderId: order(),
+      buyer: { name: "折扣", email: m },
+      items: [
+        { description: "商品", quantity: 1, unitPrice: 100, amount: 100 },
+        { description: "折扣", quantity: 1, unitPrice: -20, amount: -20 },
+      ],
+      amount: { salesAmount: 80, taxAmount: 4, totalAmount: 84 },
+      taxType: "TAXABLE",
+      priceMode: "TAX_EXCLUSIVE",
+      carrier: { type: "MEMBER", code: m },
+    });
+    expect(res.totalAmount).toBe(84);
+  });
+
   it("issues a mixed-tax invoice (應稅 + 免稅)", async () => {
     const m = member();
     const res = await p.issue({
