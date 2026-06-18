@@ -517,21 +517,28 @@ export class EzreceiptProvider implements InvoiceProvider {
       ...(opts.randNo ? { randNo: opts.randNo } : {}),
       ...(opts.accCode ? { accCode: opts.accCode } : {}),
     };
-    if (input.buyer.ubn) {
-      body.issueTo = {
-        nid: input.buyer.ubn,
-        title: input.buyer.name,
-        addr: input.buyer.address,
-        ...(opts.isNonprofit != null ? { isNonprofit: opts.isNonprofit } : {}),
-      };
-    } else if (input.donation) {
+    // A donation (carrierType 5) can't carry a 統編 (1054), so it's exclusive.
+    // Otherwise a carrier and a 統編 (issueTo) may COEXIST — e.g. a mobile-barcode
+    // B2C invoice annotated with the buyer's 統編 for expense claims.
+    if (input.donation) {
       body.carrier = { carrierType: 5, charity: input.donation.npoban };
-    } else if (input.carrier) {
-      const carrierType = CARRIER_TYPE[input.carrier.type];
-      body.carrier = { carrierType, carrierInfo: carrierInfo(input.carrier, input.buyer) };
-      if (carrierType === 1) body.buyer = toBuyer(input.buyer, carrierInfo(input.carrier, input.buyer));
-    } else if (this.config.validatePayload !== false) {
-      throw fail("ezReceipt requires a buyer.ubn (B2B), a carrier, or a donation");
+    } else {
+      if (input.carrier) {
+        const carrierType = CARRIER_TYPE[input.carrier.type];
+        body.carrier = { carrierType, carrierInfo: carrierInfo(input.carrier, input.buyer) };
+        if (carrierType === 1) body.buyer = toBuyer(input.buyer, carrierInfo(input.carrier, input.buyer));
+      }
+      if (input.buyer.ubn) {
+        body.issueTo = {
+          nid: input.buyer.ubn,
+          title: input.buyer.name,
+          addr: input.buyer.address,
+          ...(opts.isNonprofit != null ? { isNonprofit: opts.isNonprofit } : {}),
+        };
+      }
+      if (!input.carrier && !input.buyer.ubn && this.config.validatePayload !== false) {
+        throw fail("ezReceipt requires a buyer.ubn (B2B), a carrier, or a donation");
+      }
     }
     return body;
   }

@@ -92,6 +92,13 @@ describe.skipIf(!live)("ezReceipt live (test env) — variants", LIVE_OPTS, () =
     expect(res.invoiceNumber).toMatch(/^[A-Z]{2}\d{8}$/);
   });
 
+  it("issues a mobile-barcode invoice annotated with a 統編 (carrier + issueTo)", async () => {
+    const res = await p.issue({ ...base, orderId: order(), buyer: { name: "歐付寶測試", ubn: "53538851" }, carrier: { type: "MOBILE_BARCODE", code: "/ABC1234" } });
+    expect(res.invoiceNumber).toMatch(/^[A-Z]{2}\d{8}$/);
+    const q = await p.query({ invoiceNumber: res.invoiceNumber });
+    expect(q.buyer.ubn).toBe("53538851");
+  });
+
   it("issues a zero-rated invoice (zeroTaxReason + isCustom)", async () => {
     const m = member();
     const res = await p.issue({

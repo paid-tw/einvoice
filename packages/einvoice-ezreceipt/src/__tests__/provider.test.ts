@@ -185,6 +185,19 @@ describe("issue", () => {
     expect(cap.body?.issueTo).toMatchObject({ nid: "53538851", isNonprofit: true });
   });
 
+  it("annotates a carrier invoice with a 統編 (carrier + issueTo coexist)", async () => {
+    const cap: { body?: Record<string, unknown> } = {};
+    server.use(loginHandler(), issueCapture(cap));
+    await testProvider().issue({
+      ...b2cInput,
+      buyer: { name: "歐付寶", ubn: "53538851" },
+      carrier: { type: "MOBILE_BARCODE", code: "/ABC1234" },
+    });
+    expect(cap.body?.carrier).toMatchObject({ carrierType: 2, carrierInfo: "/ABC1234" });
+    expect(cap.body?.issueTo).toMatchObject({ nid: "53538851", title: "歐付寶" });
+    expect(cap.body?.buyer).toBeUndefined(); // barcode carrier → no member buyer
+  });
+
   it("rejects an invoice with no ubn / carrier / donation", async () => {
     server.use(loginHandler());
     await expect(testProvider().issue({ ...b2cInput, carrier: undefined })).rejects.toMatchObject({ code: "VALIDATION" });
