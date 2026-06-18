@@ -35,6 +35,15 @@ export interface InvoiceErrorOptions {
   cause?: unknown;
 }
 
+/**
+ * Brand stored under a globally-registered symbol (shared across realms via the
+ * `Symbol.for` registry). `isInvoiceError` checks this instead of `instanceof`,
+ * so the guard still works when two copies of this package are loaded — dual
+ * ESM/CJS resolution, or a consumer with a transitive version mismatch — where
+ * `instanceof` would silently return false.
+ */
+const INVOICE_ERROR_BRAND = Symbol.for("@paid-tw/einvoice.InvoiceError");
+
 /** The single error type all adapters throw. */
 export class InvoiceError extends Error {
   readonly provider: string;
@@ -51,6 +60,8 @@ export class InvoiceError extends Error {
     this.rawCode = options.rawCode;
     this.rawMessage = options.rawMessage;
     this.raw = options.raw;
+    // Non-enumerable so it stays out of JSON / property enumeration.
+    Object.defineProperty(this, INVOICE_ERROR_BRAND, { value: true });
   }
 
   /**
@@ -72,5 +83,9 @@ export class InvoiceError extends Error {
 }
 
 export function isInvoiceError(value: unknown): value is InvoiceError {
-  return value instanceof InvoiceError;
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    (value as Record<symbol, unknown>)[INVOICE_ERROR_BRAND] === true
+  );
 }

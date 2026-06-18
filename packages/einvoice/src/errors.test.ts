@@ -37,5 +37,26 @@ describe("InvoiceError", () => {
     expect(isInvoiceError(new InvoiceError("m", { provider: "p", code: "UNKNOWN" }))).toBe(true);
     expect(isInvoiceError(new Error("m"))).toBe(false);
     expect(isInvoiceError(null)).toBe(false);
+    expect(isInvoiceError({})).toBe(false);
+  });
+
+  it("isInvoiceError recognizes a brand from another package copy (no instanceof)", () => {
+    // Simulate an InvoiceError thrown by a *different* loaded copy of the package
+    // (dual ESM/CJS or version skew): same global brand symbol, but `instanceof`
+    // our class would be false. The brand check must still pass.
+    const foreign = { [Symbol.for("@paid-tw/einvoice.InvoiceError")]: true };
+    expect(foreign instanceof InvoiceError).toBe(false);
+    expect(isInvoiceError(foreign)).toBe(true);
+  });
+
+  it("the brand stays out of JSON output", () => {
+    const err = new InvoiceError("m", { provider: "p", code: "UNKNOWN", rawCode: "9" });
+    expect(JSON.parse(JSON.stringify(err))).toEqual({
+      name: "InvoiceError",
+      provider: "p",
+      code: "UNKNOWN",
+      message: "m",
+      rawCode: "9",
+    });
   });
 });
