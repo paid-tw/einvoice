@@ -457,6 +457,42 @@ describe("listInvoices (extension)", () => {
   });
 });
 
+describe("getInvoicePrintInfo (extension)", () => {
+  it("resolves the invID and returns the print payload", async () => {
+    const info = { invNo: "SX60721900", period: "202605", randNo: "6611", barCode: "B", qrCodeL: "L", qrCodeR: "R", sellerNID: "12345678", prodList: [{ title: "商品", qty: 1, sales: 100, saleTax: 5, taxType: 1 }] };
+    server.use(loginHandler(), listResolves("SX60721900", 999), http.post(url(EP.proofInvInfo(999)), () => ok(info)));
+    const res = await testProvider().getInvoicePrintInfo("SX60721900");
+    expect(res).toMatchObject({ invNo: "SX60721900", barCode: "B", qrCodeL: "L", qrCodeR: "R" });
+  });
+
+  it("maps a state-disallowed print (1312) to CONFLICT", async () => {
+    server.use(loginHandler(), http.post(url(EP.proofInvInfo(1)), () => fail(1312, "發票目前的狀態無法執行列印")));
+    await expect(testProvider().getInvoicePrintInfo("SX1", { invID: 1 })).rejects.toMatchObject({ code: "CONFLICT", rawCode: "1312" });
+  });
+});
+
+describe("printInvoice (extension)", () => {
+  it("resolves invoice numbers to invIDs and returns the PDF bytes", async () => {
+    let body: Record<string, unknown> | undefined;
+    server.use(
+      loginHandler(),
+      listResolves("SX60721900", 999),
+      http.post(url(EP.proofInvPrint), async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>;
+        return file([0x25, 0x50, 0x44, 0x46]);
+      }),
+    );
+    const res = await testProvider().printInvoice(["SX60721900"], { isCopy: true, format: 25, device: "TM-P20" });
+    expect(body).toEqual({ invList: [999], isCopy: true, format: 25, device: "TM-P20" });
+    expect(res.contentType).toContain("pdf");
+  });
+
+  it("maps a 境外電商 print restriction (1300) to CONFLICT", async () => {
+    server.use(loginHandler(), listResolves("SX1", 5), http.post(url(EP.proofInvPrint), () => fail(1300, "境外電商開立的發票，依法規不可列印。")));
+    await expect(testProvider().printInvoice(["SX1"])).rejects.toMatchObject({ code: "CONFLICT", rawCode: "1300" });
+  });
+});
+
 describe("printAllowance (extension)", () => {
   it("requests the allowance print file and returns the bytes", async () => {
     let body: Record<string, unknown> | undefined;

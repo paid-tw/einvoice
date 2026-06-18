@@ -46,6 +46,7 @@ export function mapEzreceiptError(code: number): InvoiceErrorCode {
     case 30:
     case 122:
     case 224:
+    case 1336:
       return InvoiceErrorCode.NOT_FOUND;
     // no usable 字軌 segment
     case 1015:
@@ -83,9 +84,11 @@ export function mapEzreceiptError(code: number): InvoiceErrorCode {
     case 1068:
     case 1073:
     case 1074:
+    case 1300:
     case 1222:
     case 1310:
     case 1311:
+    case 1312:
       return InvoiceErrorCode.CONFLICT;
   }
   if (code === -15 || code < 0) return InvoiceErrorCode.PROVIDER;

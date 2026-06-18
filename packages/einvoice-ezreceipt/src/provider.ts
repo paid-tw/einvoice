@@ -143,6 +143,39 @@ export interface ListInvoicesInput {
   pageSize?: number;
 }
 
+/** Everything needed to print a paper proof, from {@link EzreceiptProvider.getInvoicePrintInfo}. */
+export interface InvoicePrintInfo {
+  invNo: string;
+  /** 期別 YYYYMM (bimonthly, odd start month). */
+  period: string;
+  randNo: string;
+  /** Only when the print setting includes the order number. */
+  orderNo?: string;
+  invoiceTime: string;
+  /** 未稅銷售總額. */
+  salesAmount: number;
+  taxAmount: number;
+  /** 一維條碼 data. */
+  barCode: string;
+  /** 左二維條碼 data. */
+  qrCodeL: string;
+  /** 右二維條碼 data. */
+  qrCodeR: string;
+  sellerNID: string;
+  /** Only when the invoice carries a 統編. */
+  buyerNID?: string;
+  remark?: string;
+  /** base64 logo when the 字軌 uses one (then title1/title2 are omitted). */
+  logoEncoded?: string;
+  /** 自訂抬頭 line 1 (falls back to the store name). */
+  title1?: string;
+  title2?: string;
+  /** Seller address / phone — only when the print setting includes them. */
+  addr?: string;
+  phone?: string;
+  prodList: Array<{ title: string; qty: number; sales: number; saleTax: number; taxType: number }>;
+}
+
 /** One line's remaining creditable (折讓) quota from {@link EzreceiptProvider.getAllowanceQuota}. */
 export interface AllowanceQuotaItem {
   /** 原發票品項識別碼 (soiID) — use it in an allowance's prodList. */
@@ -413,6 +446,36 @@ export class EzreceiptProvider implements InvoiceProvider {
       awList: awIDs,
       eventType,
       ...(opts.forceToBuyer ? { forceToBuyer: true } : {}),
+    });
+  }
+
+  /**
+   * 取得列印發票所需的資料 — barcode, both QR codes, logo/titles and line items, so
+   * a caller can render its own paper proof (消費證明聯). JSON, not a file.
+   */
+  async getInvoicePrintInfo(invoiceNumber: string, providerOptions?: Record<string, unknown>): Promise<InvoicePrintInfo> {
+    const invID = await this.resolveInvID(invoiceNumber, providerOptions);
+    return this.client.request<InvoicePrintInfo>(ENDPOINTS.proofInvInfo(invID), {});
+  }
+
+  /**
+   * 取得發票列印檔 — the invoice proof PDF bytes (or a ZIP when `zipped`) for the
+   * given invoice numbers. `isCopy` marks the 證明聯 as 副本; `format` 1/2/11/12/21/
+   * 22/25; `device` for thermal printers (TM-T82III/TM-m10/TM-P20/mC-Print3).
+   * Binary response → returns the raw bytes + content-type.
+   */
+  async printInvoice(
+    invoiceNumbers: string[],
+    opts: { isCopy?: boolean; zipped?: boolean; format?: number; printTime?: string; device?: string } = {},
+  ): Promise<{ contentType: string; data: Uint8Array }> {
+    const invList = await Promise.all(invoiceNumbers.map((n) => this.resolveInvID(n)));
+    return this.client.requestFile(ENDPOINTS.proofInvPrint, {
+      invList,
+      ...(opts.isCopy ? { isCopy: true } : {}),
+      ...(opts.zipped ? { isZipped: true } : {}),
+      ...(opts.format != null ? { format: opts.format } : {}),
+      ...(opts.printTime ? { printTime: opts.printTime } : {}),
+      ...(opts.device ? { device: opts.device } : {}),
     });
   }
 

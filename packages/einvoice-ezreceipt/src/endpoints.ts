@@ -47,6 +47,10 @@ export const ENDPOINTS = {
   notificationInvoice: "/eInvoice/notification/invoice",
   /** 取得折讓單列印檔 (PDF/ZIP — binary, not JSON). Body: `{ awList, isZipped?, format? }`. */
   proofAwPrint: "/eInvoice/proof/awPrint",
+  /** 取得列印發票所需的資料 (by invID) — JSON: barcode / QR / logo / prodList. */
+  proofInvInfo: (invID: string | number) => `/eInvoice/proof/invInfo/${invID}`,
+  /** 取得發票列印檔 (PDF/ZIP — binary). Body: `{ invList, isCopy?, isZipped?, format?, printTime?, device? }`. */
+  proofInvPrint: "/eInvoice/proof/invPrint",
   /** 字軌分段清單 (一般用戶不帶 stID；合作廠商帶 stID 查指定店家). */
   invNumberList: (stID?: string | number) => `/eInvoice/invNumber/list${stID != null ? `/${stID}` : ""}`,
   /** 調整字軌分段的起始/結束號碼 (by inID). Body: `{ startNo?, endNo? }`. */

@@ -135,6 +135,25 @@ describe.skipIf(!live)("ezReceipt live (test env) — variants", LIVE_OPTS, () =
     expect(one.list.some((r) => r.invNo === inv.invoiceNumber)).toBe(true);
   });
 
+  it("returns the print info (barcode + QR codes) for an invoice (extension)", async () => {
+    const m = member();
+    const inv = await p.issue({ ...base, orderId: order(), buyer: { name: "x", email: m }, carrier: { type: "MEMBER", code: m } });
+    const info = await p.getInvoicePrintInfo(inv.invoiceNumber);
+    expect(info.invNo).toBe(inv.invoiceNumber);
+    expect(info.barCode).toBeTruthy();
+    expect(info.qrCodeL).toBeTruthy();
+    expect(info.qrCodeR).toBeTruthy();
+    expect(info.prodList.length).toBeGreaterThan(0);
+  });
+
+  it("downloads an invoice print PDF (binary proof endpoint, extension)", async () => {
+    const m = member();
+    const inv = await p.issue({ ...base, orderId: order(), buyer: { name: "x", email: m }, carrier: { type: "MEMBER", code: m } });
+    const pdf = await p.printInvoice([inv.invoiceNumber], { format: 25 });
+    expect(pdf.contentType.toLowerCase()).toContain("pdf");
+    expect(Array.from(pdf.data.slice(0, 4))).toEqual([0x25, 0x50, 0x44, 0x46]); // %PDF
+  }, 30_000);
+
   it("downloads an allowance print PDF (binary proof endpoint, extension)", async () => {
     const m = member();
     const inv = await p.issue({ ...base, orderId: order(), buyer: { name: "x", email: m }, carrier: { type: "MEMBER", code: m } });
