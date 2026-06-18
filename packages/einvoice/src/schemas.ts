@@ -77,11 +77,18 @@ export const invoiceItemSchema = z.object({
   remark: z.string().optional(),
 });
 
-export const amountSummarySchema = z.object({
-  salesAmount: z.number().int(),
-  taxAmount: z.number().int(),
-  totalAmount: z.number().int(),
-});
+export const amountSummarySchema = z
+  .object({
+    salesAmount: z.number().int(),
+    taxAmount: z.number().int(),
+    totalAmount: z.number().int(),
+  })
+  // Statutory invariant — also guards allowances (which reuse this schema), not
+  // just the issue path.
+  .refine((a) => a.salesAmount + a.taxAmount === a.totalAmount, {
+    message: "totalAmount must equal salesAmount + taxAmount",
+    path: ["totalAmount"],
+  });
 
 export const issueInvoiceInputSchema = z
   .object({
@@ -126,14 +133,8 @@ export const issueInvoiceInputSchema = z
         path: ["donation"],
       });
     }
-    const { salesAmount, taxAmount, totalAmount } = input.amount;
-    if (salesAmount + taxAmount !== totalAmount) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "amount.totalAmount must equal salesAmount + taxAmount",
-        path: ["amount", "totalAmount"],
-      });
-    }
+    // amount consistency (salesAmount + taxAmount === totalAmount) is enforced by
+    // amountSummarySchema itself, so it covers allowances too.
   });
 
 export const voidInvoiceInputSchema = z.object({

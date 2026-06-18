@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { carrierSchema, issueInvoiceInputSchema } from "./schemas.js";
+import { allowanceInputSchema, carrierSchema, issueInvoiceInputSchema } from "./schemas.js";
 import type { IssueInvoiceInput } from "./types.js";
 
 const valid: IssueInvoiceInput = {
@@ -59,6 +59,28 @@ describe("issueInvoiceInputSchema", () => {
 
   it("allows TWD without an exchange rate", () => {
     expect(issueInvoiceInputSchema.safeParse({ ...valid, currency: "TWD" }).success).toBe(true);
+  });
+});
+
+describe("allowanceInputSchema (shared amountSummarySchema invariant)", () => {
+  const validAllowance = {
+    invoiceNumber: "AB12345678",
+    allowanceId: "a1",
+    items: [{ description: "x", quantity: 1, unitPrice: 100, amount: 100 }],
+    amount: { salesAmount: 100, taxAmount: 5, totalAmount: 105 },
+  };
+
+  it("accepts a consistent allowance amount", () => {
+    expect(allowanceInputSchema.safeParse(validAllowance).success).toBe(true);
+  });
+
+  it("rejects an inconsistent allowance amount (total ≠ sales + tax)", () => {
+    const r = allowanceInputSchema.safeParse({
+      ...validAllowance,
+      amount: { salesAmount: 100, taxAmount: 50, totalAmount: 999 },
+    });
+    expect(r.success).toBe(false);
+    expect(r.error?.issues[0]?.path).toEqual(["amount", "totalAmount"]);
   });
 });
 
