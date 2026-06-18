@@ -701,7 +701,7 @@ export class EzreceiptProvider implements InvoiceProvider {
    */
   private async resolveInvID(
     invoiceNumber: string | undefined,
-    providerOptions: Record<string, unknown> | undefined,
+    providerOptions?: Record<string, unknown>,
   ): Promise<string | number> {
     const invID = providerOptions?.invID;
     if (invID != null) return invID as string | number;
