@@ -27,7 +27,7 @@ export type {
   InvoiceListPage,
   OnlineAllowanceResult,
   TriggerIssueResult,
-} from "./provider.js";
+} from "./types.js";
 export { ecpayIssuePayloadSchema, assertValidIssuePayload } from "./validation.js";
 export type { EcpayIssuePayload } from "./validation.js";
 export {
