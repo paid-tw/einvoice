@@ -8,7 +8,7 @@
 **English** ｜ [繁體中文](./README.md)
 
 Unified **e-invoice (電子發票) SDK for Taiwan**. One provider-agnostic interface,
-many provider adapters — switch between Amego, ECPay, ezPay, or the MOF platform
+many provider adapters — switch between Amego, ECPay, ezPay, ezReceipt, and more
 without touching your business logic.
 
 All Taiwan value-added centers wrap the same MOF (財政部) MIG 4.0 spec, so the core

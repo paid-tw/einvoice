@@ -2,7 +2,7 @@
   "name": "einvoice-tw",
   "version": "0.0.0",
   "private": true,
-  "description": "Unified e-invoice SDK for Taiwan — one interface, multiple providers (Amego, ECPay, ezPay, MOF).",
+  "description": "Unified e-invoice SDK for Taiwan — one interface, multiple providers (Amego, ECPay, ezPay, ezReceipt).",
   "license": "MIT",
   "type": "module",
   "packageManager": "pnpm@9.12.0",
