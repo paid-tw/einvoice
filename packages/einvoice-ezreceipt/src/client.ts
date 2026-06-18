@@ -44,6 +44,7 @@ export function mapEzreceiptError(code: number): InvoiceErrorCode {
     case 12:
     case 20:
     case 30:
+    case 32:
     case 122:
     case 224:
     case 1336:
@@ -89,6 +90,8 @@ export function mapEzreceiptError(code: number): InvoiceErrorCode {
     case 1310:
     case 1311:
     case 1312:
+    case 1320:
+    case 1321:
       return InvoiceErrorCode.CONFLICT;
   }
   if (code === -15 || code < 0) return InvoiceErrorCode.PROVIDER;

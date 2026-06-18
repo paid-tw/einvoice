@@ -471,6 +471,32 @@ describe("getInvoicePrintInfo (extension)", () => {
   });
 });
 
+describe("logo settings (extension)", () => {
+  it("lists logo sgoIDs", async () => {
+    server.use(loginHandler(), http.post(url(EP.settingsListLogo), () => ok({ list: [{ sgoID: 42 }, { sgoID: 43 }] })));
+    await expect(testProvider().listLogos()).resolves.toEqual([42, 43]);
+  });
+
+  it("reads a logo image (binary) with resize params", async () => {
+    let body: Record<string, unknown> | undefined;
+    server.use(
+      loginHandler(),
+      http.post(url(EP.settingsViewLogo(42)), async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>;
+        return file([0x89, 0x50, 0x4e, 0x47], "image/png");
+      }),
+    );
+    const res = await testProvider().viewLogo(42, { maxw: 200, maxh: 100 });
+    expect(body).toEqual({ maxw: 200, maxh: 100 });
+    expect(res.contentType).toContain("image/png");
+  });
+
+  it("maps an invalid logo id (32) to NOT_FOUND", async () => {
+    server.use(loginHandler(), http.post(url(EP.settingsViewLogo(9)), () => fail(32, "商標識別碼無效")));
+    await expect(testProvider().viewLogo(9)).rejects.toMatchObject({ code: "NOT_FOUND", rawCode: "32" });
+  });
+});
+
 describe("printInvoice (extension)", () => {
   it("resolves invoice numbers to invIDs and returns the PDF bytes", async () => {
     let body: Record<string, unknown> | undefined;
@@ -632,6 +658,24 @@ describe("字軌 management (extension)", () => {
   it("maps an invalid track id (20) to NOT_FOUND", async () => {
     server.use(loginHandler(), http.post(url(EP.invNumberAdjustNo(1)), () => fail(20, "字軌分段識別碼無效")));
     await expect(testProvider().adjustInvoiceTrack(1, { endNo: 60722399 })).rejects.toMatchObject({ code: "NOT_FOUND", rawCode: "20" });
+  });
+
+  it("sets a track as the default for 有統編 / 無統編", async () => {
+    let body: Record<string, unknown> | undefined;
+    server.use(
+      loginHandler(),
+      http.post(url(EP.settingsDefaultGUINo(21307)), async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>;
+        return ok({ inID: 21307 });
+      }),
+    );
+    await testProvider().setDefaultTrack(21307, { forGUINo: true });
+    expect(body).toEqual({ isForGUINo: true });
+  });
+
+  it("maps a conflicting default-track use (1320) to CONFLICT", async () => {
+    server.use(loginHandler(), http.post(url(EP.settingsDefaultGUINo(1)), () => fail(1320, "字軌已被指定為 無統編 使用")));
+    await expect(testProvider().setDefaultTrack(1, { forGUINo: true })).rejects.toMatchObject({ code: "CONFLICT", rawCode: "1320" });
   });
 
   it("opens/closes a track (action 0/1)", async () => {

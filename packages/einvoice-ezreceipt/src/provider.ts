@@ -555,6 +555,39 @@ export class EzreceiptProvider implements InvoiceProvider {
   }
 
   /**
+   * 設為預設字軌 — make a track the default for 有統編 (`forGUINo: true`) or 無統編
+   * (`false`) invoices. Fails if the track is already pinned to the opposite use
+   * (1320/1321).
+   */
+  async setDefaultTrack(inID: string | number, opts: { forGUINo?: boolean } = {}): Promise<{ inID: number }> {
+    return this.client.request<{ inID: number }>(ENDPOINTS.settingsDefaultGUINo(inID), {
+      ...(opts.forGUINo != null ? { isForGUINo: opts.forGUINo } : {}),
+    });
+  }
+
+  /** 商標識別碼清單 — list this store's uploaded logo ids (sgoID). */
+  async listLogos(): Promise<number[]> {
+    const r = await this.client.request<{ list?: Array<{ sgoID: number }> }>(ENDPOINTS.settingsListLogo, {});
+    return (r.list ?? []).map((x) => x.sgoID);
+  }
+
+  /**
+   * 讀取商標圖檔 — the logo image bytes (binary). Optional `w`/`h` resize, or
+   * `maxw`/`maxh` to bound the size while keeping the aspect ratio.
+   */
+  async viewLogo(
+    sgoID: string | number,
+    opts: { w?: number; h?: number; maxw?: number; maxh?: number } = {},
+  ): Promise<{ contentType: string; data: Uint8Array }> {
+    return this.client.requestFile(ENDPOINTS.settingsViewLogo(sgoID), {
+      ...(opts.w != null ? { w: opts.w } : {}),
+      ...(opts.h != null ? { h: opts.h } : {}),
+      ...(opts.maxw != null ? { maxw: opts.maxw } : {}),
+      ...(opts.maxh != null ? { maxh: opts.maxh } : {}),
+    });
+  }
+
+  /**
    * 開啟/關閉字軌分段 — a closed track's numbers can't be issued; an exhausted or
    * expired track can't be re-opened.
    */

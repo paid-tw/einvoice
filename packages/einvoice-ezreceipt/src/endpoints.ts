@@ -63,4 +63,10 @@ export const ENDPOINTS = {
   invNumberSplit: (inID: string | number) => `/eInvoice/invNumber/split/${inID}`,
   /** 異動分段字軌資訊 (by inID). Body: `{ bizType?, platform?, memo? }` (in-use → memo only; platform once-only). */
   invNumberUpdate: (inID: string | number) => `/eInvoice/invNumber/update/${inID}`,
+  /** 設為預設字軌 (by inID). Body: `{ isForGUINo? }` (true 有統編 / false 無統編). */
+  settingsDefaultGUINo: (inID: string | number) => `/eInvoice/settings/defaultGUINo/${inID}`,
+  /** 商標識別碼清單 → `{ list: [{ sgoID }] }`. */
+  settingsListLogo: "/eInvoice/settings/listLogo",
+  /** 讀取商標圖檔 (by sgoID) — BINARY image. Body: `{ w?, h?, maxw?, maxh? }`. */
+  settingsViewLogo: (sgoID: string | number) => `/eInvoice/settings/viewLogo/${sgoID}`,
 } as const;

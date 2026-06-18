@@ -163,6 +163,11 @@ describe.skipIf(!live)("ezReceipt live (test env) — variants", LIVE_OPTS, () =
     expect(Array.from(pdf.data.slice(0, 4))).toEqual([0x25, 0x50, 0x44, 0x46]); // %PDF
   }, 30_000);
 
+  it("lists the store's logo ids (extension)", async () => {
+    const logos = await p.listLogos();
+    expect(Array.isArray(logos)).toBe(true);
+  });
+
   it("lists the merchant's 字軌 tracks (extension)", async () => {
     const tracks = await p.listInvoiceTracks();
     expect(Array.isArray(tracks)).toBe(true);
