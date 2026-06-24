@@ -45,7 +45,7 @@ export const ubnSchema = z
 export const buyerSchema = z.object({
   name: z.string().min(1).optional(),
   ubn: ubnSchema.optional(),
-  email: z.string().email().optional(),
+  email: z.email().optional(),
   address: z.string().optional(),
   phone: z.string().optional(),
 });
@@ -118,7 +118,7 @@ export const issueInvoiceInputSchema = z
       .optional(),
     exchangeRate: z.number().positive().optional(),
     date: z.date().optional(),
-    providerOptions: z.record(z.unknown()).optional(),
+    providerOptions: z.record(z.string(), z.unknown()).optional(),
   })
   .superRefine((input, ctx) => {
     if (input.currency && input.currency !== "TWD" && input.exchangeRate == null) {
@@ -150,7 +150,7 @@ export const voidInvoiceInputSchema = z.object({
   invoiceNumber: z.string().min(1),
   reason: z.string().min(1),
   date: z.date().optional(),
-  providerOptions: z.record(z.unknown()).optional(),
+  providerOptions: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const allowanceInputSchema = z.object({
@@ -159,21 +159,21 @@ export const allowanceInputSchema = z.object({
   items: z.array(invoiceItemSchema).min(1),
   amount: amountSummarySchema,
   date: z.date().optional(),
-  providerOptions: z.record(z.unknown()).optional(),
+  providerOptions: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const voidAllowanceInputSchema = z.object({
   invoiceNumber: z.string().min(1),
   allowanceNumber: z.string().min(1),
   reason: z.string().optional(),
-  providerOptions: z.record(z.unknown()).optional(),
+  providerOptions: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const queryInvoiceInputSchema = z
   .object({
     invoiceNumber: z.string().min(1).optional(),
     orderId: z.string().min(1).optional(),
-    providerOptions: z.record(z.unknown()).optional(),
+    providerOptions: z.record(z.string(), z.unknown()).optional(),
   })
   .refine((q) => q.invoiceNumber || q.orderId, {
     message: "Provide invoiceNumber or orderId",

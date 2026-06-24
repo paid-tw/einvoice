@@ -1,5 +1,20 @@
 # @paid-tw/einvoice-ezreceipt
 
+## 0.2.1
+
+### Patch Changes
+
+- Upgrade Zod from v3 to v4 (`^4.4.3`).
+
+  Migrated all schemas to the v4 API: `z.record(key, value)` now takes explicit
+  key/value schemas, `z.string().email()` → `z.email()`, `.passthrough()` →
+  `z.looseObject(...)`, the `required_error` enum param → `error`, and the removed
+  `SafeParseReturnType` type → `ZodSafeParseResult`. No behavioural or public-API
+  changes — the unified model, validation messages, and error codes are unchanged.
+
+- Updated dependencies
+  - @paid-tw/einvoice@0.4.1
+
 ## 0.2.0
 
 ### Minor Changes

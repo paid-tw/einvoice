@@ -20,7 +20,7 @@ const itemSchema = z.object({
 });
 
 export const ecpayIssuePayloadSchema = z
-  .object({
+  .looseObject({
     RelateNumber: z
       .string()
       .min(1, "RelateNumber is required")
@@ -51,7 +51,6 @@ export const ecpayIssuePayloadSchema = z
     SpecialTaxType: z.union([z.string(), z.number()]).optional(),
     Items: z.array(itemSchema).min(1, "at least one item is required"),
   })
-  .passthrough()
   // All rules below are confirmed against the live stage API (the source of
   // truth) — the ECPay docs over-state some requirements the API doesn't enforce
   // (ZeroTaxRateReason, TAX_FREE SpecialTaxType, vat=0 amount match) and forbid

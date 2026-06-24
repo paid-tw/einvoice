@@ -11,7 +11,7 @@ const intLike = z.coerce.number().int();
 const nonNegInt = z.coerce.number().int().nonnegative();
 
 export const ezpayIssuePayloadSchema = z
-  .object({
+  .looseObject({
     MerchantOrderNo: z
       .string()
       .min(1, "MerchantOrderNo is required")
@@ -25,7 +25,6 @@ export const ezpayIssuePayloadSchema = z
       .optional(),
     BuyerAddress: z.string().max(100, "BuyerAddress must be ≤100 chars").optional(),
     BuyerEmail: z
-      .string()
       .email("BuyerEmail must be a valid email")
       .max(50, "BuyerEmail must be ≤50 chars")
       .optional()
@@ -61,7 +60,6 @@ export const ezpayIssuePayloadSchema = z
     AmtZero: nonNegInt.optional(),
     AmtFree: nonNegInt.optional(),
   })
-  .passthrough()
   .superRefine((p, ctx) => {
     // 發票金額 = 銷售額 + 稅額.
     if (Number(p.Amt) + Number(p.TaxAmt) !== Number(p.TotalAmt)) {
@@ -182,25 +180,24 @@ function refineEqualItemSegments(keys: string[]) {
 }
 
 // --- invoice_invalid (作廢發票) -------------------------------------------------
-export const ezpayVoidPayloadSchema = z
-  .object({ InvoiceNumber: invoiceNumberField, InvalidReason: invalidReasonSchema })
-  .passthrough();
+export const ezpayVoidPayloadSchema = z.looseObject({
+  InvoiceNumber: invoiceNumberField,
+  InvalidReason: invalidReasonSchema,
+});
 
 // --- invoice_touch_issue (觸發開立發票) ----------------------------------------
-export const ezpayTouchIssuePayloadSchema = z
-  .object({
-    InvoiceTransNo: z
-      .string()
-      .min(1, "InvoiceTransNo is required")
-      .max(20, "InvoiceTransNo must be ≤20 chars"),
-    MerchantOrderNo: merchantOrderNoField,
-    TotalAmt: nonNegInt,
-  })
-  .passthrough();
+export const ezpayTouchIssuePayloadSchema = z.looseObject({
+  InvoiceTransNo: z
+    .string()
+    .min(1, "InvoiceTransNo is required")
+    .max(20, "InvoiceTransNo must be ≤20 chars"),
+  MerchantOrderNo: merchantOrderNoField,
+  TotalAmt: nonNegInt,
+});
 
 // --- allowance_issue (開立折讓) ------------------------------------------------
 export const ezpayAllowancePayloadSchema = z
-  .object({
+  .looseObject({
     InvoiceNo: invoiceNumberField,
     MerchantOrderNo: merchantOrderNoField,
     ItemName: z.string().min(1, "ItemName is required"),
@@ -211,15 +208,9 @@ export const ezpayAllowancePayloadSchema = z
     ItemTaxAmt: z.string().min(1, "ItemTaxAmt is required"),
     TotalAmt: nonNegInt,
     Status: z.enum(["0", "1"]),
-    BuyerEmail: z
-      .string()
-      .email("BuyerEmail must be a valid email")
-      .max(50)
-      .optional()
-      .or(z.literal("")),
+    BuyerEmail: z.email("BuyerEmail must be a valid email").max(50).optional().or(z.literal("")),
     TaxTypeForMixed: z.string().optional(), // pipe-joined 1/2/3, only when TaxType=9
   })
-  .passthrough()
   .superRefine((p, ctx) => {
     refineEqualItemSegments([
       "ItemName",
@@ -243,32 +234,28 @@ export const ezpayAllowancePayloadSchema = z
   });
 
 // --- allowance_touch_issue (觸發確認/取消折讓) --------------------------------
-export const ezpayAllowanceTouchPayloadSchema = z
-  .object({
-    AllowanceStatus: z.enum(["C", "D"]),
-    AllowanceNo: z
-      .string()
-      .min(1, "AllowanceNo is required")
-      .max(25, "AllowanceNo must be ≤25 chars"),
-    MerchantOrderNo: merchantOrderNoField,
-    TotalAmt: nonNegInt,
-  })
-  .passthrough();
+export const ezpayAllowanceTouchPayloadSchema = z.looseObject({
+  AllowanceStatus: z.enum(["C", "D"]),
+  AllowanceNo: z
+    .string()
+    .min(1, "AllowanceNo is required")
+    .max(25, "AllowanceNo must be ≤25 chars"),
+  MerchantOrderNo: merchantOrderNoField,
+  TotalAmt: nonNegInt,
+});
 
 // --- allowanceInvalid (作廢折讓) ----------------------------------------------
-export const ezpayVoidAllowancePayloadSchema = z
-  .object({
-    AllowanceNo: z
-      .string()
-      .min(1, "AllowanceNo is required")
-      .max(25, "AllowanceNo must be ≤25 chars"),
-    InvalidReason: invalidReasonSchema,
-  })
-  .passthrough();
+export const ezpayVoidAllowancePayloadSchema = z.looseObject({
+  AllowanceNo: z
+    .string()
+    .min(1, "AllowanceNo is required")
+    .max(25, "AllowanceNo must be ≤25 chars"),
+  InvalidReason: invalidReasonSchema,
+});
 
 // --- invoice_search (查詢發票) ------------------------------------------------
 export const ezpaySearchPayloadSchema = z
-  .object({
+  .looseObject({
     SearchType: z.enum(["0", "1"]).optional(),
     InvoiceNumber: z.string().max(10).optional().or(z.literal("")),
     RandomNum: z
@@ -279,7 +266,6 @@ export const ezpaySearchPayloadSchema = z
     TotalAmt: z.coerce.number().int().nonnegative().optional(),
     DisplayFlag: z.enum(["", "1"]).optional(),
   })
-  .passthrough()
   .superRefine((p, ctx) => {
     const type = p.SearchType ?? "0";
     if (type === "1") {
