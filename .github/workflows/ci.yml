@@ -33,9 +33,11 @@ jobs:
       # matrix below runs the same suite for runtime compat (no coverage).
       - run: pnpm test:coverage
 
-  # Run the offline (MSW) suite across the supported runtime range (engines floor
-  # >=18 through the current release). Tests resolve workspace packages to source
-  # via the vitest alias, so no build is needed and a version-specific runtime bug
+  # Run the offline (MSW) suite across the supported runtime range. The matrix
+  # floor is Node 20 because vitest 4's engines require ^20 || ^22 || >=24 — the
+  # library's own runtime floor stays >=18 (consumers run the prebuilt dist; the
+  # test toolchain is dev-only). Tests resolve workspace packages to source via
+  # the vitest alias, so no build is needed and a version-specific runtime bug
   # surfaces here. Live suites are gated behind *_LIVE env vars and stay skipped.
   test:
     runs-on: ubuntu-latest
@@ -43,7 +45,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node-version: ['18', '20', '22', '24']
+        node-version: ['20', '22', '24']
     steps:
       - uses: actions/checkout@v7
 
