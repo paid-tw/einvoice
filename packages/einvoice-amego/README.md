@@ -76,6 +76,30 @@ await invoices.validateBan("28080623");           // → boolean (company exists
 `validateMobileBarcode` 與 ezPay 轉接器一致（`CARRIER_VALIDATION` 能力），因此兩個
 provider 可互換使用；`barcodeQuery()` / `banQuery()` 則保留以取得完整的原始回應。
 
+### 錯誤提示（選用）
+
+光貿的帳號／串接層錯誤（IP 限制、尚未申請 API 串接、字軌用罄…）從原始訊息看不出
+「接下來該做什麼」，而這些恰好都需要商家自己到光貿後台處理。`amegoErrorHint()`
+把這類錯誤碼翻成可直接顯示給商家的 zh-TW 行動指引；不屬於此類的錯誤回傳
+`undefined`，請退回顯示 `error.message`（光貿原文）：
+
+```ts
+import { amegoErrorHint } from "@paid-tw/einvoice-amego";
+import { isInvoiceError } from "@paid-tw/einvoice";
+
+try {
+  await invoices.issue(input);
+} catch (e) {
+  const hint = amegoErrorHint(e); // 也接受 rawCode："14" / 14
+  showError(hint ?? (isInvoiceError(e) ? e.message : "開立失敗"));
+}
+```
+
+涵蓋：`12`／`13`／`14`／`16`／`19`／`22`（帳號與串接設定）、`10`／`15`／`18`／`21`
+（光貿端暫時性錯誤）、`3040111`／`3040191`（字軌用罄）。其中 `14`「IP 錯誤」在
+後台設有 IP 限制、而請求來自雲端（IP 不固定）時必然發生——提示會引導商家移除
+IP 限制。
+
 ## 設定
 
 | 選項 | 必填 | 說明 |

@@ -78,6 +78,33 @@ await invoices.validateBan("28080623");           // → boolean (company exists
 capability) so the two providers are interchangeable; `barcodeQuery()` /
 `banQuery()` remain for the full raw responses.
 
+### Error hints (opt-in)
+
+Amego's account/setup-level errors (IP allowlist, API access not enabled,
+invoice-number tracks exhausted…) don't tell the merchant *what to do next*
+— and they are exactly the ones only the merchant can fix in the Amego
+backend. `amegoErrorHint()` translates those raw codes into actionable
+zh-TW guidance suitable for direct display; anything else returns
+`undefined` so you can fall back to `error.message` (Amego's original text):
+
+```ts
+import { amegoErrorHint } from "@paid-tw/einvoice-amego";
+import { isInvoiceError } from "@paid-tw/einvoice";
+
+try {
+  await invoices.issue(input);
+} catch (e) {
+  const hint = amegoErrorHint(e); // also accepts a raw code: "14" / 14
+  showError(hint ?? (isInvoiceError(e) ? e.message : "issue failed"));
+}
+```
+
+Covered: `12`/`13`/`14`/`16`/`19`/`22` (account & API-access setup),
+`10`/`15`/`18`/`21` (transient Amego-side), `3040111`/`3040191` (number
+tracks exhausted). Notably `14` ("IP 錯誤") is guaranteed to fire when the
+Amego backend has an IP allowlist and requests come from cloud egress IPs —
+the hint tells the merchant to remove the restriction.
+
 ## Config
 
 | Option | Required | Description |
