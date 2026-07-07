@@ -1,6 +1,6 @@
 {
   "name": "@paid-tw/einvoice-amego",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "description": "Amego (amego.tw) adapter for @paid-tw/einvoice — implements InvoiceProvider over the Amego e-invoice API.",
   "license": "MIT",
   "repository": {
