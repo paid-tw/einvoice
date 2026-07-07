@@ -12,6 +12,7 @@ export {
 export type { TrackStatus, UploadStatus } from "./endpoints.js";
 export { sign, mapAmegoErrorCode, clearTimeSyncCache, fetchServerTime } from "./client.js";
 export type { AmegoResponse, AmegoTimeResponse } from "./client.js";
+export { amegoErrorHint } from "./hints.js";
 export {
   amegoIssuePayloadSchema,
   amegoCustomIssuePayloadSchema,
