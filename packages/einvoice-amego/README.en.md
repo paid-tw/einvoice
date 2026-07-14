@@ -105,6 +105,11 @@ tracks exhausted). Notably `14` ("IP 錯誤") is guaranteed to fire when the
 Amego backend has an IP allowlist and requests come from cloud egress IPs —
 the hint tells the merchant to remove the restriction.
 
+For programmatic branching (instead of display), use the normalized `reason`
+field on `InvoiceError` (e.g. `duplicate_order` / `void_blocked_by_allowance`),
+or look it up directly with `amegoErrorReason(rawCode)` — no need to maintain
+your own raw-code table at the call site.
+
 ## Config
 
 | Option | Required | Description |

@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { InvoiceError, InvoiceErrorCode, tracedFetch } from "@paid-tw/einvoice";
+import { InvoiceError, InvoiceErrorCode, InvoiceErrorReason, tracedFetch } from "@paid-tw/einvoice";
 import { type AmegoConfig, resolveBaseUrl, resolveRetry } from "./config.js";
 
 /**
@@ -143,6 +143,7 @@ async function doRequest(
     throw new InvoiceError(json.msg || "Amego returned an error", {
       provider: "amego",
       code: mapAmegoErrorCode(json.code),
+      reason: amegoErrorReason(json.code),
       rawCode: String(json.code),
       rawMessage: json.msg,
       raw: json,
@@ -248,4 +249,60 @@ export function mapAmegoErrorCode(rawCode: number | string): InvoiceErrorCode {
   if (code >= 9000000) return InvoiceErrorCode.VALIDATION; // barcode/carrier field errors
 
   return InvoiceErrorCode.PROVIDER;
+}
+
+/**
+ * Map an Amego error code onto a normalized {@link InvoiceErrorReason} —
+ * the action-oriented axis next to {@link mapAmegoErrorCode}'s coarse code.
+ * `undefined` when no distinct action applies.
+ *
+ * Live-verified against the Amego sandbox (2026-07): 3040171 duplicate
+ * OrderId; 3050141 void refused because allowance history exists (even after
+ * the allowance itself was voided) — the signal to fall back to an allowance;
+ * 3050131 等待作廢 returned on a repeat void (idempotent-done); 3040132
+ * unregistered 手機條碼 at issue time.
+ */
+export function amegoErrorReason(rawCode: number | string): InvoiceErrorReason | undefined {
+  const code = Number(rawCode);
+  if (!Number.isFinite(code)) return undefined;
+  switch (code) {
+    // credential / account setup
+    case 12:
+    case 16:
+      return InvoiceErrorReason.CREDENTIALS_INVALID;
+    case 13:
+    case 22:
+      return InvoiceErrorReason.NOT_ENROLLED;
+    case 14:
+      return InvoiceErrorReason.IP_BLOCKED;
+    case 15:
+      return InvoiceErrorReason.STALE_TIMESTAMP;
+    case 19:
+      return InvoiceErrorReason.ACCOUNT_SUSPENDED;
+    case 21:
+      return InvoiceErrorReason.RATE_LIMITED;
+    // deadlines
+    case 51: // 超過查詢期限
+    case 3050126: // f0501 超過修改期限
+    case 4050135: // g0501 超過修改期限
+      return InvoiceErrorReason.PAST_DEADLINE;
+    // carriers
+    case 3040132: // f0401 載具號碼不存在 (issue-time registry check)
+    case 9000113: // barcode 手機條碼不存在 (lookup endpoint)
+      return InvoiceErrorReason.CARRIER_NOT_REGISTERED;
+    // idempotency / state
+    case 3040171: // f0401 OrderId 重複
+      return InvoiceErrorReason.DUPLICATE_ORDER;
+    case 3050141: // f0501 已存在折讓單 — void permanently blocked
+      return InvoiceErrorReason.VOID_BLOCKED_BY_ALLOWANCE;
+    case 3050122: // f0501 發票已作廢
+    case 3050131: // f0501 等待作廢 (repeat void while scheduled)
+    case 4040153: // g0401 原發票已作廢
+    case 4050132: // g0501 折讓單已作廢
+      return InvoiceErrorReason.ALREADY_VOIDED;
+    case 4040161: // g0401 折讓單開立中
+    case 4040163: // g0401 折讓單已存在
+      return InvoiceErrorReason.DUPLICATE_ALLOWANCE;
+  }
+  return undefined;
 }

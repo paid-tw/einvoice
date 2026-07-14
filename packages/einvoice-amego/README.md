@@ -100,6 +100,10 @@ try {
 後台設有 IP 限制、而請求來自雲端（IP 不固定）時必然發生——提示會引導商家移除
 IP 限制。
 
+若要以程式分流（而非顯示），請改用 `InvoiceError` 上正規化的 `reason` 欄位
+（如 `duplicate_order`／`void_blocked_by_allowance`），或以 `amegoErrorReason(rawCode)`
+直接查表——不需要在呼叫端自行維護原始錯誤碼對照。
+
 ## 設定
 
 | 選項 | 必填 | 說明 |
