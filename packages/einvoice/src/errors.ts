@@ -24,9 +24,49 @@ export const InvoiceErrorCode = {
 } as const;
 export type InvoiceErrorCode = (typeof InvoiceErrorCode)[keyof typeof InvoiceErrorCode];
 
+/**
+ * Normalized ACTION-oriented semantics, one level finer than
+ * {@link InvoiceErrorCode}. The codes are deliberately coarse (`CONFLICT`
+ * alone covers duplicate-order, void-blocked-by-allowance, already-voided and
+ * past-deadline — four situations a caller handles completely differently),
+ * which forces consumers to hand-roll per-provider raw-code tables. `reason`
+ * is that table, maintained once per adapter, `undefined` when unknown.
+ *
+ * Each value implies a concrete consumer action:
+ * - `duplicate_order` — the invoice already exists: query-and-adopt it.
+ * - `void_blocked_by_allowance` — fall back to issuing an allowance.
+ * - `already_voided` — treat as idempotent success.
+ * - `duplicate_allowance` — the allowance already exists: adopt / skip.
+ * - `past_deadline` — cannot be automated; hand to a human.
+ * - `carrier_not_registered` — retry the issue without the carrier.
+ * - `rate_limited` — back off and retry later.
+ * - credential sub-kinds (`credentials_invalid` / `not_enrolled` /
+ *   `contract_expired` / `ip_blocked` / `account_suspended` /
+ *   `stale_timestamp`) — each needs a different merchant-side fix; pair with
+ *   the adapters' `*ErrorHint` helpers for display copy.
+ */
+export const InvoiceErrorReason = {
+  DUPLICATE_ORDER: "duplicate_order",
+  VOID_BLOCKED_BY_ALLOWANCE: "void_blocked_by_allowance",
+  ALREADY_VOIDED: "already_voided",
+  DUPLICATE_ALLOWANCE: "duplicate_allowance",
+  PAST_DEADLINE: "past_deadline",
+  CARRIER_NOT_REGISTERED: "carrier_not_registered",
+  RATE_LIMITED: "rate_limited",
+  CREDENTIALS_INVALID: "credentials_invalid",
+  NOT_ENROLLED: "not_enrolled",
+  CONTRACT_EXPIRED: "contract_expired",
+  IP_BLOCKED: "ip_blocked",
+  ACCOUNT_SUSPENDED: "account_suspended",
+  STALE_TIMESTAMP: "stale_timestamp",
+} as const;
+export type InvoiceErrorReason = (typeof InvoiceErrorReason)[keyof typeof InvoiceErrorReason];
+
 export interface InvoiceErrorOptions {
   provider: string;
   code: InvoiceErrorCode;
+  /** Normalized semantic, when the adapter can determine one. */
+  reason?: InvoiceErrorReason;
   /** The provider's raw status/error code, preserved verbatim. */
   rawCode?: string;
   rawMessage?: string;
@@ -48,6 +88,7 @@ const INVOICE_ERROR_BRAND = Symbol.for("@paid-tw/einvoice.InvoiceError");
 export class InvoiceError extends Error {
   readonly provider: string;
   readonly code: InvoiceErrorCode;
+  readonly reason?: InvoiceErrorReason;
   readonly rawCode?: string;
   readonly rawMessage?: string;
   readonly raw?: unknown;
@@ -57,6 +98,7 @@ export class InvoiceError extends Error {
     this.name = "InvoiceError";
     this.provider = options.provider;
     this.code = options.code;
+    this.reason = options.reason;
     this.rawCode = options.rawCode;
     this.rawMessage = options.rawMessage;
     this.raw = options.raw;
@@ -75,6 +117,9 @@ export class InvoiceError extends Error {
       name: this.name,
       provider: this.provider,
       code: this.code,
+      // Included only when set so log shapes (and exact-equality tests on
+      // errors without a reason) are unchanged.
+      ...(this.reason !== undefined ? { reason: this.reason } : {}),
       message: this.message,
       rawCode: this.rawCode,
       rawMessage: this.rawMessage,

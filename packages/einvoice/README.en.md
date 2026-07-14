@@ -24,10 +24,17 @@ pnpm add @paid-tw/einvoice
   `TaxType`, `PriceMode`, `InvoiceCategory`, `AmountSummary`, … and their results.
 - **`InvoiceProvider`** — the contract: `issue`, `void`, `allowance`,
   `voidAllowance`, `query`.
-- **`InvoiceError` / `InvoiceErrorCode`** — normalized error model. `isInvoiceError(value)`
-  is its type guard — it checks a globally-registered `Symbol.for` brand (not
-  `instanceof`), so it still works when two copies of the package are loaded (dual
-  ESM/CJS, version skew).
+- **`InvoiceError` / `InvoiceErrorCode` / `InvoiceErrorReason`** — normalized error
+  model. `isInvoiceError(value)` is its type guard — it checks a globally-registered
+  `Symbol.for` brand (not `instanceof`), so it still works when two copies of the
+  package are loaded (dual ESM/CJS, version skew). `code` is deliberately coarse
+  (`CONFLICT` alone covers duplicate-order, void-blocked-by-allowance,
+  already-voided and past-deadline — four situations a caller handles completely
+  differently); `reason` is the finer, action-oriented axis (`duplicate_order` /
+  `void_blocked_by_allowance` / `already_voided` / `past_deadline` / `rate_limited`
+  / `credentials_invalid`…), resolved per adapter (`amegoErrorReason` /
+  `ezpayErrorReason` / `ecpayErrorReason`) and `undefined` when unknown — so
+  consumers no longer hand-roll per-provider raw-code tables.
 - **Schemas** — Zod schemas (`issueInvoiceInputSchema`, …) for runtime validation.
   Pair with `parseInput(schema, input, provider)`: it validates a unified input
   against a shared schema and throws a normalized `InvoiceError` (code `VALIDATION`)
