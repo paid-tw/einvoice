@@ -1,4 +1,4 @@
-import { InvoiceError, InvoiceErrorCode, tracedFetch } from "@paid-tw/einvoice";
+import { InvoiceError, InvoiceErrorCode, InvoiceErrorReason, tracedFetch } from "@paid-tw/einvoice";
 import { type EzpayConfig, resolveBaseUrl } from "./config.js";
 import { decryptPostData, encryptPostData, makeCheckValue } from "./crypto.js";
 
@@ -77,6 +77,7 @@ export async function ezpayRequest(
     throw new InvoiceError(json.Message || "ezPay returned an error", {
       provider: "ezpay",
       code: mapEzpayError(json.Status),
+      reason: ezpayErrorReason(json.Status),
       rawCode: json.Status,
       rawMessage: json.Message,
       raw: json,
@@ -161,6 +162,7 @@ export async function ezpayCarrierCheck(
     throw new InvoiceError(json.Message || "ezPay returned an error", {
       provider: "ezpay",
       code: mapEzpayError(json.Status),
+      reason: ezpayErrorReason(json.Status),
       rawCode: json.Status,
       rawMessage: json.Message,
       raw: json,
@@ -193,6 +195,10 @@ export function mapEzpayError(code: string): InvoiceErrorCode {
     case "NOR10001":
     case "KEY10014":
       return InvoiceErrorCode.NETWORK;
+    // 24h 重複作廢頻率限制 — transient, retry after the window (was previously
+    // swept into the VALIDATION fallthrough; verified live on cinv 2026-07)
+    case "LIB10014":
+      return InvoiceErrorCode.PROVIDER;
     // 解密錯誤(金鑰不符) / 未申請 / 未簽合約或到期 / 頁面停留超過30分(時間戳)
     case "KEY10002":
     case "KEY10006":
@@ -228,4 +234,45 @@ export function mapEzpayError(code: string): InvoiceErrorCode {
   // allowance and void; API/CBC cover the 手機條碼/愛心碼驗證 API.
   if (/^(KEY|INV|IAI|LIB|API|CBC)\d+$/.test(code)) return InvoiceErrorCode.VALIDATION;
   return InvoiceErrorCode.PROVIDER;
+}
+
+/**
+ * Map an ezPay error code onto a normalized {@link InvoiceErrorReason} —
+ * the action-oriented axis next to {@link mapEzpayError}'s coarse code.
+ * `undefined` when no distinct action applies.
+ *
+ * Live-verified against cinv (2026-07): LIB10003 duplicate MerchantOrderNo;
+ * LIB10007 void refused while allowance history exists; LIB10005 repeat void;
+ * LIB10014 24h re-void rate limit; KEY10002 wrong HashKey/IV.
+ */
+export function ezpayErrorReason(code: string): InvoiceErrorReason | undefined {
+  switch (code) {
+    case "KEY10002":
+      return InvoiceErrorReason.CREDENTIALS_INVALID;
+    case "KEY10006":
+      return InvoiceErrorReason.NOT_ENROLLED;
+    case "INV90005":
+      return InvoiceErrorReason.CONTRACT_EXPIRED;
+    case "KEY10007":
+      return InvoiceErrorReason.STALE_TIMESTAMP;
+    case "INV10020":
+    case "INV10021":
+      return InvoiceErrorReason.ACCOUNT_SUSPENDED;
+    case "LIB10003":
+      return InvoiceErrorReason.DUPLICATE_ORDER;
+    case "LIB10005":
+      return InvoiceErrorReason.ALREADY_VOIDED;
+    case "LIB10007":
+      return InvoiceErrorReason.VOID_BLOCKED_BY_ALLOWANCE;
+    case "LIB10008":
+      return InvoiceErrorReason.PAST_DEADLINE;
+    case "LIB10014":
+      return InvoiceErrorReason.RATE_LIMITED;
+    // Shared by the 手機條碼/愛心碼 check endpoints: the supplied code is not
+    // in the MOF registry. (ezPay does not re-validate carriers at issue time,
+    // verified live 2026-07, so this only surfaces from the explicit checks.)
+    case "API10002":
+      return InvoiceErrorReason.CARRIER_NOT_REGISTERED;
+  }
+  return undefined;
 }

@@ -98,6 +98,36 @@ await invoices.validateLoveCode("8585"); // → boolean
 格式會先在本地端檢查（手機條碼 `/` + 7 個 `[0-9A-Z.+-]`；愛心碼 3–7 位數字）。
 宣告為 `CARRIER_VALIDATION` 能力。
 
+### 錯誤提示（選用）
+
+ezPay 的帳號／串接層錯誤（金鑰不符、尚未申請 API 串接、合約到期、可開立張數
+用罄…）從原始訊息看不出「接下來該做什麼」，而這些恰好都需要商家自己到 ezPay
+後台處理。`ezpayErrorHint()` 把這類錯誤碼翻成可直接顯示給商家的 zh-TW 行動
+指引；不屬於此類的錯誤回傳 `undefined`，請退回顯示 `error.message`（ezPay 原文）：
+
+```ts
+import { ezpayErrorHint } from "@paid-tw/einvoice-ezpay";
+import { isInvoiceError } from "@paid-tw/einvoice";
+
+try {
+  await invoices.issue(input);
+} catch (e) {
+  const hint = ezpayErrorHint(e); // 也接受 rawCode："KEY10002"
+  showError(hint ?? (isInvoiceError(e) ? e.message : "開立失敗"));
+}
+```
+
+涵蓋：`KEY10002`／`KEY10006`／`INV90005`／`KEY10007`（金鑰與串接設定）、
+`INV10020`／`INV10021`（帳號狀態）、`INV90006`（可開立張數用罄——ezPay 以張數
+計，非字軌配號）、`NOR10001`／`KEY10014`／`CBC10003`／`CBC10004`（暫時性錯誤）、
+`LIB10014`（24 小時內重複作廢的頻率限制）。其中 `KEY10002`「解密失敗」最常見的
+實際原因是把測試商店（cinv）的憑證打到正式主機（inv）——ezPay 測試與正式為
+不同主機、不同商店註冊，提示會一併指出。
+
+若要以程式分流（而非顯示），請改用 `InvoiceError` 上正規化的 `reason` 欄位
+（如 `duplicate_order`／`void_blocked_by_allowance`），或以 `ezpayErrorReason(rawCode)`
+直接查表——不需要在呼叫端自行維護原始錯誤碼對照。
+
 ## 瀏覽器表單 POST（僅建立而不送出）
 
 對於瀏覽器直接 POST 至 ezPay 的流程——例如結果頁面由 ezPay 渲染的查詢（`DisplayFlag=1`）——

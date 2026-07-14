@@ -101,6 +101,41 @@ await invoices.validateLoveCode("8585"); // → boolean
 Format is checked locally first (barcode `/` + 7 of `[0-9A-Z.+-]`; love code 3–7
 digits). Declared as the `CARRIER_VALIDATION` capability.
 
+### Error hints (optional)
+
+ezPay's account/integration-level errors (wrong HashKey/IV, e-invoice API not
+enabled, expired contract, invoice quota exhausted…) don't tell the merchant
+*what to do next* — and they are exactly the ones only the merchant can fix in
+the ezPay backend. `ezpayErrorHint()` translates those raw codes into
+actionable zh-TW guidance suitable for direct display; anything else returns
+`undefined` so you can fall back to `error.message` (ezPay's original text):
+
+```ts
+import { ezpayErrorHint } from "@paid-tw/einvoice-ezpay";
+import { isInvoiceError } from "@paid-tw/einvoice";
+
+try {
+  await invoices.issue(input);
+} catch (e) {
+  const hint = ezpayErrorHint(e); // also accepts a raw code: "KEY10002"
+  showError(hint ?? (isInvoiceError(e) ? e.message : "issue failed"));
+}
+```
+
+Covers `KEY10002` / `KEY10006` / `INV90005` / `KEY10007` (keys & integration
+setup), `INV10020` / `INV10021` (account state), `INV90006` (invoice quota —
+ezPay meters by count, not by number tracks), `NOR10001` / `KEY10014` /
+`CBC10003` / `CBC10004` (transient), and `LIB10014` (the 24-hour re-void rate
+limit). The most common real-world cause of `KEY10002` "decryption failed" is
+test-store (cinv) credentials hitting the production host (inv) — ezPay's test
+and production environments are separate hosts with separate registrations,
+and the hint says so.
+
+For programmatic branching (instead of display), use the normalized `reason`
+field on `InvoiceError` (e.g. `duplicate_order` / `void_blocked_by_allowance`),
+or look it up directly with `ezpayErrorReason(rawCode)` — no need to maintain
+your own raw-code table at the call site.
+
 ## Browser Form POST (build without sending)
 
 For flows where the browser POSTs straight to ezPay — e.g. a query whose result

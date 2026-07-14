@@ -1,7 +1,7 @@
 import { http, HttpResponse } from "msw";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { InvoiceError, isInvoiceError } from "@paid-tw/einvoice";
-import { mapAmegoErrorCode } from "../client.js";
+import { amegoErrorReason, mapAmegoErrorCode } from "../client.js";
 import { BASE, server, testProvider } from "./server.js";
 import { ERR_CUSTOM_INVOICEDATE } from "./fixtures.js";
 
@@ -176,6 +176,7 @@ describe("error propagation", () => {
     expect(err).toBeInstanceOf(InvoiceError);
     expect(err.code).toBe("CONFLICT");
     expect(err.rawCode).toBe("3050122");
+    expect(err.reason).toBe("already_voided");
     expect(err.rawMessage).toBe("發票已作廢");
     expect(err.provider).toBe("amego");
   });
@@ -213,5 +214,49 @@ describe("error propagation", () => {
       .catch((e) => e);
     expect(err.code).toBe("VALIDATION");
     expect(err.rawCode).toBe("99");
+  });
+});
+
+describe("amegoErrorReason (action-oriented axis)", () => {
+  it.each([
+    // credential / account setup
+    [12, "credentials_invalid"], // 統編錯誤
+    [16, "credentials_invalid"], // 簽名驗證錯誤
+    [13, "not_enrolled"], // status 未啟用
+    [22, "not_enrolled"], // 尚未申請 API 串接
+    [14, "ip_blocked"], // IP 錯誤
+    [15, "stale_timestamp"], // Time 錯誤
+    [19, "account_suspended"], // 公司停權
+    [21, "rate_limited"], // 人數過多
+    // deadlines
+    [51, "past_deadline"], // 超過查詢期限
+    [3050126, "past_deadline"], // f0501 超過修改期限
+    [4050135, "past_deadline"], // g0501 超過修改期限
+    // carriers
+    [3040132, "carrier_not_registered"], // 載具號碼不存在 (issue-time, verified live)
+    [9000113, "carrier_not_registered"], // 手機條碼不存在 (barcode endpoint)
+    // idempotency / state (all verified live 2026-07)
+    [3040171, "duplicate_order"], // OrderId 重複 → query-and-adopt
+    [3050141, "void_blocked_by_allowance"], // 已存在折讓單 → fall back to allowance
+    [3050122, "already_voided"], // 發票已作廢
+    [3050131, "already_voided"], // 等待作廢 (repeat void while scheduled)
+    [4040153, "already_voided"], // g0401 原發票已作廢
+    [4050132, "already_voided"], // g0501 折讓單已作廢
+    [4040161, "duplicate_allowance"], // 折讓單開立中
+    [4040163, "duplicate_allowance"], // 折讓單已存在
+  ])("maps %s → %s", (code, expected) => {
+    expect(amegoErrorReason(code)).toBe(expected);
+  });
+
+  it("coerces the string codes returned by f0501/g0401/g0501", () => {
+    expect(amegoErrorReason("3050141")).toBe("void_blocked_by_allowance");
+    expect(amegoErrorReason("4040163")).toBe("duplicate_allowance");
+  });
+
+  it("returns undefined for plain validation/system codes and non-numeric input", () => {
+    expect(amegoErrorReason(3040174)).toBeUndefined(); // SalesAmount 計算錯誤
+    expect(amegoErrorReason(10)).toBeUndefined(); // 系統停機維護
+    expect(amegoErrorReason(3040111)).toBeUndefined(); // 字軌不足 — code NUMBER_EXHAUSTED covers it
+    expect(amegoErrorReason("not-a-code")).toBeUndefined();
   });
 });

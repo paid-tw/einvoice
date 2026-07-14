@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { InvoiceError, isInvoiceError } from "./errors.js";
+import { InvoiceError, InvoiceErrorCode, InvoiceErrorReason, isInvoiceError } from "./errors.js";
 
 describe("InvoiceError", () => {
   it("preserves the cause chain", () => {
@@ -58,5 +58,42 @@ describe("InvoiceError", () => {
       message: "m",
       rawCode: "9",
     });
+  });
+});
+
+describe("InvoiceError.reason", () => {
+  it("stores the normalized reason and includes it in toJSON when set", () => {
+    const e = new InvoiceError("OrderId 重複", {
+      provider: "amego",
+      code: InvoiceErrorCode.CONFLICT,
+      reason: InvoiceErrorReason.DUPLICATE_ORDER,
+      rawCode: "3040171",
+    });
+    expect(e.reason).toBe("duplicate_order");
+    expect(JSON.parse(JSON.stringify(e)).reason).toBe("duplicate_order");
+  });
+
+  it("omits reason from toJSON when the adapter could not determine one", () => {
+    const e = new InvoiceError("boom", { provider: "p", code: InvoiceErrorCode.PROVIDER });
+    expect(e.reason).toBeUndefined();
+    expect("reason" in e.toJSON()).toBe(false);
+  });
+
+  it("keeps the reason values stable (consumers persist/branch on them)", () => {
+    expect(Object.values(InvoiceErrorReason).sort()).toEqual([
+      "account_suspended",
+      "already_voided",
+      "carrier_not_registered",
+      "contract_expired",
+      "credentials_invalid",
+      "duplicate_allowance",
+      "duplicate_order",
+      "ip_blocked",
+      "not_enrolled",
+      "past_deadline",
+      "rate_limited",
+      "stale_timestamp",
+      "void_blocked_by_allowance",
+    ]);
   });
 });

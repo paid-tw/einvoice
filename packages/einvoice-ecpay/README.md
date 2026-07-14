@@ -175,6 +175,11 @@ res.invoiceNumber === orig.invoiceNumber; // true — reuses the original number
 
 ## 補充說明
 
+- **錯誤分流**：`InvoiceError` 上的正規化 `reason` 欄位（`duplicate_order`／
+  `already_voided`／`void_blocked_by_allowance`…）由 `ecpayErrorReason(rtnMsg)`
+  以 `RtnMsg` 關鍵字對應（綠界的 `RtnCode` 區段不一致，訊息才是可靠訊號），
+  無法判定時為 `undefined`。
+
 - 零稅率發票（`taxType: "ZERO_RATED"` 或混合）需要通關方式註記：
   傳入 `providerOptions: { clearanceMark: "1" | "2" }`（1=非經海關，2=經海關）。
   這些驗證規則是依據實機 API 行為驗證，而非僅參照文件（例如
