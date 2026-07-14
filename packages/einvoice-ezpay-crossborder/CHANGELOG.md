@@ -1,5 +1,13 @@
 # @paid-tw/einvoice-ezpay-crossborder
 
+## 0.2.2
+
+### Patch Changes
+
+- Updated dependencies [d3cecf9]
+  - @paid-tw/einvoice@0.5.0
+  - @paid-tw/einvoice-ezpay@0.5.0
+
 ## 0.2.1
 
 ### Patch Changes
