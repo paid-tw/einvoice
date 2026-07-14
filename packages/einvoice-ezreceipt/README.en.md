@@ -111,13 +111,13 @@ The unified interface only covers the 5 operations; the typed provider returned 
 
 - `getAllowanceQuota` — each line's remaining creditable quota.
 - `notifyAllowance` — queue allowance-event email notifications.
-- `notifyInvoice` — queue invoice-event email notifications.
+- `notifyInvoice` — queue invoice-event email notifications (recipient is not selectable, see below).
 
 **Proof / print**
 
 - `getInvoicePrintInfo` — data needed to render an invoice proof (JSON).
-- `printInvoice` — invoice proof print file (PDF bytes).
-- `printAllowance` — allowance print file (PDF bytes).
+- `printInvoice` — invoice proof print file (PDF bytes). `format` is **required**; allowed values `1`/`2`/`11`/`12`/`21`/`22`/`25` (verified live; omitting it returns `304`).
+- `printAllowance` — allowance print file (PDF bytes). `format`: `1` thermal / `2` A4.
 
 **MOF (財政部) lookups**
 
@@ -137,6 +137,23 @@ The unified interface only covers the 5 operations; the typed provider returned 
 - `uploadLogo` — upload a logo image.
 - `viewLogo` — read a logo image (bytes).
 - `setInvoiceTrackLogo` — set the logo a track prints on invoices.
+
+## Invoice-notification recipient (verified live)
+
+`notifyInvoice` **cannot pick a recipient**. Behaviour verified live on `tryapi`:
+
+- The endpoint ignores any per-send recipient override (`email` / `notifyEmail` /
+  `to` / `receiverEmail` … none had any effect); `forceToBuyer` only flips the
+  user's "notify buyer" toggle, it does not change the address.
+- The invoice's `notifyEmail` (the intended target) is set **only at issue time**,
+  via `issue`'s `providerOptions.sendTo.email` (after issuing, `view` shows it as
+  `notifyEmail`). A top-level `notifyEmail` body field or a MEMBER carrier's
+  `buyer.email` do **not** set it, and no endpoint changes it afterwards.
+- ⚠️ The `tryapi` sandbox redirects **all** notification mail to the API account's
+  own registered email (ignoring `notifyEmail`/buyer), so whether `notifyEmail` is
+  the real delivery address cannot be confirmed there.
+- To mail an **already-issued** invoice to an arbitrary address: render the proof
+  with `printInvoice` and send it from your own mailer.
 
 ## Config
 

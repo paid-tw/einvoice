@@ -392,6 +392,16 @@ export class EzreceiptProvider implements InvoiceProvider {
    * invoice event: ISSUE(1) / CONFIRM(2, 交換) / VOID(4) / VOID_CONFIRM(5, 交換) /
    * WON(20 中獎) / REQUEST(30 索取). `format` (print style) and `action` (1 single /
    * 2 packed) apply only when a proof is attached (ISSUE/CONFIRM).
+   *
+   * Recipient is NOT selectable here — the endpoint ignores any per-send override
+   * (email / notifyEmail / to / receiverEmail … all had no effect on tryapi), and
+   * `forceToBuyer` only flips the user's per-event "notify buyer" toggle, not the
+   * address. The invoice's own `notifyEmail` (set at issue via sendTo.email) is the
+   * intended target, but NOTE: the tryapi sandbox redirects ALL notification mail
+   * to the API account's own registered email regardless of notifyEmail/buyer, so
+   * the real buyer-facing recipient can't be confirmed there. To mail an
+   * already-issued invoice to an arbitrary address, render the proof
+   * (proofInvPrint) and send it yourself.
    */
   async notifyInvoice(
     invIDs: Array<string | number>,
@@ -645,6 +655,14 @@ export class EzreceiptProvider implements InvoiceProvider {
       msgType: opts.msgType ?? 1,
       ...(input.currency && input.currency !== "TWD" ? { currency: input.currency } : {}),
       ...(input.remark ? { remarks: input.remark } : {}),
+      // sendTo.email populates the invoice's `notifyEmail` (the intended notify
+      // target). Verified on tryapi: issuing with sendTo.email → view() returns it
+      // as notifyEmail, whereas a top-level `notifyEmail` body field AND a MEMBER
+      // carrier's buyer.email both leave notifyEmail null. It is set ONLY here, at
+      // issue time; there is no endpoint to change it afterwards. CAVEAT: the tryapi
+      // sandbox redirects all notification mail to the API account's own email, so
+      // that notifyEmail is the real delivery address is unconfirmed (see
+      // notifyInvoice).
       ...(opts.sendTo ? { sendTo: opts.sendTo } : {}),
       ...(opts.credit4 ? { credit4: opts.credit4 } : {}),
       // Self-assigned number / 註銷重開 (invNo + autoInvNo); else the platform picks.

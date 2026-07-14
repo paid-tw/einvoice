@@ -106,13 +106,13 @@ await invoices.voidAllowance({
 
 - `getAllowanceQuota` —— 查詢各品項尚餘可折讓額度。
 - `notifyAllowance` —— 排程折讓事件 email 通知。
-- `notifyInvoice` —— 排程發票事件 email 通知。
+- `notifyInvoice` —— 排程發票事件 email 通知（收件人不可指定，見下）。
 
 **證明聯 / 列印**
 
 - `getInvoicePrintInfo` —— 取得列印發票所需資料（JSON）。
-- `printInvoice` —— 取得發票列印檔（PDF bytes）。
-- `printAllowance` —— 取得折讓單列印檔（PDF bytes）。
+- `printInvoice` —— 取得發票列印檔（PDF bytes）。`format` 為**必填**，允許值 `1`/`2`/`11`/`12`/`21`/`22`/`25`（實機驗證；漏帶回 `304`）。
+- `printAllowance` —— 取得折讓單列印檔（PDF bytes）。`format`：`1` 熱感紙 / `2` A4。
 
 **財政部查詢**
 
@@ -132,6 +132,21 @@ await invoices.voidAllowance({
 - `uploadLogo` —— 上傳商標圖檔。
 - `viewLogo` —— 讀取商標圖檔（bytes）。
 - `setInvoiceTrackLogo` —— 設定字軌印製發票的商標。
+
+## 發票通知的收件人（實機驗證）
+
+`notifyInvoice` **無法指定收件人**。實機在 `tryapi` 驗證的行為：
+
+- 通知端點忽略任何 per-send 收件人覆寫參數（`email` / `notifyEmail` / `to` /
+  `receiverEmail` … 皆無效）；`forceToBuyer` 只切換使用者的「通知買方」開關，不改地址。
+- 發票的 `notifyEmail`（預期的通知對象）**只在開立當下設定**，透過
+  `issue` 的 `providerOptions.sendTo.email`（開立後 `view` 可看到它成為 `notifyEmail`）。
+  改用 body 頂層 `notifyEmail`、或 MEMBER 載具的 `buyer.email`，都**不會**設定它。
+  開立後沒有任何端點可以更改。
+- ⚠️ **`tryapi` 沙盒會把所有通知信改寄到 API 帳號本身的註冊 email**（無視
+  `notifyEmail` / 買方），因此「`notifyEmail` 是否為真實投遞地址」無法在沙盒中確認。
+- 要把**已開立**的發票補寄到任意地址：用 `printInvoice` 取得證明聯 PDF，再由你自己的
+  mailer 寄出。
 
 ## 設定
 
