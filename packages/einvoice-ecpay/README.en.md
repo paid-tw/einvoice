@@ -176,6 +176,12 @@ an unknown number returns "no invoice data" (查無發票資料) → `NOT_FOUND`
 
 ## Notes
 
+- **Error branching**: the normalized `reason` field on `InvoiceError`
+  (`duplicate_order` / `already_voided` / `void_blocked_by_allowance` …) is
+  resolved by `ecpayErrorReason(rtnMsg)` from `RtnMsg` keywords (ECPay's
+  `RtnCode` ranges are inconsistent — the message is the reliable signal);
+  `undefined` when unknown.
+
 - Zero-rated invoices (`taxType: "ZERO_RATED"` or mixed) require a customs mark:
   pass `providerOptions: { clearanceMark: "1" | "2" }` (1=not via customs 非經海關,
   2=via customs 經海關). The

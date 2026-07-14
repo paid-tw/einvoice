@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mapEcpayError } from "../client.js";
+import { ecpayErrorReason, mapEcpayError } from "../client.js";
 
 describe("mapEcpayError (keyword-based, ECPay RtnMsg)", () => {
   it.each([
@@ -25,5 +25,28 @@ describe("mapEcpayError (keyword-based, ECPay RtnMsg)", () => {
 
   it("defaults to VALIDATION for an unrecognised business error", () => {
     expect(mapEcpayError(123456, "某個未知的欄位錯誤")).toBe("VALIDATION");
+  });
+});
+
+describe("ecpayErrorReason (action-oriented axis, RtnMsg keywords)", () => {
+  it.each([
+    ["資料解密錯誤，請確認金鑰", "credentials_invalid"],
+    ["簽章驗證失敗", "credentials_invalid"],
+    ["特店編號不存在", "not_enrolled"],
+    ["平台商編號不存在", "not_enrolled"],
+    ["發票已作廢過", "already_voided"],
+    ["該發票已被折讓過，無法直接作廢發票", "void_blocked_by_allowance"],
+    ["自訂編號不可重複", "duplicate_order"],
+    ["系統忙碌中，請稍後再試", "rate_limited"],
+  ])("maps %s → %s", (msg, expected) => {
+    expect(ecpayErrorReason(msg)).toBe(expected);
+  });
+
+  it("returns undefined for messages with no distinct consumer action", () => {
+    expect(ecpayErrorReason("驗證發票金額發現錯誤，與商品合計金額不符")).toBeUndefined();
+    expect(ecpayErrorReason("查無發票資料，請重新確認")).toBeUndefined();
+    expect(ecpayErrorReason("發票字軌已用完")).toBeUndefined(); // code NUMBER_EXHAUSTED covers it
+    expect(ecpayErrorReason("")).toBeUndefined();
+    expect(ecpayErrorReason()).toBeUndefined();
   });
 });

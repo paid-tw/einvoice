@@ -1,4 +1,4 @@
-import { InvoiceError, InvoiceErrorCode, tracedFetch } from "@paid-tw/einvoice";
+import { InvoiceError, InvoiceErrorCode, InvoiceErrorReason, tracedFetch } from "@paid-tw/einvoice";
 import { type EcpayConfig, resolveBaseUrl } from "./config.js";
 import { decryptData, encryptData } from "./crypto.js";
 
@@ -108,6 +108,7 @@ export async function ecpayRequest(
     throw new InvoiceError(result.RtnMsg || "ECPay returned an error", {
       provider: "ecpay",
       code: mapEcpayError(Number(result.RtnCode), result.RtnMsg),
+      reason: ecpayErrorReason(result.RtnMsg),
       rawCode: String(result.RtnCode),
       rawMessage: result.RtnMsg,
       raw: result,
@@ -138,4 +139,21 @@ export function mapEcpayError(rtnCode: number, rtnMsg = ""): InvoiceErrorCode {
   if (/查無|查不到|無.*資料|不存在/.test(rtnMsg)) return InvoiceErrorCode.NOT_FOUND;
   if (/系統(錯誤|異常|忙碌)|請稍後/.test(rtnMsg)) return InvoiceErrorCode.PROVIDER;
   return InvoiceErrorCode.VALIDATION;
+}
+
+/**
+ * Map an ECPay error onto a normalized {@link InvoiceErrorReason}. Like
+ * {@link mapEcpayError} this keys off the Chinese `RtnMsg` (ECPay's RtnCodes
+ * span inconsistent ranges). Best-effort: `已折讓/折讓過` is only emitted by
+ * the void API, so it resolves to `void_blocked_by_allowance`; `undefined`
+ * when no distinct action applies.
+ */
+export function ecpayErrorReason(rtnMsg = ""): InvoiceErrorReason | undefined {
+  if (/金鑰|簽章|未授權/.test(rtnMsg)) return InvoiceErrorReason.CREDENTIALS_INVALID;
+  if (/特店.*不存在|平台商.*不存在/.test(rtnMsg)) return InvoiceErrorReason.NOT_ENROLLED;
+  if (/已作廢/.test(rtnMsg)) return InvoiceErrorReason.ALREADY_VOIDED;
+  if (/已折讓|折讓過/.test(rtnMsg)) return InvoiceErrorReason.VOID_BLOCKED_BY_ALLOWANCE;
+  if (/重複|不可重複/.test(rtnMsg)) return InvoiceErrorReason.DUPLICATE_ORDER;
+  if (/系統忙碌|請稍後/.test(rtnMsg)) return InvoiceErrorReason.RATE_LIMITED;
+  return undefined;
 }
