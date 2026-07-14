@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mapEzpayError } from "../client.js";
+import { ezpayErrorReason, mapEzpayError } from "../client.js";
 
 describe("mapEzpayError (ezPay §九 錯誤代碼)", () => {
   it.each([
@@ -94,5 +94,44 @@ describe("mapEzpayError (ezPay §九 錯誤代碼)", () => {
       expect(mapEzpayError(code)).toBe(cat);
     }
     expect(Object.keys(expected)).toHaveLength(39);
+  });
+});
+
+describe("mapEzpayError — LIB10014 (24h re-void rate limit)", () => {
+  // Previously swept into the VALIDATION fallthrough. It is a transient
+  // frequency limit (verified live on cinv 2026-07) — the request is valid
+  // and succeeds after the window, so it must not be classified as a
+  // caller-input error.
+  it("classifies LIB10014 as PROVIDER (transient), not VALIDATION", () => {
+    expect(mapEzpayError("LIB10014")).toBe("PROVIDER");
+  });
+});
+
+describe("ezpayErrorReason (action-oriented axis)", () => {
+  it.each([
+    // credential / account setup
+    ["KEY10002", "credentials_invalid"], // 解密失敗 (常見:測試憑證打到正式主機)
+    ["KEY10006", "not_enrolled"], // 未申請電子發票 API 串接
+    ["INV90005", "contract_expired"], // 合約未生效或已到期
+    ["KEY10007", "stale_timestamp"], // 時間驗證失敗
+    ["INV10020", "account_suspended"], // 暫停使用
+    ["INV10021", "account_suspended"], // 異常終止
+    // idempotency / state (LIB10003/05/07/14 verified live on cinv 2026-07)
+    ["LIB10003", "duplicate_order"], // MerchantOrderNo 重覆 → query-and-adopt
+    ["LIB10005", "already_voided"], // 發票已作廢過
+    ["LIB10007", "void_blocked_by_allowance"], // 已折讓無法作廢 → fall back to allowance
+    ["LIB10008", "past_deadline"], // 超過可作廢期限
+    ["LIB10014", "rate_limited"], // 24h 內重複作廢請求
+    // carrier / donation registry lookups
+    ["API10002", "carrier_not_registered"], // 查無條碼/愛心碼
+  ])("maps %s → %s", (code, expected) => {
+    expect(ezpayErrorReason(code)).toBe(expected);
+  });
+
+  it("returns undefined for plain validation/system codes", () => {
+    expect(ezpayErrorReason("KEY10004")).toBeUndefined(); // 資料不齊全
+    expect(ezpayErrorReason("INV90006")).toBeUndefined(); // 張數用罄 — code NUMBER_EXHAUSTED covers it
+    expect(ezpayErrorReason("NOR10001")).toBeUndefined(); // 網路異常 — code NETWORK covers it
+    expect(ezpayErrorReason("SOMETHING")).toBeUndefined();
   });
 });

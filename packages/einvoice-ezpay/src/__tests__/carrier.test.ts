@@ -84,6 +84,7 @@ describe("validateLoveCode (checkLoveCode)", () => {
       .catch((e) => e);
     expect(err.code).toBe("NOT_FOUND");
     expect(err.rawCode).toBe("API10002");
+    expect(err.reason).toBe("carrier_not_registered");
   });
 
   it("wraps a network failure as a NETWORK error", async () => {
