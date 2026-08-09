@@ -9,7 +9,7 @@
 // month via the runtime-agnostic client. Writes ./out/ezpay_<UBN>_<YYYY-MM>.csv,
 // skips empty months, prints a summary. Credentials come from 1Password (item
 // $EZPAY_OP_ITEM, via `op`) or the EZPAY_UBN / EZPAY_ACCOUNT / EZPAY_PASSWORD env.
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, renameSync, writeFileSync } from "node:fs";
 import { PROD_BASE, enumerateMonths, monthRange } from "./lib.ts";
 import { EzpayBackendClient } from "./client.ts";
 import { getCreds, PROD } from "./creds.ts";
@@ -47,6 +47,11 @@ mkdirSync(OUT, { recursive: true });
 console.log(`logged in UBN ${ubn}; ${list.length} month(s)${merId ? `, store ${merId}` : ""}\n`);
 
 const summary: Array<{ month: string; rows: number; bytes: number }> = [];
+function writePrivateAtomic(path: string, data: string): void {
+  const tmp = `${path}.tmp-${process.pid}`;
+  writeFileSync(tmp, data, { mode: 0o600 });
+  renameSync(tmp, path);
+}
 for (const ym of list) {
   const [start, end] = monthRange(ym);
   const { csv, empty } = await client.exportCsv({
@@ -62,7 +67,7 @@ for (const ym of list) {
   }
   const rows = csv.split(/\r?\n/).filter((l) => l.trim().length > 0).length - 1; // minus header
   const file = `${OUT}ezpay_${ubn}${merId ? `_${merId}` : ""}_${ym}.csv`;
-  writeFileSync(file, csv);
+  writePrivateAtomic(file, csv);
   console.log(`${ym}  ${rows} rows  ${(csv.length / 1024).toFixed(0)} KB  -> ${file}`);
   summary.push({ month: ym, rows, bytes: csv.length });
 }

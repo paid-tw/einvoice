@@ -24,6 +24,7 @@ export interface ReportJob {
   queryEndDate: string;
   sellbuyType: string; // "1" 進項 / "2" 銷項
   companyName: string;
+  ban: string; // the job's own 統編 (decoded from the token) — filter downloads to your company
 }
 
 const iso = (d: string, end = false) => `${d}T${end ? "23:59:59.999" : "00:00:00.000"}Z`;
@@ -32,6 +33,47 @@ const iso = (d: string, end = false) => `${d}T${end ? "23:59:59.999" : "00:00:00
 export interface NatInvoice {
   items: Array<Record<string, string>>;
   [col: string]: string | Array<Record<string, string>>;
+}
+
+/**
+ * Whether a month's output is final (skippable). A month is final only once it was
+ * fetched AFTER it closed:
+ *  - the current (still-open) month is never final — always re-fetch it;
+ *  - an archive taken while the month was open (`.open` marker still present) is not
+ *    final until one post-close refresh clears the marker;
+ *  - otherwise exactly one of the data file / empty marker must be present (XOR). Both
+ *    present — a crash between writing one and removing the other — is contradictory,
+ *    so it is not final and the next run re-fetches to reconcile.
+ */
+export function isMonthFinal(opts: { hasData: boolean; hasEmpty: boolean; hasOpen: boolean; isCurrent: boolean }): boolean {
+  if (opts.isCurrent) return false;
+  if (opts.hasOpen) return false;
+  return opts.hasData !== opts.hasEmpty;
+}
+
+/** Remove exact cross-month portal overlaps; reject a reused statutory key with conflicting content. */
+export function dedupeNatInvoices(invoices: NatInvoice[]): NatInvoice[] {
+  const unique = new Map<string, { invoice: NatInvoice; signature: string }>();
+  for (const invoice of invoices) {
+    const seller = (invoice["賣方統一編號"] as string) ?? "";
+    const number = (invoice["發票號碼"] as string) ?? "";
+    // 發票號碼 tracks (字軌) are reassigned per 期別, so the same number legitimately
+    // recurs in a later period — key on 發票日期 too, or a later invoice looks like a conflict.
+    const date = (invoice["發票日期"] as string) ?? "";
+    const missing = [!seller && "賣方統一編號", !number && "發票號碼", !date && "發票日期"].filter(Boolean);
+    if (missing.length) throw new Error(`NAT invoice is missing key component(s): ${missing.join(", ")}`);
+    const key = `${seller}|${number}|${date}`;
+    const signature = JSON.stringify(invoice);
+    const previous = unique.get(key);
+    if (previous) {
+      // Same statutory key, different content: a silent keep-first would make totals
+      // depend on input order and could retain pre-void/amendment data — fail loudly.
+      if (previous.signature !== signature) throw new Error(`NAT duplicate invoice key has conflicting content: ${key}`);
+      continue;
+    }
+    unique.set(key, { invoice, signature });
+  }
+  return [...unique.values()].map(({ invoice }) => invoice);
 }
 
 /** Inclusive list of "YYYY-MM" between two YYYY-MM-DD dates. */
@@ -51,28 +93,59 @@ function monthsBetween(from: string, to: string): string[] {
   return out;
 }
 
-/** Quote-aware CSV line split (handles ""-escaped quotes and commas in fields). */
-function parseCsvLine(line: string): string[] {
-  const out: string[] = [];
+/** Parse complete CSV records, including quoted commas, quotes, and newlines. */
+function parseCsv(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
   let cur = "";
   let q = false;
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i];
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
     if (q) {
       if (ch === '"') {
-        if (line[i + 1] === '"') {
+        if (text[i + 1] === '"') {
           cur += '"';
           i++;
         } else q = false;
       } else cur += ch;
     } else if (ch === '"') q = true;
     else if (ch === ",") {
-      out.push(cur);
+      row.push(cur);
+      cur = "";
+    } else if (ch === "\n" || ch === "\r") {
+      if (ch === "\r" && text[i + 1] === "\n") i++;
+      row.push(cur);
+      rows.push(row);
+      row = [];
       cur = "";
     } else cur += ch;
   }
-  out.push(cur);
-  return out;
+  // An open quote at EOF means the stream ended mid-field \u2014 a truncated download that
+  // still lined up its delimiters would otherwise archive silently with clipped content.
+  if (q) throw new Error("NAT CSV ended inside a quoted field \u2014 download may be truncated");
+  if (cur.length || row.length) {
+    row.push(cur);
+    rows.push(row);
+  }
+  if (rows[0]?.[0].startsWith("\uFEFF")) rows[0][0] = rows[0][0].slice(1);
+  return rows;
+}
+
+/** Repair a NAT row where an unquoted comma in 買方名稱 shifted every later field. */
+function normalizeMasterRow(row: string[], header: string[]): string[] {
+  if (row.length !== header.length + 1) return row;
+  const buyerName = header.indexOf("買方名稱");
+  const sellerUbn = header.indexOf("賣方統一編號");
+  const sentAt = header.indexOf("寄送日期");
+  if (
+    buyerName < 0 ||
+    sellerUbn !== buyerName + 1 ||
+    sentAt < 0 ||
+    /^\d{8}$/.test(row[sellerUbn] ?? "") ||
+    !/^\d{8}$/.test(row[sellerUbn + 1] ?? "") ||
+    !/^\d{4}-\d{2}-\d{2}/.test(row[sentAt + 1] ?? "")
+  ) return row;
+  return [...row.slice(0, buyerName), `${row[buyerName]},${row[buyerName + 1]}`, ...row.slice(buyerName + 2)];
 }
 
 export class NatClient {
@@ -80,12 +153,13 @@ export class NatClient {
     readonly browser: Browser,
     readonly ctx: BrowserContext,
     readonly page: Page,
+    readonly loginBan: string,
   ) {}
 
   /** Log in (automated captcha) and return a ready client. */
   static async login(): Promise<NatClient> {
     const s = await login();
-    return new NatClient(s.browser, s.ctx, s.page);
+    return new NatClient(s.browser, s.ctx, s.page, s.ban);
   }
 
   /** In-page fetch → JSON. Reads the Bearer token from sessionStorage each call. */
@@ -129,6 +203,14 @@ export class NatClient {
     return this.apiJson("GET", "https://service-m.einvoice.nat.gov.tw/btb/settings/api/btb002i/company/authorized");
   }
 
+  /** Resolve the credential's 統編 against the companies this login may access. */
+  async authorizedCompany(ban = this.loginBan): Promise<{ ban: string; companyName: string; closed: boolean }> {
+    const companies = await this.authorizedCompanies();
+    const company = companies.find((candidate) => candidate.ban === ban);
+    if (!company) throw new Error(`NAT credential UBN ${ban} is not among this login's ${companies.length} authorized company record(s)`);
+    return company;
+  }
+
   /**
    * Online invoice query (即時). Returns up to **200** rows; throws none for empty.
    * Use a ≤1-month range so 進項 stays under 200; otherwise use the offline job.
@@ -169,6 +251,8 @@ export class NatClient {
       queryApplyDateStart: iso(opts.applyFrom ?? today),
       queryApplyDateEnd: iso(opts.applyTo ?? today, true),
       showMessage: "true",
+      page: "0",
+      size: "500",
     });
     const r = await this.apiJson<{ content?: Array<{ token: string }> }>("GET", `${API}/api/btb411w/reportJob/xlsx?${qs}`);
     // spread decoded fields first, then the raw list token last (decoded has token:null)
@@ -208,7 +292,15 @@ export class NatClient {
         await new Promise((r) => setTimeout(r, 3000));
         const jobs = await this.listJobs();
         job = jobs
-          .filter((j) => j.fileType === "CSV" && j.status === "2" && j.queryStartDate?.startsWith(ym) && Date.parse(j.applyDate) >= stamp - 60_000)
+          .filter(
+            (j) =>
+              j.ban === opts.ban &&
+              j.sellbuyType === opts.invType &&
+              j.fileType === "CSV" &&
+              j.status === "2" &&
+              j.queryStartDate?.startsWith(ym) &&
+              Date.parse(j.applyDate) >= stamp - 60_000,
+          )
           .sort((a, b) => b.seqNo - a.seqNo)[0];
       }
       if (!job) throw new Error(`export: ${ym} job did not complete`);
@@ -218,15 +310,16 @@ export class NatClient {
       for (const inv of invoices) {
         inv.direction = inv["買方統一編號"] === opts.ban ? "進項" : inv["賣方統一編號"] === opts.ban ? "銷項" : "其他";
       }
-      opts.onProgress?.(ym, invoices.length);
-      all.push(...invoices);
+      const merged = dedupeNatInvoices([...all, ...invoices]);
+      opts.onProgress?.(ym, merged.length - all.length);
+      all.splice(0, all.length, ...merged);
     }
     return all;
   }
 
   /** Parse a 財政部 M/D-format CSV (UTF-8) into invoices (M) + their line items (D). */
   static parseNatCsv(bytes: Uint8Array): NatInvoice[] {
-    const rows = new TextDecoder("utf-8").decode(bytes).split(/\r?\n/).filter((l) => l.length).map(parseCsvLine);
+    const rows = parseCsv(new TextDecoder("utf-8").decode(bytes)).filter((row) => row.some((cell) => cell.length));
     const mHead = rows.find((r) => r[0] === "M");
     const dHead = rows.find((r) => r[0] === "D");
     if (!mHead) return [];
@@ -239,14 +332,26 @@ export class NatClient {
           seenMHead = true;
           continue;
         } // skip header
+        const normalized = normalizeMasterRow(r, mHead);
+        // A width we can't reconcile to the header means an unrecognized delimiter
+        // corruption; mapping it would silently shift values into the wrong columns
+        // (and misattribute the following D rows), so refuse rather than corrupt the archive.
+        if (normalized.length !== mHead.length) {
+          throw new Error(`NAT M row has ${normalized.length} columns, expected ${mHead.length} — unrecognized delimiter corruption`);
+        }
         const inv: NatInvoice = { items: [] };
-        for (let i = 1; i < mHead.length; i++) inv[mHead[i]] = r[i] ?? "";
+        for (let i = 1; i < mHead.length; i++) inv[mHead[i]] = normalized[i] ?? "";
         invoices.push(inv);
       } else if (r[0] === "D" && dHead) {
         if (!seenDHead) {
           seenDHead = true;
           continue;
         } // skip header
+        // Same strict-width policy as M rows: a D row that doesn't line up with its
+        // header would silently shift line-item values, so refuse rather than corrupt it.
+        if (r.length !== dHead.length) {
+          throw new Error(`NAT D row has ${r.length} columns, expected ${dHead.length} — unrecognized delimiter corruption`);
+        }
         const item: Record<string, string> = {};
         for (let i = 1; i < dHead.length; i++) item[dHead[i]] = r[i] ?? "";
         invoices[invoices.length - 1]?.items.push(item);
@@ -307,9 +412,9 @@ if (import.meta.main) {
   const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
   const c = await NatClient.login();
   try {
-    const companies = await c.authorizedCompanies();
-    const ban = companies[0].ban;
-    console.log("logged in; company:", companies[0].companyName, ban);
+    const company = await c.authorizedCompany();
+    const ban = company.ban;
+    console.log("logged in; company:", company.companyName, ban);
     const rows = await c.queryInvoices({ ban, from: `${ym}-01`, to: `${ym}-${String(last).padStart(2, "0")}`, invType: "1" });
     console.log(`進項 ${ym}: ${rows.length} row(s) (online, ≤200)`);
   } finally {

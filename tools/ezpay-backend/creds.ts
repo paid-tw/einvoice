@@ -1,6 +1,6 @@
 // Bun-only helper: fetch backend login credentials from 1Password via `op`.
 // Not imported by client.ts (which stays runtime-agnostic) — only by live scripts.
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 
 export interface Creds {
   ubn: string;
@@ -21,7 +21,12 @@ export const CINV: OpItem = { item: process.env.EZPAY_CINV_OP_ITEM || "ezpay-bac
 
 export function getCreds(target: OpItem = PROD): Creds {
   const cache = new URL(`./${target.cacheFile}`, import.meta.url).pathname;
-  if (existsSync(cache)) return JSON.parse(readFileSync(cache, "utf8")) as Creds;
+  if (existsSync(cache)) {
+    chmodSync(cache, 0o600);
+    const creds = JSON.parse(readFileSync(cache, "utf8")) as Creds;
+    if (!creds.ubn || !creds.account || !creds.password) throw new Error(`${cache} is missing a credential field`);
+    return creds;
+  }
   const p = Bun.spawnSync([
     "op",
     "item",
@@ -38,6 +43,6 @@ export function getCreds(target: OpItem = PROD): Creds {
   const get = (l: string) => fields.find((f) => f.label === l)?.value ?? "";
   const creds = { ubn: get(target.ubnLabel), account: get("username"), password: get("password") };
   if (!creds.ubn || !creds.account || !creds.password) throw new Error("missing a credential field");
-  writeFileSync(cache, JSON.stringify(creds)); // cache (gitignored) to avoid repeat biometric prompts
+  writeFileSync(cache, JSON.stringify(creds), { mode: 0o600 }); // cache (gitignored) to avoid repeat biometric prompts
   return creds;
 }

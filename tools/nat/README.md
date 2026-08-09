@@ -21,9 +21,12 @@ bash scripts/fetch_ocr_model.sh                          # fetch the OCR model (
 The model fetch is a one-time step that needs `python3` + `pip` (it pulls the model out
 of the ddddocr PyPI package). Nothing at *runtime* uses python — only this setup step.
 
-Credentials: set `NAT_OP_ITEM` to a 1Password item exposing the fields `統一編號`,
-`user_id`, `user_password`; they're read via the `op` CLI and cached to
-`secrets.nat-*.json` (gitignored). Nothing account-specific is baked into source.
+Run the offline tests with `bun run test`.
+
+Credentials: either set `NAT_UBN`, `NAT_USER_ID`, and `NAT_PASSWORD`, or set
+`NAT_OP_ITEM` to a 1Password item exposing the fields `統一編號`, `user_id`,
+`user_password`. 1Password credentials are cached to `secrets.nat-*.json`
+(gitignored, mode 0600). Nothing account-specific is baked into source.
 
 ## NatClient — the client
 
@@ -70,9 +73,12 @@ NAT_OP_ITEM='<your item>' bun run nat-export-history.ts    [fromYm] [toYm]   # �
 NAT_OP_ITEM='<your item>' bun run nat-export-allowances.ts [fromYm] [toYm]   # 折讓單 (btb412w)
 ```
 
-Defaults: `2020-02` → `2026-08`, output under `./out/nat-history` and
-`./out/nat-allowances` (override with `OUTDIR`). Empty allowance months are recorded with
-a marker file so they aren't retried. Downloaded CSVs contain PII — `out/` is gitignored;
+Defaults: `2020-02` → the current month (resolved in Asia/Taipei), output under
+`./out/nat-history` and `./out/nat-allowances` (override with `OUTDIR`). Empty months in
+**either** export are recorded with a `.empty` marker file so they aren't retried. Files
+are written atomically with mode 0600, so an interrupted partial file is not mistaken for
+a completed month. The current (still-open) month is always re-fetched on each run; only
+closed months are treated as final. Downloaded CSVs contain PII — `out/` is gitignored;
 handle per your own data-retention rules.
 
 ### Switching accounts

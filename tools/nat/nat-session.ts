@@ -2,7 +2,7 @@
 // Captcha solved headlessly (onnxruntime-web + jimp + ddddocr); retries on reject.
 import { chromium, type Browser, type BrowserContext, type Page } from "playwright";
 import { Jimp } from "jimp";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { classify } from "./ocr.ts";
 import { digitsOnly } from "./lib/captcha.ts";
 
@@ -13,16 +13,40 @@ const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (
 // Set NAT_OP_ITEM to your own item; override it to switch between accounts.
 const OP_ITEM = process.env.NAT_OP_ITEM || "nat-einvoice";
 
-export function natCreds(): { ban: string; customId: string; password: string } {
+export interface NatCredentials {
+  ban: string;
+  customId: string;
+  password: string;
+}
+
+function assertCreds(creds: NatCredentials, source: string): NatCredentials {
+  const missing = Object.entries(creds).filter(([, value]) => !value).map(([key]) => key);
+  if (missing.length) throw new Error(`${source} is missing credential field(s): ${missing.join(", ")}`);
+  return creds;
+}
+
+export function natCreds(): NatCredentials {
+  const env = {
+    ban: process.env.NAT_UBN ?? "",
+    customId: process.env.NAT_USER_ID ?? "",
+    password: process.env.NAT_PASSWORD ?? "",
+  };
+  const envCount = Object.values(env).filter(Boolean).length;
+  if (envCount === 3) return env;
+  if (envCount > 0) return assertCreds(env, "NAT environment");
+
   const slug = OP_ITEM.replace(/[^A-Za-z0-9]+/g, "-").slice(-24);
   const cache = new URL(`./secrets.nat-${slug}.json`, import.meta.url).pathname;
-  if (existsSync(cache)) return JSON.parse(readFileSync(cache, "utf8"));
+  if (existsSync(cache)) {
+    chmodSync(cache, 0o600);
+    return assertCreds(JSON.parse(readFileSync(cache, "utf8")) as NatCredentials, cache);
+  }
   const p = Bun.spawnSync(["op", "item", "get", OP_ITEM, "--fields", "label=統一編號,label=user_id,label=user_password", "--reveal", "--format", "json"]);
   if (p.exitCode !== 0) throw new Error("op failed: " + p.stderr.toString());
   const f = JSON.parse(p.stdout.toString()) as Array<{ label: string; value: string }>;
   const g = (l: string) => f.find((x) => x.label === l)?.value ?? "";
-  const c = { ban: g("統一編號"), customId: g("user_id"), password: g("user_password") };
-  writeFileSync(cache, JSON.stringify(c));
+  const c = assertCreds({ ban: g("統一編號"), customId: g("user_id"), password: g("user_password") }, `1Password item ${OP_ITEM}`);
+  writeFileSync(cache, JSON.stringify(c), { mode: 0o600 });
   return c;
 }
 
@@ -38,6 +62,7 @@ export interface NatSession {
   ctx: BrowserContext;
   page: Page;
   jwt: string;
+  ban: string;
 }
 
 export async function login(): Promise<NatSession> {
@@ -88,7 +113,17 @@ export async function login(): Promise<NatSession> {
     throw new Error("NAT login failed after retries");
   }
   await page.goto(DASH, { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
-  await page.waitForTimeout(3000);
-  const jwt = (await page.evaluate(() => sessionStorage.getItem("token"))) ?? "";
-  return { browser, ctx, page, jwt };
+  // The SPA writes the JWT to sessionStorage a moment after the dashboard loads, so poll
+  // for it (up to ~20s) rather than reading once after a fixed wait — a single-shot check
+  // was hard-failing slow-but-successful logins where the token just wasn't written yet.
+  let jwt = "";
+  for (let i = 0; i < 20 && !jwt; i++) {
+    jwt = ((await page.evaluate(() => sessionStorage.getItem("token")).catch(() => "")) as string) ?? "";
+    if (!jwt) await page.waitForTimeout(1000);
+  }
+  if (!jwt) {
+    await browser.close();
+    throw new Error("NAT login completed without an authentication token");
+  }
+  return { browser, ctx, page, jwt, ban: creds.ban };
 }
