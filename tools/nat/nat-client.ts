@@ -230,6 +230,9 @@ export class NatClient {
   /**
    * Online invoice query (即時). Returns up to **200** rows; throws none for empty.
    * Use a ≤1-month range so 進項 stays under 200; otherwise use the offline job.
+   * ⚠️ Observed 2026-08-09: only the CURRENT month returns rows — one-day probes on
+   * 2026-07-15 and every older month returned 0 even unfiltered. For anything but
+   * the running month, use the offline job (createReportJob / exportInvoices).
    */
   async queryInvoices(opts: { ban: string; from: string; to: string; invType: InvType }): Promise<Array<Record<string, unknown>>> {
     const qs = new URLSearchParams({
@@ -246,8 +249,22 @@ export class NatClient {
     return r.content ?? [];
   }
 
-  /** Create a 非即時 (async) report job. Range ≤ 2 months. Returns the raw response. */
-  createReportJob(opts: { ban: string; from: string; to: string; invType: InvType; fileType?: FileType }): Promise<unknown> {
+  /**
+   * Create a 非即時 (async) report job. Range ≤ 2 months. Returns the raw response.
+   * `invNoStart`/`invNoEnd` narrow to an invoice-number range — set both to one
+   * 發票號碼 for a single-invoice job (verified live: returns exactly that invoice's
+   * M/D rows). This is THE spot-verification path for months the online query no
+   * longer serves.
+   */
+  createReportJob(opts: {
+    ban: string;
+    from: string;
+    to: string;
+    invType: InvType;
+    fileType?: FileType;
+    invNoStart?: string;
+    invNoEnd?: string;
+  }): Promise<unknown> {
     return this.apiJson("POST", `${API}/api/btb411w/reportJob/apply/xlsx`, {
       invStartDate: iso(opts.from),
       invEndDate: iso(opts.to, true),
@@ -257,6 +274,8 @@ export class NatClient {
       invType: "00",
       fileType: opts.fileType ?? "EXCEL",
       queryType: "I",
+      ...(opts.invNoStart ? { invNoStart: opts.invNoStart } : {}),
+      ...(opts.invNoEnd ? { invNoEnd: opts.invNoEnd } : {}),
     });
   }
 
@@ -408,10 +427,15 @@ export class NatClient {
     return this.apiBinary("POST", `${API}/api/btb412w/download/${job.jobType}`, { token: job.token });
   }
 
-  /** Decode a job list token (JWT → base64 `data` → JSON). */
-  static decodeJobToken(token: string): Omit<ReportJob, "token"> {
+  /** Decode any btb list-row token (JWT → base64 `data` → JSON) — jobs and invoices alike. */
+  static decodeDataToken<T = Record<string, unknown>>(token: string): T {
     const payload = JSON.parse(Buffer.from(token.split(".")[1], "base64").toString("utf8"));
     return JSON.parse(Buffer.from(payload.data, "base64").toString("utf8"));
+  }
+
+  /** Decode a job list token (JWT → base64 `data` → JSON). */
+  static decodeJobToken(token: string): Omit<ReportJob, "token"> {
+    return NatClient.decodeDataToken<Omit<ReportJob, "token">>(token);
   }
 
   close(): Promise<void> {
