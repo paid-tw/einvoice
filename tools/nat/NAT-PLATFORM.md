@@ -89,14 +89,27 @@ Screen `BTB411W`, three tabs: **線上查詢** (online, ≤200) / **非即時查
 | `showMessage` | `true` |
 
 Response: `{ "content": [ { "token": "<JWT-ish blob encoding the invoice fields>", … } ] }`.
-Result columns seen in the UI: 發票號碼, 買受人註記欄, 發票日期, 銷售額合計, 應稅/零稅/免稅銷售額,
-營業稅, … The SPA also exposes optional filters: `invoiceNumberStart/End`, `buyerTaxId`,
+Each row's `token` decodes like a job token (JWT payload → base64 `data` → JSON;
+`NatClient.decodeDataToken`) into full invoice fields (verified 2026-08-09):
+`invoiceNumber, invoiceDate (YYYYMMDD), fmtInvDate (ISO), salesAmount, taxAmount,
+totalAmount, taxType, extStatus, processDate, carrierType/carrierId1/2, mainRemark,
+emfFormatCode, sourceType, invType, buyerId, buyerName, sellerId, sellerName,
+senderId, senderName (傳送方 = the value-added centre), migType, messageType,
+zeroTax/freeTaxSalesAmount, …Str display variants`.
+The SPA also exposes optional filters: `invoiceNumberStart/End`, `buyerTaxId`,
 `buyerName`, `sellerId`, `sellerName`, `carrierType`/`carrierId`, `invoicePeriod` (期別),
-最後異動日期 range, 手機條碼.
+最後異動日期 range, 手機條碼. ⚠️ `invoiceNumberStart/End` did **not** match live even for
+an in-window invoice (returned 0 rows; exact param encoding unconfirmed) — for
+single-invoice lookups use the offline job's `invNoStart/End` instead (§3.3, verified).
 
 **Hard limit: 200 rows.** A single **month** of 進項 is typically well under 200 for a
 small business, so query per-month by date range. A **期別 (bimonthly)** or busy month
 can exceed 200 → use the offline job (§3.3).
+
+⚠️ **History window: current month only** (observed 2026-08-09): unfiltered one-day
+probes on 2026-07-15, -06-15, -05-15, -02-16, 2025-12-15, 2025-06-16 all returned
+**0 rows** while 2026-08 (the running month) returned data. Anything older must go
+through the offline job (§3.3).
 
 ### 3.1.1 進項 vs 銷項 (queryInvType) & how to tell them apart
 
@@ -151,6 +164,13 @@ All three verified live (created a 進項 job → completed → downloaded the X
 ```
 `fileType` = `EXCEL` | `CSV`; `queryInvType` 1 進項 / 2 銷項; optional `invNoStart/End`,
 `sellerBan`/`buyerBan`, `lastProcessDateStart/End` (最後異動日期). **Range ≤ 2 months**.
+
+★ `invNoStart`/`invNoEnd` verified live (2026-08-09): a job with both set to one
+發票號碼 + a date window returns exactly that invoice's M/D rows (`dataCount:3` =
+1 M + 2 D for a two-item invoice) regardless of how old the month is — this is the
+**single-invoice verification path** (`nat-verify.ts` wraps it). Confirmed on a
+2024-06 作廢 invoice, its 2024-07 replacement, and a 2025-12 invoice transmitted
+by a different value-added centre.
 
 **List** `GET /api/btb411w/reportJob/xlsx?queryApplyDateStart=<ISO>&queryApplyDateEnd=<ISO>&showMessage=true&page=0&size=0`
 → `{ content: [ { token } ] }`. Each `token` is a JWT whose `data` (base64 JSON) decodes to

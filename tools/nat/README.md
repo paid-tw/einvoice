@@ -63,6 +63,26 @@ const invoices = await c.exportInvoices({ ban, from: "2024-01-01", to: "2025-12-
 // invoices[0] = { 發票號碼, 發票日期, 賣方統一編號, 總計, 課稅別, …27 cols, items: [{品名,數量,單價,金額,…}] }
 ```
 
+## Spot verification — nat-verify
+
+Verify individual invoices against the MoF platform (the statutory source of
+truth) — for reconciling a gateway export or local DB row whose status/amount is
+in doubt. Gateway exports can go stale (e.g. an invoice voided on the platform
+after the gateway snapshot still shows 是否作廢=否); the MoF row is authoritative.
+
+```bash
+NAT_OP_ITEM='<your item>' bun run nat-verify.ts 2024-06..2024-07 AB12345678 CD23456789
+# ✓ AB12345678: 發票狀態=作廢已確認  發票日期=…  總計=…  傳送方名稱=…  品項=2
+```
+
+`<range>` is the 發票日期 window (`YYYY-MM` or `YYYY-MM..YYYY-MM`, chunked into
+≤2-month jobs); `--in` marks the numbers as 進項 (default 銷項); `--json` dumps the
+full decoded M row + items. Exit 1 if any invoice is not found.
+
+Implementation note: the online (即時) query only serves the **current month**, so
+each invoice runs as a 非即時 CSV job with `invNoStart == invNoEnd == 發票號碼` —
+works for any archived month and returns exactly that invoice's M/D rows.
+
 ## Monthly history export (resumable)
 
 Two CLIs write the government's native CSV, one file per month, and skip months already
@@ -103,6 +123,7 @@ spare the primary account — the login/job methods are identical across account
 | `nat-client.ts` | **NatClient** — login / online query / offline job create·list·download / `exportInvoices` + 折讓 variants + demo CLI |
 | `nat-session.ts` | reusable `login()` → authenticated Playwright page + JWT (`natCreds()` reads 1Password) |
 | `ocr.ts`, `lib/captcha.ts`, `ocr-model/` | captcha OCR (onnxruntime-web + jimp + ddddocr); `charset.json` vendored, model fetched |
+| `nat-verify.ts` | spot-verify single invoices (offline job + `invNoStart/End`) against the MoF record |
 | `nat-export-history.ts` | resumable monthly 進+銷 invoice CSV export |
 | `nat-export-allowances.ts` | resumable monthly 折讓單 CSV export |
 | `scripts/fetch_ocr_model.sh` | download the ddddocr OCR model into `ocr-model/` (gitignored) |
