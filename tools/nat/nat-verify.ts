@@ -37,7 +37,15 @@ function monthsBetween(fromYm: string, toYm: string): string[] {
 export function chunkRange(arg: string): Array<{ from: string; to: string }> {
   const m = arg.match(/^(\d{4}-\d{2})(?:\.\.(\d{4}-\d{2}))?$/);
   if (!m) throw new Error(`bad range "${arg}" — expected YYYY-MM or YYYY-MM..YYYY-MM`);
-  const months = monthsBetween(m[1], m[2] ?? m[1]);
+  const [fromYm, toYm] = [m[1], m[2] ?? m[1]];
+  // Guard against silent empties: a month out of 01-12 or a reversed range would
+  // yield zero chunks and make every invoice read as "not found on the platform".
+  for (const ym of [fromYm, toYm]) {
+    const month = Number(ym.slice(5));
+    if (month < 1 || month > 12) throw new Error(`bad range "${arg}" — month ${ym} is not 01-12`);
+  }
+  if (toYm < fromYm) throw new Error(`bad range "${arg}" — start ${fromYm} is after end ${toYm}`);
+  const months = monthsBetween(fromYm, toYm);
   const chunks: Array<{ from: string; to: string }> = [];
   for (let i = 0; i < months.length; i += 2) {
     const last = months[Math.min(i + 1, months.length - 1)];
@@ -70,6 +78,7 @@ async function runInvoiceJob(
           j.status === "2" &&
           j.seqNo > opts.minSeqNo &&
           j.queryStartDate?.startsWith(opts.from.slice(0, 7)) &&
+          j.queryEndDate?.startsWith(opts.to.slice(0, 7)) &&
           Date.parse(j.applyDate) >= stamp - 60_000,
       )
       .sort((a, b) => b.seqNo - a.seqNo)[0];

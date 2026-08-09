@@ -31,6 +31,16 @@ describe("chunkRange", () => {
     expect(() => chunkRange("2024-6")).toThrow("bad range");
     expect(() => chunkRange("2024-06..07")).toThrow("bad range");
   });
+
+  test("rejects out-of-bounds months instead of yielding zero chunks", () => {
+    expect(() => chunkRange("2024-00")).toThrow("not 01-12");
+    expect(() => chunkRange("2024-13")).toThrow("not 01-12");
+    expect(() => chunkRange("2024-01..2024-13")).toThrow("not 01-12");
+  });
+
+  test("rejects a reversed range instead of yielding zero chunks", () => {
+    expect(() => chunkRange("2025-01..2024-12")).toThrow("start 2025-01 is after end 2024-12");
+  });
 });
 
 describe("NatClient.decodeDataToken", () => {
