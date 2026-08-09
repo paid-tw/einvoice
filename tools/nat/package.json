@@ -1,0 +1,13 @@
+{
+  "name": "nat-einvoice-tool",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "bun test"
+  },
+  "dependencies": {
+    "jimp": "^1.6.1",
+    "onnxruntime-web": "^1.27.0",
+    "playwright": "^1.62.1"
+  }
+}

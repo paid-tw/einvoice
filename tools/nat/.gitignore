@@ -1,0 +1,10 @@
+node_modules/
+bun.lock
+bun.lockb
+secrets*.json
+out/
+.userdata/
+*.csv
+*.xlsx
+# OCR model binary — fetch with scripts/fetch_ocr_model.sh (charset.json IS committed)
+ocr-model/*.onnx

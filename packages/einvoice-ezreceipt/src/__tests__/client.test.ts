@@ -10,7 +10,7 @@ afterAll(() => server.close());
 
 const client = (overrides = {}) =>
   new EzreceiptClient({
-    appCode: "83567500",
+    appCode: "12345678",
     appKey: "k",
     accName: "A123",
     password: "pw",
@@ -59,7 +59,7 @@ describe("token auth", () => {
       http.post(url("/eInvoice/invoice/list"), () => ok({ list: [] })),
     );
     await client().request(EZRECEIPT_ENDPOINTS.list, {});
-    expect(loginHeaders?.get("x-deva-appcode")).toBe("83567500");
+    expect(loginHeaders?.get("x-deva-appcode")).toBe("12345678");
     expect(loginHeaders?.get("x-deva-appkey")).toBe("k");
     expect(loginHeaders?.get("x-deva-locale")).toBe("zh");
     expect(loginHeaders?.get("x-deva-token")).toBeNull();

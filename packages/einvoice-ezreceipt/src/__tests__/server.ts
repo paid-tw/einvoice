@@ -9,7 +9,7 @@ export const server = setupServer();
 
 export function testProvider(overrides: Partial<EzreceiptConfig> = {}) {
   return createEzreceiptProvider({
-    appCode: "83567500",
+    appCode: "12345678",
     appKey: "testkey",
     accName: "A123",
     password: "pw",

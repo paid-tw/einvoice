@@ -8,5 +8,5 @@
     "typescript/no-base-to-string": "off",
     "typescript/no-unsafe-type-assertion": "off"
   },
-  "ignorePatterns": ["**/dist/**"]
+  "ignorePatterns": ["**/dist/**", "tools/**"]
 }

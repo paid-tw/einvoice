@@ -1,0 +1,13 @@
+{
+  "name": "ezpay-backend-tool",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "msw": "^2.15.0",
+    "vitest": "^4.1.10"
+  }
+}
