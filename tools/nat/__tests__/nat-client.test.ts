@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { dedupeNatInvoices, isMonthFinal, NatClient, type NatInvoice } from "../nat-client.ts";
+import { dedupeNatInvoices, isMonthFinal, monthChunkRange, NatClient, type NatInvoice } from "../nat-client.ts";
 
 describe("NatClient.parseNatCsv", () => {
   test("preserves quoted commas, escaped quotes, and multiline fields", () => {
@@ -90,6 +90,21 @@ describe("dedupeNatInvoices", () => {
 
   test("throws when a key component is missing", () => {
     expect(() => dedupeNatInvoices([{ 發票號碼: "AB12345678", 總計: "100", items: [] } as NatInvoice])).toThrow(/missing key component/);
+  });
+});
+
+describe("monthChunkRange", () => {
+  test("clamps the first and last chunk to the requested interval; interior months span whole", () => {
+    // a single mid-month chunk exports only the requested days
+    expect(monthChunkRange("2026-08", "2026-08-15", "2026-08-20")).toEqual({ from: "2026-08-15", to: "2026-08-20" });
+    // across 3 months: first keeps the start, interior is whole, last keeps the end
+    expect(monthChunkRange("2026-07", "2026-07-15", "2026-09-10")).toEqual({ from: "2026-07-15", to: "2026-07-31" });
+    expect(monthChunkRange("2026-08", "2026-07-15", "2026-09-10")).toEqual({ from: "2026-08-01", to: "2026-08-31" });
+    expect(monthChunkRange("2026-09", "2026-07-15", "2026-09-10")).toEqual({ from: "2026-09-01", to: "2026-09-10" });
+  });
+
+  test("a whole-month range is unchanged (incl. leap February)", () => {
+    expect(monthChunkRange("2024-02", "2024-02-01", "2024-02-29")).toEqual({ from: "2024-02-01", to: "2024-02-29" });
   });
 });
 

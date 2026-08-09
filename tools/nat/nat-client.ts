@@ -51,6 +51,20 @@ export function isMonthFinal(opts: { hasData: boolean; hasEmpty: boolean; hasOpe
   return opts.hasData !== opts.hasEmpty;
 }
 
+/**
+ * The [from, to] slice of one month chunk (`ym` = "YYYY-MM") intersected with a requested
+ * "YYYY-MM-DD" range: the first chunk keeps the requested start and the last chunk the
+ * requested end, while interior months span whole — so a mid-month range exports only the
+ * requested interval, not the whole month. YYYY-MM-DD sorts chronologically, so plain
+ * string min/max clamps correctly.
+ */
+export function monthChunkRange(ym: string, from: string, to: string): { from: string; to: string } {
+  const [y, m] = ym.split("-").map(Number);
+  const monthStart = `${ym}-01`;
+  const monthEnd = `${ym}-${String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, "0")}`;
+  return { from: from > monthStart ? from : monthStart, to: to < monthEnd ? to : monthEnd };
+}
+
 /** Remove exact cross-month portal overlaps; reject a reused statutory key with conflicting content. */
 export function dedupeNatInvoices(invoices: NatInvoice[]): NatInvoice[] {
   const unique = new Map<string, { invoice: NatInvoice; signature: string }>();
@@ -185,8 +199,10 @@ export class NatClient {
         if (body !== undefined) headers["Content-Type"] = "application/json";
         const res = await fetch(url, { method, headers, credentials: "include", body: body !== undefined ? JSON.stringify(body) : undefined });
         const buf = new Uint8Array(await res.arrayBuffer());
+        // Bytes → binary string in 32 KB chunks; per-byte concatenation is quadratic and
+        // the spread has an argument-count ceiling, both of which bite on multi-MB exports.
         let s = "";
-        for (const b of buf) s += String.fromCharCode(b);
+        for (let i = 0; i < buf.length; i += 0x8000) s += String.fromCharCode(...buf.subarray(i, i + 0x8000));
         return { status: res.status, ct: res.headers.get("content-type") || "", b64: btoa(s) };
       },
       { method, url, body },
@@ -281,10 +297,8 @@ export class NatClient {
     const months = monthsBetween(opts.from, opts.to);
     const all: NatInvoice[] = [];
     for (const ym of months) {
-      const [y, m] = ym.split("-").map(Number);
-      const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
-      const from = `${ym}-01`;
-      const to = `${ym}-${String(last).padStart(2, "0")}`;
+      // Clamp each chunk to the requested interval so a mid-month range doesn't over-export.
+      const { from, to } = monthChunkRange(ym, opts.from, opts.to);
       const stamp = Date.now();
       await this.createReportJob({ ban: opts.ban, from, to, invType: opts.invType, fileType: "CSV" });
       let job: ReportJob | undefined;
