@@ -75,12 +75,15 @@ error to the normalized `InvoiceError`:
   "name": "void blocked by active allowance",
   "rtnCode": "5070450",
   "rtnMsg": "B2C作廢發票 該發票已被折讓過，無法直接作廢發票",
-  "expect": { "code": "CONFLICT", "rawCode": "5070450" }
+  "expect": { "code": "CONFLICT", "reason": "void_blocked_by_allowance" }
 }
 ```
 
-`code` is the stable `InvoiceErrorCode` both SDKs normalize onto; `rawCode` is
-the provider code preserved on the error.
+`code` is the stable `InvoiceErrorCode` both SDKs normalize onto. `reason` is the
+optional action-oriented axis (`null` when the message implies no distinct
+consumer action). Classification is keyword-based on `rtnMsg`, not purely on
+`rtnCode` — several cases share `rtnCode` `"0"` — so both SDKs must key off the
+message and agree on both axes.
 
 ## ECPay test vectors
 

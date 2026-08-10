@@ -3,7 +3,6 @@ import { fileURLToPath } from "node:url";
 import { http, HttpResponse } from "msw";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { mapEcpayError, ecpayErrorReason } from "../client.js";
-import { ENDPOINTS } from "../endpoints.js";
 import { BASE, ecSuccess, parseRequest, server, testProvider } from "./server.js";
 
 /**
@@ -52,22 +51,18 @@ const RESULT_STUB: Record<WireCase["operation"], Record<string, unknown>> = {
   },
 };
 
-const ENDPOINT_FOR: Record<WireCase["operation"], string> = {
-  issue: ENDPOINTS.issue,
-  void: ENDPOINTS.invalid,
-  allowance: ENDPOINTS.allowance,
-  voidAllowance: ENDPOINTS.allowanceInvalid,
-  query: ENDPOINTS.getIssue,
-};
-
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
 
 async function capture(c: WireCase) {
   let data: Record<string, unknown> | undefined;
+  // Register the handler at the fixture's declared endpoint. If the adapter
+  // posts anywhere else — i.e. the fixture's `endpoint` is wrong — the request
+  // is unhandled and `onUnhandledRequest: "error"` fails the case. This is what
+  // validates the endpoint half of the contract.
   server.use(
-    http.post(`${BASE}${ENDPOINT_FOR[c.operation]}`, async ({ request }) => {
+    http.post(`${BASE}${c.expect.endpoint}`, async ({ request }) => {
       data = parseRequest(await request.text()).data;
       return HttpResponse.json(ecSuccess(RESULT_STUB[c.operation]));
     }),
