@@ -23,7 +23,8 @@
           "Donation": "0",
           "TaxType": "1",
           "SalesAmount": 100,
-          "InvType": "07"
+          "InvType": "07",
+          "Items": [{ "ItemName": "商品一", "ItemCount": 1, "ItemPrice": 100, "ItemAmount": 100 }]
         }
       }
     },

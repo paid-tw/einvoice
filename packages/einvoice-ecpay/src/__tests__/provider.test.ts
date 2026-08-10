@@ -48,88 +48,15 @@ describe("issue (Issue)", () => {
       }),
     );
     const res = await testProvider().issue(issueInput());
+    // The request wire payload (RelateNumber, CarrierType, TaxType, Items, the
+    // B2B/tax-type/item-remark mappings, …) is asserted in fixtures.test.ts
+    // against fixtures/ecpay/issue.json — the single source of truth for the
+    // wire contract. This test covers the response half: result parsing.
     expect(res.invoiceNumber).toBe("JU11082062");
     expect(res.randomCode).toBe("3136");
     expect(res.invoiceDate.getFullYear()).toBe(2026);
     expect(res.status).toBe("ISSUED");
-
-    expect(captured?.merchantId).toBe(MERCHANT);
-    expect(captured?.data).toMatchObject({
-      RelateNumber: "ORDER_1",
-      CarrierType: "1", // MEMBER → ECPay carrier
-      Print: "0",
-      Donation: "0",
-      TaxType: "1",
-      SalesAmount: 100,
-      InvType: "07",
-    });
-    expect(captured?.data.Items).toHaveLength(1);
-  });
-
-  it("maps the tax type onto the wire TaxType (TAXABLE→1 / ZERO_RATED→2 / TAX_FREE→3)", async () => {
-    let captured: Awaited<ReturnType<typeof parseRequest>> | undefined;
-    server.use(
-      http.post(url(ECPAY_ENDPOINTS.issue), async ({ request }) => {
-        captured = parseRequest(await request.text());
-        return HttpResponse.json(ecSuccess(ISSUE_OK));
-      }),
-    );
-    const cases: Array<[IssueInvoiceInput["taxType"], string]> = [
-      ["TAXABLE", "1"],
-      ["ZERO_RATED", "2"],
-      ["TAX_FREE", "3"],
-    ];
-    for (const [taxType, code] of cases) {
-      await testProvider().issue(
-        // ECPay requires a customs-clearance mark for zero-rated invoices.
-        issueInput({
-          taxType,
-          ...(taxType === "ZERO_RATED" ? { providerOptions: { clearanceMark: "1" } } : {}),
-        }),
-      );
-      expect(captured?.data.TaxType).toBe(code);
-    }
-  });
-
-  it("sends B2B fields (CustomerIdentifier, Print=1) for a 統編 buyer", async () => {
-    let data: Record<string, unknown> | undefined;
-    server.use(
-      http.post(url(ECPAY_ENDPOINTS.issue), async ({ request }) => {
-        data = parseRequest(await request.text()).data;
-        return HttpResponse.json(ecSuccess(ISSUE_OK));
-      }),
-    );
-    await testProvider().issue(
-      issueInput({
-        buyer: { ubn: "53538851", name: "測試公司", address: "台北市測試路1號", email: "b@x.com" },
-        carrier: undefined,
-      }),
-    );
-    expect(data?.CustomerIdentifier).toBe("53538851");
-    expect(data?.Print).toBe("1");
-    expect(data?.CarrierType).toBe("");
-  });
-
-  it("maps an item's remark to ItemRemark (omitted when absent)", async () => {
-    let data: Record<string, unknown> | undefined;
-    server.use(
-      http.post(url(ECPAY_ENDPOINTS.issue), async ({ request }) => {
-        data = parseRequest(await request.text()).data;
-        return HttpResponse.json(ecSuccess(ISSUE_OK));
-      }),
-    );
-    await testProvider().issue(
-      issueInput({
-        items: [
-          { description: "有備註", quantity: 1, unitPrice: 60, amount: 60, remark: "備註1" },
-          { description: "無備註", quantity: 1, unitPrice: 40, amount: 40 },
-        ],
-        amount: { salesAmount: 100, taxAmount: 0, totalAmount: 100 },
-      }),
-    );
-    const items = data?.Items as Array<Record<string, unknown>>;
-    expect(items[0]?.ItemRemark).toBe("備註1");
-    expect(items[1]).not.toHaveProperty("ItemRemark");
+    expect(captured?.merchantId).toBe(MERCHANT); // envelope MerchantID, not part of Data
   });
 
   it("maps a business error (RtnCode ≠ 1) to the normalized code", async () => {
@@ -202,23 +129,12 @@ describe("void / allowance / voidAllowance", () => {
     ).rejects.toMatchObject({ code: "VALIDATION", provider: "ecpay" });
   });
 
-  it("void posts InvoiceNo + InvoiceDate + Reason", async () => {
-    let data: Record<string, unknown> | undefined;
-    server.use(
-      http.post(url(ECPAY_ENDPOINTS.invalid), async ({ request }) => {
-        data = parseRequest(await request.text()).data;
-        return HttpResponse.json(ecSuccess({}));
-      }),
-    );
+  it("void parses the result (wire payload covered by fixtures)", async () => {
+    server.use(http.post(url(ECPAY_ENDPOINTS.invalid), () => HttpResponse.json(ecSuccess({}))));
     const res = await testProvider().void({
       invoiceNumber: "JU11082062",
       reason: "客戶取消",
       providerOptions: { invoiceDate: "2026-06-17" },
-    });
-    expect(data).toMatchObject({
-      InvoiceNo: "JU11082062",
-      InvoiceDate: "2026-06-17",
-      Reason: "客戶取消",
     });
     expect(res.status).toBe("VOIDED");
     expect((res.raw as { RtnCode: number }).RtnCode).toBe(1); // response captured, not discarded
@@ -279,19 +195,17 @@ describe("void / allowance / voidAllowance", () => {
     expect(data?.InvoiceDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 
-  it("allowance posts /Allowance (default AllowanceNotify=N) and returns IA_Allow_No + IA_Date", async () => {
-    let data: Record<string, unknown> | undefined;
+  it("allowance parses IA_Allow_No + IA_Date (wire payload covered by fixtures)", async () => {
     server.use(
-      http.post(url(ECPAY_ENDPOINTS.allowance), async ({ request }) => {
-        data = parseRequest(await request.text()).data;
-        return HttpResponse.json(
+      http.post(url(ECPAY_ENDPOINTS.allowance), () =>
+        HttpResponse.json(
           ecSuccess({
             IA_Allow_No: "2026061721545183",
             IA_Date: "2026-06-17 21:54:51",
             IA_Remain_Allowance_Amt: 0,
           }),
-        );
-      }),
+        ),
+      ),
     );
     const res = await testProvider().allowance({
       invoiceNumber: "JU11082062",
@@ -300,51 +214,18 @@ describe("void / allowance / voidAllowance", () => {
       amount: { salesAmount: 100, taxAmount: 0, totalAmount: 100 },
       providerOptions: { invoiceDate: "2026-06-17" },
     });
-    expect(data).toMatchObject({
-      InvoiceNo: "JU11082062",
-      AllowanceAmount: 100,
-      AllowanceNotify: "N",
-    });
     expect(res.allowanceNumber).toBe("2026061721545183");
     expect(res.allowanceDate.getFullYear()).toBe(2026);
   });
 
-  it("allowance can notify by email (AllowanceNotify=E + NotifyMail)", async () => {
-    let data: Record<string, unknown> | undefined;
+  it("voidAllowance parses the result (wire payload covered by fixtures)", async () => {
     server.use(
-      http.post(url(ECPAY_ENDPOINTS.allowance), async ({ request }) => {
-        data = parseRequest(await request.text()).data;
-        return HttpResponse.json(ecSuccess({ IA_Allow_No: "A1", IA_Date: "2026-06-17 21:54:51" }));
-      }),
-    );
-    await testProvider().allowance({
-      invoiceNumber: "JU1",
-      allowanceId: "O1",
-      items: [{ description: "x", quantity: 1, unitPrice: 100, amount: 100 }],
-      amount: { salesAmount: 100, taxAmount: 0, totalAmount: 100 },
-      providerOptions: {
-        invoiceDate: "2026-06-17",
-        allowanceNotify: "E",
-        notifyMail: "b@x.com",
-        reason: "退款",
-      },
-    });
-    expect(data).toMatchObject({ AllowanceNotify: "E", NotifyMail: "b@x.com", Reason: "退款" });
-  });
-
-  it("voidAllowance posts InvoiceNo + AllowanceNo + Reason", async () => {
-    let data: Record<string, unknown> | undefined;
-    server.use(
-      http.post(url(ECPAY_ENDPOINTS.allowanceInvalid), async ({ request }) => {
-        data = parseRequest(await request.text()).data;
-        return HttpResponse.json(ecSuccess({}));
-      }),
+      http.post(url(ECPAY_ENDPOINTS.allowanceInvalid), () => HttpResponse.json(ecSuccess({}))),
     );
     const res = await testProvider().voidAllowance({
       invoiceNumber: "JU11082062",
       allowanceNumber: "A1",
     });
-    expect(data).toMatchObject({ InvoiceNo: "JU11082062", AllowanceNo: "A1", Reason: "作廢折讓" });
     expect(res.allowanceNumber).toBe("A1");
   });
 
@@ -385,16 +266,11 @@ describe("query (GetIssue)", () => {
     Items: [{ ItemName: "商品一", ItemCount: 1, ItemPrice: 100, ItemAmount: 100, ItemWord: "式" }],
   };
 
-  it("queries by orderId (RelateNumber), parses IIS_ fields + Items + amount + buyer addr/phone", async () => {
-    let data: Record<string, unknown> | undefined;
+  it("parses IIS_ fields + Items + amount + buyer addr/phone (wire payload covered by fixtures)", async () => {
     server.use(
-      http.post(url(ECPAY_ENDPOINTS.getIssue), async ({ request }) => {
-        data = parseRequest(await request.text()).data;
-        return HttpResponse.json(ecSuccess(GET_OK));
-      }),
+      http.post(url(ECPAY_ENDPOINTS.getIssue), () => HttpResponse.json(ecSuccess(GET_OK))),
     );
     const res = await testProvider().query({ orderId: "ORDER_1" });
-    expect(data).toEqual({ MerchantID: "2000132", RelateNumber: "ORDER_1" });
     expect(res.invoiceNumber).toBe("JU11082062");
     expect(res.amount).toEqual({ salesAmount: 100, taxAmount: 5, totalAmount: 105 });
     expect(res.buyer).toMatchObject({
@@ -404,22 +280,6 @@ describe("query (GetIssue)", () => {
     });
     expect(res.buyer.ubn).toBeUndefined(); // 0000000000 placeholder
     expect(res.items[0]?.description).toBe("商品一");
-  });
-
-  it("queries by invoiceNumber via InvoiceNo + InvoiceDate (情境二)", async () => {
-    let data: Record<string, unknown> | undefined;
-    server.use(
-      http.post(url(ECPAY_ENDPOINTS.getIssue), async ({ request }) => {
-        data = parseRequest(await request.text()).data;
-        return HttpResponse.json(ecSuccess(GET_OK));
-      }),
-    );
-    const res = await testProvider().query({
-      invoiceNumber: "JU11082062",
-      providerOptions: { invoiceDate: "2026-06-17" },
-    });
-    expect(data).toMatchObject({ InvoiceNo: "JU11082062", InvoiceDate: "2026-06-17" });
-    expect(res.invoiceNumber).toBe("JU11082062");
   });
 
   it("derives ALLOWANCE when the remaining allowance is below the sales total", async () => {
