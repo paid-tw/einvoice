@@ -1,5 +1,4 @@
 import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import { http, HttpResponse } from "msw";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { mapEcpayError, ecpayErrorReason } from "../client.js";
@@ -12,7 +11,7 @@ import { BASE, ecSuccess, parseRequest, server, testProvider } from "./server.js
  * for a given unified input — see `fixtures/README.md`.
  */
 
-const FIXTURE_DIR = fileURLToPath(new URL("../../../../fixtures/ecpay/", import.meta.url));
+const FIXTURE_DIR = new URL("../../../../fixtures/ecpay/", import.meta.url);
 
 interface WireCase {
   name: string;
@@ -28,7 +27,7 @@ interface WireCase {
 }
 
 function load(file: string): WireCase[] {
-  return JSON.parse(readFileSync(new URL(file, `file://${FIXTURE_DIR}`), "utf8")).cases;
+  return JSON.parse(readFileSync(new URL(file, FIXTURE_DIR), "utf8")).cases;
 }
 
 // A minimal per-operation result so the adapter's result parsing doesn't throw.
@@ -101,7 +100,7 @@ interface ErrorCase {
 
 describe("fixtures/ecpay/errors.json", () => {
   const cases: ErrorCase[] = JSON.parse(
-    readFileSync(new URL("errors.json", `file://${FIXTURE_DIR}`), "utf8"),
+    readFileSync(new URL("errors.json", FIXTURE_DIR), "utf8"),
   ).cases;
   for (const c of cases) {
     it(c.name, () => {
