@@ -56,6 +56,14 @@ Each file is `{ "version", "provider", "cases": [...] }`. A case:
    every key in `expect.dataAbsent` is missing, and — if `expect.dataExact` —
    that `data` has no keys beyond those in `expect.data`.
 
+   The partial match applies to **objects**: extra keys in the captured object
+   are ignored. **Arrays match by length and position** — an array in
+   `expect.data` (e.g. `Items`) must have the same number of elements as the
+   captured one, each matched as a subset by index. (This mirrors Vitest's
+   `toMatchObject`, which enforces array length; every SDK's consumer must do
+   the same so a dropped/duplicated line item fails.) Use `dataAbsent` /
+   `itemsAbsent` to assert a key is *not* present.
+
 ### Dynamic fields
 
 Fixtures are deterministic: cases that would otherwise depend on "today" or a
