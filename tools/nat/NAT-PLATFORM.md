@@ -185,6 +185,33 @@ token>" }`** → XLSX binary (filename `<ban>_IN_<ts>.xlsx`, `IN` = 進項). So:
 (The offline list only fetches on demand — job-create or an explicit 查詢 triggers the list
 GET; not on bare tab open.)
 
+### 3.4 隨機碼 (4-digit anti-counterfeit random code) — NOT in any bulk export ★
+
+Accountants may require the 隨機碼 (防偽隨機碼, the 4-digit code printed on every
+電子發票證明聯). Verified 2026-08-11 against actually-downloaded files:
+
+- **The NAT M/D CSV (offline job export) does NOT contain it.** The M header has 27
+  columns (發票號碼/買受人註記/格式代號/發票狀態/發票日期/買賣方統編+名稱/寄送日期/
+  各稅別銷售額/營業稅/總計/課稅別/匯率/載具/總備註/開立確認+最後異動時間/MIG訊息類別/
+  傳送方) — no 隨機碼. The XLSX export is the same report format, and the online-query
+  row token decodes to fields without a `randomNumber` either.
+- **On the NAT platform the code only surfaces per-invoice:** the detail view (SPA i18n
+  label `invoiceRandomCode` = 發票防偽隨機碼, presumably `GET /api/btb411w/invoice/detail`
+  — response not yet captured live) and the 證明聯 PDF (§3.2: realtime ≤10, PDF job ≤20).
+  This is why "the PDF version has it" while our CSV/Excel doesn't. No bulk path exists
+  on the NAT side.
+- **Bulk random codes come from the value-added centre instead:**
+  - ezPay backend CSV export has a populated 防偽隨機碼 column (sampled 2025-11: real
+    4-digit values).
+  - ezReceipt API returns `randNo` on issue and on per-invoice view — mapped to
+    `randomCode` in `@paid-tw/einvoice-ezreceipt` (`provider.ts`).
+
+Direction matters: for **銷項** (invoices we issued) the centre data above covers
+everything. For **進項** (suppliers' invoices to us) only NAT has the rows, and its
+exports lack the code — options are the per-invoice 證明聯 PDF (≤10/20 per batch, not
+viable in bulk), probing whether `/api/btb411w/invoice/detail` returns it (unverified),
+or asking the supplier for the 證明聯.
+
 ## 4. Other 營業人 endpoints seen
 
 - `GET  btb/settings/api/btb002i/company/authorized` → `[{ ban, companyName, closed }]`
