@@ -64,6 +64,18 @@
       "expect": { "code": "CONFLICT", "reason": "duplicate_order" }
     },
     {
+      "name": "duplicate custom order number — live wording uses 重覆 (覆, not 複)",
+      "rtnCode": "5070357",
+      "rtnMsg": "B2C開立發票 自訂編號重覆，請重新設定",
+      "expect": { "code": "CONFLICT", "reason": "duplicate_order" }
+    },
+    {
+      "name": "re-void an already-voided invoice — live wording (已被作廢過)",
+      "rtnCode": "5070453",
+      "rtnMsg": "B2C作廢發票 該發票已被作廢過",
+      "expect": { "code": "CONFLICT", "reason": "already_voided" }
+    },
+    {
       "name": "merchant id not found",
       "rtnCode": "0",
       "rtnMsg": "特店編號不存在",

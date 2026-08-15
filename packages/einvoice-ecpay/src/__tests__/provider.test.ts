@@ -329,6 +329,27 @@ describe("transport errors", () => {
     expect(err.rawCode).toBe("0");
   });
 
+  // A wrong HashKey/HashIV fails at the TRANSPORT layer (TransCode 110, HTTP 500,
+  // live-verified 2026-08-15) — it must surface as AUTH, not a PROVIDER outage.
+  it.each([
+    [110, "The parameter [Data] decrypt fail.", "credentials_invalid"],
+    [104, "Timestamp is over 10 minutes than it just produced.", "stale_timestamp"],
+    [115, "B2C/B2B功能尚未開通，請聯繫所屬業務", "not_enrolled"],
+  ])("throws AUTH for TransCode %s (%s)", async (transCode, transMsg, reason) => {
+    server.use(
+      http.post(url(ECPAY_ENDPOINTS.issue), () =>
+        HttpResponse.json(ecTransError(transCode, transMsg), { status: 500 }),
+      ),
+    );
+    const err = await testProvider()
+      .issue(issueInput())
+      .catch((e) => e);
+    expect(err.code).toBe("AUTH");
+    expect(err.reason).toBe(reason);
+    expect(err.rawCode).toBe(String(transCode));
+    expect(err.rawMessage).toBe(transMsg);
+  });
+
   it("wraps a network failure as NETWORK and a non-JSON response as PROVIDER", async () => {
     server.use(http.post(url(ECPAY_ENDPOINTS.issue), () => HttpResponse.error()));
     await expect(testProvider().issue(issueInput())).rejects.toMatchObject({ code: "NETWORK" });

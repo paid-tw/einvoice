@@ -195,6 +195,14 @@ res.invoiceNumber === orig.invoiceNumber; // true — reuses the original number
   （會誤導純關鍵字比對）而直接建表，其餘才回退至 `RtnMsg` 關鍵字，無法判定時為
   `undefined`。這三碼皆對應為 `CONFLICT`（實機驗證，2026-08-01）。
 
+- **傳輸層錯誤**：金鑰錯誤不會走到業務層 —— HashKey/HashIV 錯誤時 `Data` 解不開，
+  外層直接回 `TransCode 110`（HTTP 500，實機驗證 2026-08-15）。這類封包層錯誤
+  以 `TransCode` 建表對應：`110` 解密失敗 → `AUTH`/`credentials_invalid`、
+  `115` 功能尚未開通（特店不存在或未啟用）→ `AUTH`/`not_enrolled`、
+  `104` Timestamp 偏移超過 10 分鐘 → `AUTH`/`stale_timestamp`，
+  其餘 `TransCode ≠ 1` 為 `PROVIDER`。另外 `RqHeader.Revision` 文件標必填，
+  實測不帶也會成功，本 SDK 不送。
+
 - **產品服務別**：透過 `providerOptions: { productServiceId: "A00001" }` 傳入
   （對應綠界 `ProductServiceID`）。公開 sandbox 特店需要它，否則開立回 `5070350`（見上方）。
 

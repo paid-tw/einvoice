@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { http, HttpResponse } from "msw";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import { mapEcpayError, ecpayErrorReason } from "../client.js";
+import { mapEcpayError, mapEcpayTransportError, ecpayErrorReason } from "../client.js";
 import { BASE, ecSuccess, parseRequest, server, testProvider } from "./server.js";
 
 /**
@@ -104,8 +104,30 @@ describe("fixtures/ecpay/errors.json", () => {
   ).cases;
   for (const c of cases) {
     it(c.name, () => {
+      // Both arguments, mirroring the real call path in ecpayRequest: a few
+      // stable RtnCodes are pinned code-first, the rest classify by keyword.
       expect(mapEcpayError(Number(c.rtnCode), c.rtnMsg)).toBe(c.expect.code);
-      expect(ecpayErrorReason(c.rtnMsg) ?? null).toBe(c.expect.reason);
+      expect(ecpayErrorReason(c.rtnMsg, Number(c.rtnCode)) ?? null).toBe(c.expect.reason);
+    });
+  }
+});
+
+interface TransportErrorCase {
+  name: string;
+  transCode: string;
+  transMsg: string;
+  expect: { code: string; reason: string | null };
+}
+
+describe("fixtures/ecpay/transport-errors.json", () => {
+  const cases: TransportErrorCase[] = JSON.parse(
+    readFileSync(new URL("transport-errors.json", FIXTURE_DIR), "utf8"),
+  ).cases;
+  for (const c of cases) {
+    it(c.name, () => {
+      const { code, reason } = mapEcpayTransportError(Number(c.transCode));
+      expect(code).toBe(c.expect.code);
+      expect(reason ?? null).toBe(c.expect.reason);
     });
   }
 });

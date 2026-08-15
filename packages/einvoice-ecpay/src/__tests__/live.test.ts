@@ -458,3 +458,36 @@ describe.skipIf(!live)("ECPay live (stage) — 錯誤碼對應 (issue #3)", LIVE
     expect(err.reason).toBe("void_blocked_by_allowance");
   });
 });
+
+describe.skipIf(!live)("ECPay live (stage) — transport-layer 錯誤對應", LIVE_OPTS, () => {
+  // Regression for the wire responses recorded 2026-08-15: credential mistakes
+  // fail at the TRANSPORT layer (TransCode, HTTP 500), before any business
+  // RtnCode exists. Both probes are read-only — the server can't act on the
+  // request, so nothing is issued.
+
+  it("TransCode 110 (wrong HashKey) → AUTH / credentials_invalid", async () => {
+    const bad = createEcpayProvider({
+      merchantId: process.env.ECPAY_MERCHANT_ID ?? ECPAY_SANDBOX.merchantId,
+      hashKey: "0000000000000000",
+      hashIV: process.env.ECPAY_HASH_IV ?? ECPAY_SANDBOX.hashIV,
+      mode: "TEST",
+    });
+    const err = await bad.query({ orderId: "NO-SUCH-ORDER" }).catch((e) => e);
+    expect(err.rawCode).toBe("110");
+    expect(err.code).toBe("AUTH");
+    expect(err.reason).toBe("credentials_invalid");
+  });
+
+  it("TransCode 115 (unknown MerchantID) → AUTH / not_enrolled", async () => {
+    const bad = createEcpayProvider({
+      merchantId: "9999999",
+      hashKey: ECPAY_SANDBOX.hashKey,
+      hashIV: ECPAY_SANDBOX.hashIV,
+      mode: "TEST",
+    });
+    const err = await bad.query({ orderId: "NO-SUCH-ORDER" }).catch((e) => e);
+    expect(err.rawCode).toBe("115");
+    expect(err.code).toBe("AUTH");
+    expect(err.reason).toBe("not_enrolled");
+  });
+});

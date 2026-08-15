@@ -51,6 +51,8 @@ export async function ecpayRequest(
   const doFetch = config.fetch ?? fetch;
   const body = JSON.stringify({
     MerchantID: config.merchantId,
+    // RqHeader.Revision is omitted: the doc marks it required, but the API
+    // accepts requests without it (live-verified on stage, 2026-08-15).
     RqHeader: { Timestamp: ecpayTimestamp() },
     Data: encryptData({ MerchantID: config.merchantId, ...data }, config.hashKey, config.hashIV),
   });
@@ -89,9 +91,11 @@ export async function ecpayRequest(
 
   // TransCode is the transport/decryption result (1 = OK).
   if (Number(envelope.TransCode) !== 1 || !envelope.Data) {
+    const { code, reason } = mapEcpayTransportError(Number(envelope.TransCode));
     throw new InvoiceError(envelope.TransMsg || "ECPay transport error", {
       provider: "ecpay",
-      code: InvoiceErrorCode.PROVIDER,
+      code,
+      reason,
       rawCode: String(envelope.TransCode),
       rawMessage: envelope.TransMsg,
       raw: envelope,
@@ -191,4 +195,33 @@ const ECPAY_ERROR_TABLE: Record<number, { code: InvoiceErrorCode; reason?: Invoi
   },
   // 作廢: 該發票已被作廢過 — the target state is already reached (idempotent no-op).
   5070453: { code: InvoiceErrorCode.CONFLICT, reason: InvoiceErrorReason.ALREADY_VOIDED },
+};
+
+/**
+ * Map a transport-level `TransCode` (the envelope layer, before any business
+ * `RtnCode` exists) onto a normalized `(code, reason)`. Live-verified against
+ * `einvoice-stage.ecpay.com.tw` (2026-08-15): a wrong HashKey/HashIV fails
+ * HERE — TransCode 110, never a business-layer 金鑰 message — so without this
+ * mapping a credentials mistake surfaces as a PROVIDER outage. Unlisted codes
+ * (e.g. 111 empty Data, which this SDK can't produce) fall back to PROVIDER.
+ */
+export function mapEcpayTransportError(transCode: number): {
+  code: InvoiceErrorCode;
+  reason?: InvoiceErrorReason;
+} {
+  return ECPAY_TRANSPORT_TABLE[transCode] ?? { code: InvoiceErrorCode.PROVIDER };
+}
+
+const ECPAY_TRANSPORT_TABLE: Record<
+  number,
+  { code: InvoiceErrorCode; reason?: InvoiceErrorReason }
+> = {
+  // "Timestamp is over 10 minutes than it just produced." — the caller's clock
+  // is skewed; matches Amego 15 / ezPay KEY10007 (AUTH / stale_timestamp).
+  104: { code: InvoiceErrorCode.AUTH, reason: InvoiceErrorReason.STALE_TIMESTAMP },
+  // "The parameter [Data] decrypt fail." — wrong HashKey/HashIV.
+  110: { code: InvoiceErrorCode.AUTH, reason: InvoiceErrorReason.CREDENTIALS_INVALID },
+  // "B2C/B2B功能尚未開通，請聯繫所屬業務" — unknown MerchantID, or e-invoice not
+  // enabled for the merchant.
+  115: { code: InvoiceErrorCode.AUTH, reason: InvoiceErrorReason.NOT_ENROLLED },
 };

@@ -178,9 +178,21 @@ an unknown number returns "no invoice data" (查無發票資料) → `NOT_FOUND`
 
 - **Error branching**: the normalized `reason` field on `InvoiceError`
   (`duplicate_order` / `already_voided` / `void_blocked_by_allowance` …) is
-  resolved by `ecpayErrorReason(rtnMsg)` from `RtnMsg` keywords (ECPay's
+  resolved by `ecpayErrorReason(rtnMsg, rtnCode)` — a few stable codes
+  (`5070357` duplicate order [重覆], `5070453` already voided, `5070450` void
+  blocked by allowance) are pinned code-first because their live messages
+  defeat keyword matching; the rest classify by `RtnMsg` keywords (ECPay's
   `RtnCode` ranges are inconsistent — the message is the reliable signal);
   `undefined` when unknown.
+
+- **Transport-layer errors**: a wrong HashKey/HashIV never reaches the business
+  layer — the envelope returns `TransCode 110` (HTTP 500, live-verified
+  2026-08-15). These envelope errors map by `TransCode`: `110` decrypt fail →
+  `AUTH`/`credentials_invalid`, `115` not enabled/unknown merchant →
+  `AUTH`/`not_enrolled`, `104` timestamp over 10 minutes →
+  `AUTH`/`stale_timestamp`; any other `TransCode ≠ 1` → `PROVIDER`. Also,
+  `RqHeader.Revision` is documented as required but the API accepts requests
+  without it — this SDK omits it.
 
 - Zero-rated invoices (`taxType: "ZERO_RATED"` or mixed) require a customs mark:
   pass `providerOptions: { clearanceMark: "1" | "2" }` (1=not via customs 非經海關,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ecpayErrorReason, mapEcpayError } from "../client.js";
+import { ecpayErrorReason, mapEcpayError, mapEcpayTransportError } from "../client.js";
 
 describe("mapEcpayError (keyword-based, ECPay RtnMsg)", () => {
   it.each([
@@ -86,5 +86,22 @@ describe("ecpayErrorReason (action-oriented axis, RtnMsg keywords)", () => {
     expect(ecpayErrorReason("發票字軌已用完")).toBeUndefined(); // code NUMBER_EXHAUSTED covers it
     expect(ecpayErrorReason("")).toBeUndefined();
     expect(ecpayErrorReason()).toBeUndefined();
+  });
+});
+
+describe("mapEcpayTransportError (envelope TransCode)", () => {
+  // Live-verified 2026-08-15 (stage, MerchantID 2000132) — the messages are the
+  // exact TransMsg the gateway returns; classification keys off the code alone.
+  it.each([
+    [104, "Timestamp is over 10 minutes than it just produced.", "AUTH", "stale_timestamp"],
+    [110, "The parameter [Data] decrypt fail.", "AUTH", "credentials_invalid"],
+    [115, "B2C/B2B功能尚未開通，請聯繫所屬業務", "AUTH", "not_enrolled"],
+  ])("maps TransCode %s (%s) → %s / %s", (code, _msg, expectedCode, expectedReason) => {
+    expect(mapEcpayTransportError(code)).toEqual({ code: expectedCode, reason: expectedReason });
+  });
+
+  it("defaults to PROVIDER with no reason for unlisted TransCodes", () => {
+    expect(mapEcpayTransportError(111)).toEqual({ code: "PROVIDER" }); // Data cannot be empty
+    expect(mapEcpayTransportError(999)).toEqual({ code: "PROVIDER" });
   });
 });

@@ -20,7 +20,8 @@ fixtures/
     issue.json           one file per operation family
     void-allowance.json
     query.json
-    errors.json          provider error code → normalized error
+    errors.json          provider business error → normalized error
+    transport-errors.json  envelope-layer error → normalized error (optional)
 ```
 
 ## Case schema (operation fixtures)
@@ -91,7 +92,31 @@ error to the normalized `InvoiceError`:
 optional action-oriented axis (`null` when the message implies no distinct
 consumer action). Classification is keyword-based on `rtnMsg`, not purely on
 `rtnCode` — several cases share `rtnCode` `"0"` — so both SDKs must key off the
-message and agree on both axes.
+message and agree on both axes. A few stable codes (e.g. ECPay `5070357`, whose
+live wording uses 重覆 rather than 重複) are additionally pinned code-first; the
+fixture cases carry the live wording so a keyword-only implementation still
+agrees.
+
+## Transport-error schema (`transport-errors.json`)
+
+Same envelope, but for **envelope-layer** failures — the response arrives with
+`TransCode ≠ 1` and no business payload at all (for ECPay: HTTP 500, no `Data`
+to decrypt). These are where credential mistakes actually surface — a wrong
+AES key can never reach the business layer — so both SDKs must classify them,
+not lump them into a generic provider error:
+
+```jsonc
+{
+  "name": "Data decrypt fail (wrong HashKey/HashIV)",
+  "transCode": "110",
+  "transMsg": "The parameter [Data] decrypt fail.",
+  "expect": { "code": "AUTH", "reason": "credentials_invalid" }
+}
+```
+
+Classification keys off `transCode` alone; `transMsg` is the live-observed
+wording, recorded for reference. Codes not listed normalize to `PROVIDER` with
+no reason.
 
 ## ECPay test vectors
 
