@@ -28,6 +28,17 @@ Credentials: either set `NAT_UBN`, `NAT_USER_ID`, and `NAT_PASSWORD`, or set
 `user_password`. 1Password credentials are cached to `secrets.nat-*.json`
 (gitignored, mode 0600). Nothing account-specific is baked into source.
 
+The portal forces a password change every 90 days. An expired password does **not** fail
+the login: it succeeds, but the account's menu shrinks to 個人資料維護 and every data call
+is refused (`400 Access Denied`, page `/dashboard/btb/forbidden`). Change the password in
+a browser, update the credential source, and **delete the stale `secrets.nat-*.json`** —
+the cache is never refreshed on its own.
+
+Network: the SPA's entry bundle is intermittently refused (403) at the portal's CDN,
+leaving a blank page; `login()` reloads up to 5 times before giving up. If your egress is
+refused consistently, set `NAT_PROXY` (e.g. `socks5://127.0.0.1:1080`) to route the
+browser through a proxy.
+
 ## NatClient — the client
 
 `nat-client.ts` exports `NatClient` (Playwright-based; data calls run in-page so they

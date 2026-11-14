@@ -65,9 +65,34 @@ export interface NatSession {
   ban: string;
 }
 
+/**
+ * Browser launch options. `NAT_PROXY` (e.g. `socks5://127.0.0.1:1080`) routes the whole
+ * browser through a proxy — for runners whose egress the portal's CDN treats badly.
+ */
+export function launchOptions(env: Record<string, string | undefined> = process.env): { headless: true; proxy?: { server: string } } {
+  const server = env.NAT_PROXY?.trim();
+  return server ? { headless: true, proxy: { server } } : { headless: true };
+}
+
+/**
+ * Run `attempt` (1-based) until it yields a truthy value, at most `attempts` times,
+ * calling `pause` between tries (never after the last). Returns undefined if every try
+ * came back empty. The portal's SPA entry bundle intermittently 403s at the CDN, which
+ * leaves a blank shell that never recovers on its own — only a reload does — so both
+ * the pre-login and the post-login page loads go through this.
+ */
+export async function untilReady<T>(attempts: number, attempt: (n: number) => Promise<T | undefined | null | false | "">, pause: () => Promise<unknown> = async () => {}): Promise<T | undefined> {
+  for (let n = 1; n <= attempts; n++) {
+    const value = await attempt(n);
+    if (value) return value;
+    if (n < attempts) await pause();
+  }
+  return undefined;
+}
+
 export async function login(): Promise<NatSession> {
   const creds = natCreds();
-  const browser = await chromium.launch({ headless: true });
+  const browser = await chromium.launch(launchOptions());
   const ctx = await browser.newContext({ userAgent: UA, viewport: { width: 1440, height: 1100 } });
   const page = await ctx.newPage();
 
@@ -80,9 +105,22 @@ export async function login(): Promise<NatSession> {
     }
   });
 
-  await page.goto(DASH, { waitUntil: "networkidle", timeout: 60000 }).catch(() => {});
+  // Reload until the login tabs actually render (see untilReady).
+  const tab = page.getByText("營業人").first();
+  const rendered = await untilReady(
+    5,
+    async () => {
+      await page.goto(DASH, { waitUntil: "networkidle", timeout: 60000 }).catch(() => {});
+      return tab.waitFor({ state: "visible", timeout: 10000 }).then(() => true, () => false);
+    },
+    () => page.waitForTimeout(5000),
+  );
+  if (!rendered) {
+    await browser.close();
+    throw new Error("NAT login page did not render after 5 loads");
+  }
   await page.waitForTimeout(1500);
-  await page.getByText("營業人").first().click({ timeout: 10000 });
+  await tab.click({ timeout: 10000 });
   await page.waitForTimeout(2000);
   await page.fill("#ban", creds.ban);
   await page.fill("#user_id", creds.customId);
@@ -112,15 +150,19 @@ export async function login(): Promise<NatSession> {
     await browser.close();
     throw new Error("NAT login failed after retries");
   }
-  await page.goto(DASH, { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
   // The SPA writes the JWT to sessionStorage a moment after the dashboard loads, so poll
-  // for it (up to ~20s) rather than reading once after a fixed wait — a single-shot check
-  // was hard-failing slow-but-successful logins where the token just wasn't written yet.
-  let jwt = "";
-  for (let i = 0; i < 20 && !jwt; i++) {
-    jwt = ((await page.evaluate(() => sessionStorage.getItem("token")).catch(() => "")) as string) ?? "";
-    if (!jwt) await page.waitForTimeout(1000);
-  }
+  // for it (up to ~20s per load) rather than reading once after a fixed wait. The
+  // dashboard load can hit the same blank shell as the login page, so reload — the
+  // session cookie survives — before giving up.
+  const jwt =
+    (await untilReady(4, async () => {
+      await page.goto(DASH, { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
+      return untilReady(
+        20,
+        async () => ((await page.evaluate(() => sessionStorage.getItem("token")).catch(() => "")) as string | null) ?? "",
+        () => page.waitForTimeout(1000),
+      );
+    })) ?? "";
   if (!jwt) {
     await browser.close();
     throw new Error("NAT login completed without an authentication token");
