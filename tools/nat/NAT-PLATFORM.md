@@ -172,7 +172,10 @@ All three verified live (created a 進項 job → completed → downloaded the X
 2024-06 作廢 invoice, its 2024-07 replacement, and a 2025-12 invoice transmitted
 by a different value-added centre.
 
-**List** `GET /api/btb411w/reportJob/xlsx?queryApplyDateStart=<ISO>&queryApplyDateEnd=<ISO>&showMessage=true&page=0&size=0`
+**List** `GET /api/btb411w/reportJob/xlsx?queryApplyDateStart=<ISO>&queryApplyDateEnd=<ISO>&processStatus=A&showMessage=true&page=0&size=500`
+(`processStatus=A` is **required** since 2026-11 — without it the endpoint answers HTTP 200
+with the plain-text body `Parameter validation failed.`; same for `btb412w`. `page`/`size`
+are optional.)
 → `{ content: [ { token } ] }`. Each `token` is a JWT whose `data` (base64 JSON) decodes to
 the job: `{ jobType, applyDate, ban, queryStartDate, queryEndDate, sellbuyType(1 進項),
 fileType, status, seqNo, filePath, dataCount, companyName, … }`. **`status:"2"` = 處理完成**

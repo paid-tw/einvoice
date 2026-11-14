@@ -29,6 +29,24 @@ export interface ReportJob {
 
 const iso = (d: string, end = false) => `${d}T${end ? "23:59:59.999" : "00:00:00.000"}Z`;
 
+/**
+ * Query string for the 非即時 job list (btb411w and btb412w share it), by APPLY date.
+ * `processStatus=A` (all states) is mandatory: without it the portal answers HTTP 200
+ * with the plain-text body "Parameter validation failed." instead of JSON (observed
+ * 2026-11; the SPA's own 查詢 sends it). `size=500` returns the whole day's jobs, not
+ * just page 1 — otherwise a completed job can be hidden behind the first page.
+ */
+export function jobListQuery(applyFrom: string, applyTo: string): URLSearchParams {
+  return new URLSearchParams({
+    queryApplyDateStart: iso(applyFrom),
+    queryApplyDateEnd: iso(applyTo, true),
+    processStatus: "A",
+    showMessage: "true",
+    page: "0",
+    size: "500",
+  });
+}
+
 /** One invoice (財政部 M row), keyed by the CSV headers, with its line items (D rows). */
 export interface NatInvoice {
   items: Array<Record<string, string>>;
@@ -282,13 +300,7 @@ export class NatClient {
   /** List report jobs applied within [applyFrom, applyTo] (defaults: today). Decodes each token. */
   async listJobs(opts: { applyFrom?: string; applyTo?: string } = {}): Promise<ReportJob[]> {
     const today = (await this.page.evaluate(() => new Date().toISOString().slice(0, 10))) as string;
-    const qs = new URLSearchParams({
-      queryApplyDateStart: iso(opts.applyFrom ?? today),
-      queryApplyDateEnd: iso(opts.applyTo ?? today, true),
-      showMessage: "true",
-      page: "0",
-      size: "500",
-    });
+    const qs = jobListQuery(opts.applyFrom ?? today, opts.applyTo ?? today);
     const r = await this.apiJson<{ content?: Array<{ token: string }> }>("GET", `${API}/api/btb411w/reportJob/xlsx?${qs}`);
     // spread decoded fields first, then the raw list token last (decoded has token:null)
     return (r.content ?? []).map((c) => ({ ...NatClient.decodeJobToken(c.token), token: c.token }) as ReportJob);
@@ -411,13 +423,7 @@ export class NatClient {
   /** List 折讓 report jobs applied within [applyFrom, applyTo] (defaults today); decodes tokens. */
   async listAllowanceJobs(opts: { applyFrom?: string; applyTo?: string } = {}): Promise<ReportJob[]> {
     const today = (await this.page.evaluate(() => new Date().toISOString().slice(0, 10))) as string;
-    const qs = new URLSearchParams({
-      queryApplyDateStart: iso(opts.applyFrom ?? today),
-      queryApplyDateEnd: iso(opts.applyTo ?? today, true),
-      showMessage: "true",
-      page: "0",
-      size: "500", // return all of today's jobs, not just page 1 (else a completed job can be hidden)
-    });
+    const qs = jobListQuery(opts.applyFrom ?? today, opts.applyTo ?? today);
     const r = await this.apiJson<{ content?: Array<{ token: string }> }>("GET", `${API}/api/btb412w/reportJob/xlsx?${qs}`);
     return (r.content ?? []).map((c) => ({ ...NatClient.decodeJobToken(c.token), token: c.token }) as ReportJob);
   }

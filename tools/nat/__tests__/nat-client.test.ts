@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { dedupeNatInvoices, isMonthFinal, monthChunkRange, NatClient, type NatInvoice } from "../nat-client.ts";
+import { dedupeNatInvoices, isMonthFinal, jobListQuery, monthChunkRange, NatClient, type NatInvoice } from "../nat-client.ts";
 
 describe("NatClient.parseNatCsv", () => {
   test("preserves quoted commas, escaped quotes, and multiline fields", () => {
@@ -128,5 +128,31 @@ describe("isMonthFinal", () => {
   test("a closed month with neither or both representations is not final", () => {
     expect(f({})).toBe(false); // nothing written yet
     expect(f({ hasData: true, hasEmpty: true })).toBe(false); // contradictory (crash between write+cleanup)
+  });
+});
+
+describe("jobListQuery", () => {
+  test("always sends processStatus=A — the portal rejects the list without it", () => {
+    // Regression (2026-11): the list endpoint started answering HTTP 200 with the
+    // plain-text body "Parameter validation failed." unless processStatus is present.
+    expect(jobListQuery("2026-01-02", "2026-01-02").get("processStatus")).toBe("A");
+  });
+
+  test("spans the whole apply-date range, start of first day to end of last", () => {
+    const qs = jobListQuery("2026-01-02", "2026-01-05");
+    expect(qs.get("queryApplyDateStart")).toBe("2026-01-02T00:00:00.000Z");
+    expect(qs.get("queryApplyDateEnd")).toBe("2026-01-05T23:59:59.999Z");
+  });
+
+  test("asks for every job of the day in one page", () => {
+    const qs = jobListQuery("2026-01-02", "2026-01-02");
+    expect(Object.fromEntries(qs)).toEqual({
+      queryApplyDateStart: "2026-01-02T00:00:00.000Z",
+      queryApplyDateEnd: "2026-01-02T23:59:59.999Z",
+      processStatus: "A",
+      showMessage: "true",
+      page: "0",
+      size: "500",
+    });
   });
 });
