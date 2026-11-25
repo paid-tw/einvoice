@@ -89,6 +89,30 @@ export function makeCheckCode(
 }
 
 /**
+ * The 字軌管理 response CheckCode (EZP_Track 附件二): SHA256 over the 5 fields
+ * sorted A–Z, wrapped by `HashIv=…&` (front — note the lowercase `v`, unlike
+ * {@link makeCheckCode}) and `&HashKey=…` (back), uppercased. `AphabeticLetter`
+ * is ezPay's spelling.
+ */
+export function makeTrackCheckCode(
+  fields: {
+    AphabeticLetter: string;
+    CompanyId: string;
+    EndNumber: string;
+    ManagementNo: string;
+    StartNumber: string;
+  },
+  hashKey: string,
+  hashIV: string,
+): string {
+  const sorted = (Object.keys(fields) as Array<keyof typeof fields>).sort();
+  const qs = new URLSearchParams();
+  for (const k of sorted) qs.append(k, fields[k]);
+  const raw = `HashIv=${hashIV}&${qs.toString()}&HashKey=${hashKey}`;
+  return createHash("sha256").update(raw).digest("hex").toUpperCase();
+}
+
+/**
  * The `CheckValue` for the 手機條碼/愛心碼驗證 API: SHA256 over the *encrypted*
  * PostData_ hex wrapped by `HashKey=…&` (front) and `&HashIV=…` (back),
  * uppercased. Note the wrap order is the reverse of {@link makeCheckCode}.

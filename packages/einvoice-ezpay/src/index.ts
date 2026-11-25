@@ -5,6 +5,7 @@ export {
   encryptPostData,
   decryptPostData,
   makeCheckCode,
+  makeTrackCheckCode,
   makeCheckValue,
 } from "./crypto.js";
 export { ENDPOINTS as EZPAY_ENDPOINTS } from "./endpoints.js";
@@ -16,6 +17,14 @@ export {
   ezpayTimestamp,
 } from "./client.js";
 export { ezpayErrorHint } from "./hints.js";
+export { mapEzpayTrackError } from "./track.js";
+export type {
+  EzpayTrack,
+  EzpayTrackStatus,
+  CreateTrackInput,
+  SetTrackStatusInput,
+  SearchTracksInput,
+} from "./track.js";
 export type { EzpayResponse, EzpayResult, CarrierCheckResult } from "./client.js";
 export { createEzpayProvider, EzpayProvider, ezpayTaxType, ezpayTaxRate } from "./provider.js";
 export type { EzpayPendingInvoice, TriggerIssueInput, TriggerAllowanceInput } from "./provider.js";

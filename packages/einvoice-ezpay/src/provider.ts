@@ -45,6 +45,15 @@ import {
   assertValidVoidAllowancePayload,
   assertValidVoidPayload,
 } from "./validation.js";
+import {
+  type CreateTrackInput,
+  type EzpayTrack,
+  type SearchTracksInput,
+  type SetTrackStatusInput,
+  createTrack,
+  searchTracks,
+  setTrackStatus,
+} from "./track.js";
 
 /** Unified carrier type → ezPay CarrierType. */
 const CARRIER_TYPE: Record<Carrier["type"], string> = {
@@ -141,6 +150,21 @@ export class EzpayProvider implements InvoiceProvider {
       });
     }
   }
+
+  /**
+   * 字軌管理 — register, pause/activate/disable, and list the 字軌 ranges the
+   * store issues from. Needs `config.companyId` (會員編號); see the README.
+   * Not cross-provider.
+   */
+  readonly track = {
+    /** 新增字軌 — register a range obtained from 財政部. The first one is auto-activated. */
+    create: (input: CreateTrackInput): Promise<EzpayTrack> => createTrack(this.config, input),
+    /** 字軌資料管理 — change a range's status. `DISABLED` cannot be undone. */
+    setStatus: (input: SetTrackStatusInput): Promise<EzpayTrack> =>
+      setTrackStatus(this.config, input),
+    /** 字軌資料查詢 — the ranges of one period (`[]` when there are none). */
+    search: (input: SearchTracksInput): Promise<EzpayTrack[]> => searchTracks(this.config, input),
+  };
 
   /** Escape hatch: call any ezPay endpoint with raw PostData_ params. */
   raw(path: string, postData: Record<string, string | number | undefined>): Promise<EzpayResult> {
