@@ -276,7 +276,9 @@ function toTrack(config: EzpayConfig, entry: Record<string, unknown>): EzpayTrac
   // The manual spells it `AphabeticLetter` (sic); accept the correct spelling too.
   const letters = str("AphabeticLetter") || str("AlphabeticLetter");
 
-  if (config.verifyCheckCode !== false && entry.CheckCode) {
+  // Every live 字軌 response carries a CheckCode (create, manage and each search
+  // entry; cinv 2026-11-24), so a missing one is a mismatch, not a pass.
+  if (config.verifyCheckCode !== false) {
     const creds = trackCredentials(config);
     const expected = makeTrackCheckCode(
       {
@@ -289,7 +291,7 @@ function toTrack(config: EzpayConfig, entry: Record<string, unknown>): EzpayTrac
       creds.hashKey,
       creds.hashIV,
     );
-    if (expected !== String(entry.CheckCode).toUpperCase()) {
+    if (expected !== str("CheckCode").toUpperCase()) {
       throw new InvoiceError("ezPay 字軌 response CheckCode mismatch — possible tampering", {
         provider: "ezpay",
         code: InvoiceErrorCode.PROVIDER,

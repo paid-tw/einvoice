@@ -179,6 +179,42 @@ describe("track.create (createNumber)", () => {
     ).rejects.toMatchObject({ code: "CONFLICT", rawCode: "LIB10016", reason: undefined });
   });
 
+  it.each([
+    ["missing", undefined],
+    ["empty", ""],
+  ])("rejects a response whose CheckCode is %s", async (_label, checkCode) => {
+    server.use(
+      http.post(url(EZPAY_ENDPOINTS.trackCreate), () =>
+        ok({ ...trackEntry({}), CheckCode: checkCode }),
+      ),
+    );
+    await expect(
+      testProvider({ companyId: COMPANY }).track.create({
+        year: 115,
+        term: 6,
+        letters: "AA",
+        startNumber: 0,
+        endNumber: 49,
+      }),
+    ).rejects.toMatchObject({ code: "PROVIDER", rawCode: "CHECKCODE_MISMATCH" });
+  });
+
+  it("accepts a missing CheckCode when verifyCheckCode is false", async () => {
+    server.use(
+      http.post(url(EZPAY_ENDPOINTS.trackCreate), () =>
+        ok({ ...trackEntry({}), CheckCode: undefined }),
+      ),
+    );
+    const track = await testProvider({ companyId: COMPANY, verifyCheckCode: false }).track.create({
+      year: 115,
+      term: 6,
+      letters: "AA",
+      startNumber: 0,
+      endNumber: 49,
+    });
+    expect(track.managementNo).toBe("0p7f5h7d3");
+  });
+
   it("rejects a response whose CheckCode does not match", async () => {
     server.use(
       http.post(url(EZPAY_ENDPOINTS.trackCreate), () =>
