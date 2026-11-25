@@ -76,7 +76,7 @@ export async function ezpayRequest(
   if (json.Status !== "SUCCESS") {
     throw new InvoiceError(json.Message || "ezPay returned an error", {
       provider: "ezpay",
-      code: mapEzpayError(json.Status),
+      code: mapEzpayError(json.Status, json.Message),
       reason: ezpayErrorReason(json.Status),
       rawCode: json.Status,
       rawMessage: json.Message,
@@ -161,7 +161,7 @@ export async function ezpayCarrierCheck(
   if (json.Status !== "SUCCESS") {
     throw new InvoiceError(json.Message || "ezPay returned an error", {
       provider: "ezpay",
-      code: mapEzpayError(json.Status),
+      code: mapEzpayError(json.Status, json.Message),
       reason: ezpayErrorReason(json.Status),
       rawCode: json.Status,
       rawMessage: json.Message,
@@ -179,10 +179,21 @@ export async function ezpayCarrierCheck(
 }
 
 /**
+ * ezPay's "no invoice numbers left for this period" message. Observed live on
+ * cinv (2026-11-24) as `已無任何本期(6)字軌資料可使用，請確認。` — the period
+ * number varies and the trailing `。` is absent on `invoice_touch_issue`.
+ */
+const TRACK_EXHAUSTED = /已無.*字軌.*可使用/;
+
+/**
  * Map an ezPay error code onto a normalized {@link InvoiceErrorCode}.
  * Source: the ezPay 技術串接手冊 §九 錯誤代碼.
+ *
+ * Pass the response `message` too: a store that has run out of 字軌 answers
+ * with the generic data-error code `LIB10001`, which only the message tells
+ * apart from a real validation failure (issue #15).
  */
-export function mapEzpayError(code: string): InvoiceErrorCode {
+export function mapEzpayError(code: string, message?: string): InvoiceErrorCode {
   switch (code) {
     // 查無發票 / 折讓查詢失敗
     case "INV20006":
@@ -232,7 +243,12 @@ export function mapEzpayError(code: string): InvoiceErrorCode {
   }
   // Field / data / amount validation families. KEY/INV/IAI/LIB cover invoice,
   // allowance and void; API/CBC cover the 手機條碼/愛心碼驗證 API.
-  if (/^(KEY|INV|IAI|LIB|API|CBC)\d+$/.test(code)) return InvoiceErrorCode.VALIDATION;
+  if (/^(KEY|INV|IAI|LIB|API|CBC)\d+$/.test(code)) {
+    // 字軌用罄 is recoverable (the store adds numbers and the same request
+    // succeeds), so it must not read as a caller-input error.
+    if (message && TRACK_EXHAUSTED.test(message)) return InvoiceErrorCode.NUMBER_EXHAUSTED;
+    return InvoiceErrorCode.VALIDATION;
+  }
   return InvoiceErrorCode.PROVIDER;
 }
 

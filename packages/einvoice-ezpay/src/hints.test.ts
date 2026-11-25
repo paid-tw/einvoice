@@ -30,6 +30,24 @@ describe("ezpayErrorHint", () => {
     expect(hint).not.toContain("字軌");
   });
 
+  it("hints at adding 字軌 when an ezpay error normalized to NUMBER_EXHAUSTED (#15)", () => {
+    // 字軌用罄 arrives as the generic LIB10001, so the hint keys off the
+    // normalized code and is only reachable through the error object.
+    const exhausted = new InvoiceError("已無任何本期(6)字軌資料可使用，請確認。", {
+      provider: "ezpay",
+      code: InvoiceErrorCode.NUMBER_EXHAUSTED,
+      rawCode: "LIB10001",
+    });
+    expect(ezpayErrorHint(exhausted)).toContain("字軌");
+    expect(ezpayErrorHint("LIB10001")).toBeUndefined();
+    const other = new InvoiceError("資料格式錯誤", {
+      provider: "ezpay",
+      code: InvoiceErrorCode.VALIDATION,
+      rawCode: "LIB10001",
+    });
+    expect(ezpayErrorHint(other)).toBeUndefined();
+  });
+
   it("covers transient codes with a retry hint", () => {
     for (const code of ["KEY10007", "NOR10001", "KEY10014", "CBC10003", "CBC10004"]) {
       expect(ezpayErrorHint(code)).toContain("稍後再試");

@@ -107,6 +107,32 @@ describe("mapEzpayError — LIB10014 (24h re-void rate limit)", () => {
   });
 });
 
+describe("mapEzpayError — 字軌用罄 (LIB10001 + message, issue #15)", () => {
+  // LIB10001 is a generic data-error code; only the message identifies an
+  // exhausted 字軌. The first two messages are verbatim from cinv (2026-11-24).
+  it.each([
+    ["LIB10001", "已無任何本期(6)字軌資料可使用，請確認。"], // invoice_issue
+    ["LIB10001", "已無任何本期(6)字軌資料可使用，請確認"], // invoice_touch_issue (no 。)
+    ["LIB10001", "已無任何本期(1)字軌資料可使用，請確認。"], // another period
+  ])("classifies %s %j as NUMBER_EXHAUSTED", (code, message) => {
+    expect(mapEzpayError(code, message)).toBe("NUMBER_EXHAUSTED");
+  });
+
+  it("keeps LIB10001 as VALIDATION for any other message, or none", () => {
+    expect(mapEzpayError("LIB10001")).toBe("VALIDATION");
+    expect(mapEzpayError("LIB10001", "")).toBe("VALIDATION");
+    expect(mapEzpayError("LIB10001", "資料格式錯誤")).toBe("VALIDATION");
+    expect(mapEzpayError("LIB10001", "字軌格式錯誤")).toBe("VALIDATION");
+  });
+
+  it("does not let the message override an explicitly mapped or unknown code", () => {
+    const message = "已無任何本期(6)字軌資料可使用，請確認。";
+    expect(mapEzpayError("KEY10002", message)).toBe("AUTH");
+    expect(mapEzpayError("LIB10003", message)).toBe("CONFLICT");
+    expect(mapEzpayError("SOMETHING", message)).toBe("PROVIDER");
+  });
+});
+
 describe("ezpayErrorReason (action-oriented axis)", () => {
   it.each([
     // credential / account setup
