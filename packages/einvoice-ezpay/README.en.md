@@ -123,8 +123,10 @@ try {
 ```
 
 Covers `KEY10002` / `KEY10006` / `INV90005` / `KEY10007` (keys & integration
-setup), `INV10020` / `INV10021` (account state), `INV90006` (invoice quota —
-ezPay meters by count, not by number tracks), `NOR10001` / `KEY10014` /
+setup), `INV10020` / `INV10021` (account state), `INV90006` (invoice quota),
+exhausted number tracks (字軌 — ezPay answers with the generic `LIB10001`, which
+the SDK normalizes to `NUMBER_EXHAUSTED` from the message; this hint needs the
+`InvoiceError`, not the raw code), `NOR10001` / `KEY10014` /
 `CBC10003` / `CBC10004` (transient), and `LIB10014` (the 24-hour re-void rate
 limit). The most common real-world cause of `KEY10002` "decryption failed" is
 test-store (cinv) credentials hitting the production host (inv) — ezPay's test

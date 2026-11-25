@@ -1,4 +1,4 @@
-import { isInvoiceError } from "@paid-tw/einvoice";
+import { InvoiceErrorCode, isInvoiceError } from "@paid-tw/einvoice";
 
 /**
  * 商家可行動的錯誤提示（zh-TW）——與 `@paid-tw/einvoice-amego` 的
@@ -27,7 +27,7 @@ const HINTS: Record<string, string> = {
   INV10020: "此商店的電子發票功能已暫停使用，請聯繫 ezPay 客服。",
   INV10021: "此商店的電子發票功能已異常終止，請聯繫 ezPay 客服。",
 
-  // 可開立張數（ezPay 以張數計，非字軌配號）
+  // 可開立張數（方案的張數額度；字軌用罄是另一回事，見 TRACK_EXHAUSTED_HINT）
   INV90006: "本期可開立發票張數已用罄，請至 ezPay 後台加購張數後即可繼續開立。",
 
   // 暫時性（ezPay 端 / 財政部大平台），稍後重試即可
@@ -39,6 +39,13 @@ const HINTS: Record<string, string> = {
   // 操作頻率限制
   LIB10014: "同一張發票 24 小時內請勿重複發送作廢請求，請稍後再試。",
 };
+
+/**
+ * 字軌用罄沒有專屬錯誤碼：ezPay 以通用的 `LIB10001` 回覆，只有訊息能分辨
+ * （cinv 實測 2026-11-24）。因此這則提示掛在正規化後的 `NUMBER_EXHAUSTED`
+ * 上，只在傳入 `InvoiceError` 時才查得到；單傳 `"LIB10001"` 不會命中。
+ */
+const TRACK_EXHAUSTED_HINT = "本期發票字軌號碼已用完，請至 ezPay 後台新增本期字軌後即可繼續開立。";
 
 /**
  * 依 ezPay 原始錯誤碼取得商家行動指引。
@@ -63,7 +70,10 @@ export function ezpayErrorHint(input: unknown): string | undefined {
     return HINTS[input];
   }
   if (isInvoiceError(input) && input.provider === "ezpay" && input.rawCode !== undefined) {
-    return HINTS[input.rawCode];
+    return (
+      HINTS[input.rawCode] ??
+      (input.code === InvoiceErrorCode.NUMBER_EXHAUSTED ? TRACK_EXHAUSTED_HINT : undefined)
+    );
   }
   return undefined;
 }

@@ -239,6 +239,33 @@ describe("issue response CheckCode verification", () => {
     });
   });
 
+  // Issue #15: an exhausted 字軌 answers with the generic LIB10001; the message
+  // (verbatim from cinv, 2026-11-24) is what makes it NUMBER_EXHAUSTED.
+  it("issue rejects with NUMBER_EXHAUSTED when the store has no 字軌 left", async () => {
+    const message = "已無任何本期(6)字軌資料可使用，請確認。";
+    server.use(
+      http.post(url(EZPAY_ENDPOINTS.issue), () => HttpResponse.json(ezError("LIB10001", message))),
+    );
+    await expect(testProvider().issue(issueInput())).rejects.toMatchObject({
+      code: "NUMBER_EXHAUSTED",
+      provider: "ezpay",
+      rawCode: "LIB10001",
+      rawMessage: message,
+    });
+  });
+
+  it("issue keeps any other LIB10001 as VALIDATION", async () => {
+    server.use(
+      http.post(url(EZPAY_ENDPOINTS.issue), () =>
+        HttpResponse.json(ezError("LIB10001", "資料格式錯誤")),
+      ),
+    );
+    await expect(testProvider().issue(issueInput())).rejects.toMatchObject({
+      code: "VALIDATION",
+      rawCode: "LIB10001",
+    });
+  });
+
   it("verifyCheckCode:false skips verification", async () => {
     server.use(
       http.post(url(EZPAY_ENDPOINTS.issue), () =>
