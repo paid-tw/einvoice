@@ -1,5 +1,27 @@
 # @paid-tw/einvoice-ezpay
 
+## 0.5.1
+
+### Patch Changes
+
+- c184346: Fix `query()` reporting a voided invoice as `ISSUED`. ezPay's `invoice_search`
+  returns `InvoiceStatus: "2"` for a voided invoice (`"1"` = issued), but the
+  adapter only treated `"0"` as voided, so `"2"` fell through to `ISSUED` (#13).
+  `"2"` now maps to `VOIDED`; `"0"` (待開立 in the merchant backend, not a void) no
+  longer does.
+- a885812: Classify an exhausted 字軌 as `NUMBER_EXHAUSTED` instead of `VALIDATION` (#15).
+  When a store has no invoice numbers left for the current period, ezPay answers
+  with the generic data-error code `LIB10001` and the message
+  `已無任何本期(N)字軌資料可使用，請確認。`; the adapter looked at the code alone
+  and reported a recoverable condition as a permanent input error.
+
+  - `mapEzpayError(code, message?)` takes the response message as an optional
+    second argument and uses it to tell this case apart. Other `LIB10001`
+    messages stay `VALIDATION`; calling it with the code alone behaves as before.
+  - `ezpayErrorHint(error)` returns an "add 字軌 in the ezPay backend" hint for
+    such an error. The raw-code form `ezpayErrorHint("LIB10001")` still returns
+    `undefined`, since the code alone does not identify the case.
+
 ## 0.5.0
 
 ### Minor Changes
