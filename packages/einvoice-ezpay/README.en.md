@@ -138,6 +138,39 @@ field on `InvoiceError` (e.g. `duplicate_order` / `void_blocked_by_allowance`),
 or look it up directly with `ezpayErrorReason(rawCode)` — no need to maintain
 your own raw-code table at the call site.
 
+## 字軌 management (`provider.track`, ezPay-specific)
+
+Wraps ezPay's 字軌管理 API (EZP_Track 1.0.0): register a 字軌 range, change its
+status, and list a period's ranges. These endpoints are keyed by the platform
+**member** (`CompanyID_`), not the store, so they need extra config:
+
+| Option | Description |
+| --- | --- |
+| `companyId` | Member id (會員編號, `CompanyID_`, e.g. `C54352706`) |
+| `companyHashKey` / `companyHashIV` | The member's API keys (會員管理/基本資料); omit when they equal the store keys |
+
+```ts
+const invoices = createEzpayProvider({ merchantId, hashKey, hashIV, companyId: "C54352706" });
+
+// year is the ROC year (民國年); term 1–6 = Jan–Feb … Nov–Dec
+const track = await invoices.track.create({
+  year: 115, term: 6, letters: "AB", startNumber: 0, endNumber: 49, // type defaults to "07"
+});
+await invoices.track.setStatus({ managementNo: track.managementNo, year: 115, status: "PAUSED" });
+const tracks = await invoices.track.search({ year: 115, term: 6 }); // [] when there are none
+```
+
+Each returned range's `CheckCode` is verified (the 字軌 API wraps with `HashIv=`,
+lowercase v, unlike the invoice API); `verifyCheckCode: false` disables it.
+`LIB10004`/`LIB10016` (range exists / overlaps) and `SET10006` (status unchanged
+or already disabled) map to `CONFLICT`; `MOD10003` and any 查無資料 message to
+`NOT_FOUND` (an empty period really answers `INM10002` + 查無資料, so `search`
+resolves `[]`); `INM10004` (bad parameter, e.g. a past period) to `VALIDATION`.
+The undocumented `Flag=3` is a used-up range (`status: "EXHAUSTED"`), and a
+disabled range is reported with `endNumber` equal to `startNumber`. The member
+keys differ from the store keys in practice (the store keys get `KEY10002`). ezPay does not check
+that a range was really assigned to you by 財政部 — verify before registering.
+
 ## Browser Form POST (build without sending)
 
 For flows where the browser POSTs straight to ezPay — e.g. a query whose result

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 import { createEzpayProvider } from "../provider.js";
 
 /**
@@ -224,5 +224,172 @@ describe.skipIf(!live)("ezPay live — 觸發折讓 (held → cancel)", LIVE_OPT
       invoiceNumber,
     });
     expect(res.allowanceNumber).toBe(allowanceNumber);
+  });
+});
+
+// --- 字軌管理 (provider.track) ---------------------------------------------
+// Needs the member id (CompanyID_) and, when they differ from the store's, the
+// member keys. The read-only suite runs with EZPAY_LIVE; the lifecycle suite
+// registers a throwaway range and disables it, so it also needs
+// EZPAY_TRACK_MUTATE=1 — every run leaves one 停用 range behind on cinv.
+const liveTrack = live && Boolean(process.env.EZPAY_COMPANY_ID);
+const liveTrackMutate = liveTrack && process.env.EZPAY_TRACK_MUTATE === "1";
+
+function trackProvider() {
+  return createEzpayProvider({
+    merchantId: process.env.EZPAY_MERCHANT_ID!,
+    hashKey: process.env.EZPAY_HASH_KEY!,
+    hashIV: process.env.EZPAY_HASH_IV!,
+    companyId: process.env.EZPAY_COMPANY_ID,
+    companyHashKey: process.env.EZPAY_COMPANY_HASH_KEY || undefined,
+    companyHashIV: process.env.EZPAY_COMPANY_HASH_IV || undefined,
+    mode: "TEST",
+  });
+}
+
+/** The current 民國年 and 期別 on the Asia/Taipei calendar. */
+function currentPeriod() {
+  const taipei = new Date(Date.now() + 8 * 3600_000);
+  return {
+    year: taipei.getUTCFullYear() - 1911,
+    term: Math.floor(taipei.getUTCMonth() / 2) + 1,
+  };
+}
+
+describe.skipIf(!liveTrack)("ezPay live — 字軌查詢 (read-only)", LIVE_OPTS, () => {
+  const provider = trackProvider();
+
+  it("lists this period's 字軌, verifying every range's CheckCode (HashIv=…)", async () => {
+    // verifyCheckCode defaults to true, so any mismatch rejects here.
+    const tracks = await provider.track.search(currentPeriod());
+    for (const t of tracks) {
+      expect(t.letters).toMatch(/^[A-Z]{2}$/);
+      expect(t.startNumber).toMatch(/^\d{8}$/);
+      expect(t.managementNo).not.toBe("");
+      expect(["PAUSED", "ACTIVE", "DISABLED", "EXHAUSTED"]).toContain(t.status);
+      if (t.status === "EXHAUSTED") expect(t.remaining).toBe(0);
+    }
+  });
+
+  // cinv answers an empty period with INM10002 + 查無資料 (verified 2026-11-24).
+  it("resolves [] for a period with no ranges", async () => {
+    const { year } = currentPeriod();
+    expect(await provider.track.search({ year: year + 1, term: 6 })).toEqual([]);
+  });
+
+  it("maps an out-of-window year to VALIDATION (INM10004)", async () => {
+    const { year } = currentPeriod();
+    await expect(provider.track.search({ year: year - 5, term: 1 })).rejects.toMatchObject({
+      code: "VALIDATION",
+      rawCode: "INM10004",
+    });
+  });
+
+  it("rejects the store keys: the 字軌 API needs the member keys (KEY10002)", async () => {
+    const store = createEzpayProvider({
+      merchantId: process.env.EZPAY_MERCHANT_ID!,
+      hashKey: process.env.EZPAY_HASH_KEY!,
+      hashIV: process.env.EZPAY_HASH_IV!,
+      companyId: process.env.EZPAY_COMPANY_ID,
+      mode: "TEST",
+    });
+    const sameKeys =
+      !process.env.EZPAY_COMPANY_HASH_KEY ||
+      process.env.EZPAY_COMPANY_HASH_KEY === process.env.EZPAY_HASH_KEY;
+    if (sameKeys) return; // nothing to tell apart on this account
+    await expect(store.track.search(currentPeriod())).rejects.toMatchObject({
+      code: "AUTH",
+      rawCode: "KEY10002",
+      reason: "credentials_invalid",
+    });
+  });
+});
+
+describe.skipIf(!liveTrackMutate)("ezPay live — 字軌 lifecycle (mutating)", LIVE_OPTS, () => {
+  const provider = trackProvider();
+  const { year, term } = currentPeriod();
+  // A throwaway range in the current period: "Z?" letters, a random 50-number
+  // booklet. It is registered PAUSED (another range is already active) and
+  // disabled at the end, so it never issues a number.
+  const letters = `Z${String.fromCharCode(65 + Math.floor(Math.random() * 26))}`;
+  const startNumber = (10_000 + Math.floor(Math.random() * 1_000_000)) * 50;
+  const input = { year, term, letters, startNumber, endNumber: startNumber + 49 };
+  let managementNo = "";
+
+  afterAll(async () => {
+    // Leave nothing usable behind even when a step failed midway.
+    if (!managementNo) return;
+    await provider.track.setStatus({ managementNo, year, status: "DISABLED" }).catch(() => {});
+  });
+
+  it("registers a range (createNumber)", async () => {
+    const t = await provider.track.create(input);
+    managementNo = t.managementNo;
+    expect(t).toMatchObject({
+      year,
+      term,
+      letters,
+      startNumber: String(startNumber).padStart(8, "0"),
+      endNumber: String(startNumber + 49).padStart(8, "0"),
+      type: "07",
+      remaining: 50,
+      usedNumber: undefined,
+    });
+    expect(["PAUSED", "ACTIVE"]).toContain(t.status);
+  });
+
+  it("finds it by managementNo (searchNumber)", async () => {
+    const found = await provider.track.search({ year, term, managementNo });
+    expect(found.map((t) => t.managementNo)).toEqual([managementNo]);
+  });
+
+  it("rejects the same range again with CONFLICT (LIB10016)", async () => {
+    await expect(provider.track.create(input)).rejects.toMatchObject({
+      code: "CONFLICT",
+      rawCode: "LIB10016",
+    });
+  });
+
+  it("rejects an overlapping range with CONFLICT (LIB10004)", async () => {
+    await expect(
+      provider.track.create({
+        ...input,
+        startNumber: startNumber + 10,
+        endNumber: startNumber + 99,
+      }),
+    ).rejects.toMatchObject({ code: "CONFLICT", rawCode: "LIB10004" });
+  });
+
+  it("rejects a period before the current one with VALIDATION (INM10004)", async () => {
+    if (term === 1) return; // no earlier period in this year to try
+    await expect(provider.track.create({ ...input, term: term - 1 })).rejects.toMatchObject({
+      code: "VALIDATION",
+      rawCode: "INM10004",
+    });
+  });
+
+  it("rejects a no-op status change with CONFLICT (SET10006)", async () => {
+    const [current] = await provider.track.search({ year, term, managementNo });
+    await expect(
+      provider.track.setStatus({ managementNo, year, status: current!.status as "PAUSED" }),
+    ).rejects.toMatchObject({ code: "CONFLICT", rawCode: "SET10006" });
+  });
+
+  it("disables it (manageNumber Flag=2)", async () => {
+    const t = await provider.track.setStatus({ managementNo, year, status: "DISABLED" });
+    expect(t.status).toBe("DISABLED");
+    expect(t.managementNo).toBe(managementNo);
+  });
+
+  it("refuses to re-enable a disabled range (SET10006)", async () => {
+    await expect(
+      provider.track.setStatus({ managementNo, year, status: "ACTIVE" }),
+    ).rejects.toMatchObject({ code: "CONFLICT", rawCode: "SET10006" });
+  });
+
+  it("maps an unknown managementNo to NOT_FOUND (MOD10003)", async () => {
+    await expect(
+      provider.track.setStatus({ managementNo: "0zzzzzzzzz", year, status: "PAUSED" }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND", rawCode: "MOD10003" });
   });
 });

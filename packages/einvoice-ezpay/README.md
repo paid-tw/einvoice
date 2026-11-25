@@ -129,6 +129,39 @@ try {
 （如 `duplicate_order`／`void_blocked_by_allowance`），或以 `ezpayErrorReason(rawCode)`
 直接查表——不需要在呼叫端自行維護原始錯誤碼對照。
 
+## 字軌管理（`provider.track`，ezPay 特有）
+
+對應 ezPay《電子發票字軌管理技術串接手冊》(EZP_Track 1.0.0)：新增字軌、變更字軌狀態、
+查詢字軌。這組 API 以**會員**（`CompanyID_`，會員編號）而非商店識別，因此需要額外設定：
+
+| 選項 | 說明 |
+| --- | --- |
+| `companyId` | 會員編號（`CompanyID_`，例如 `C54352706`） |
+| `companyHashKey` / `companyHashIV` | 會員 API 串接金鑰（會員管理／基本資料）。實測與商店金鑰**不同**（用商店金鑰會得到 `KEY10002`）；僅在兩者相同時可省略 |
+
+```ts
+const invoices = createEzpayProvider({ merchantId, hashKey, hashIV, companyId: "C54352706" });
+
+// 新增字軌（年度為民國年；期別 1–6 = 一二月 … 十一十二月）
+const track = await invoices.track.create({
+  year: 115, term: 6, letters: "AB", startNumber: 0, endNumber: 49, // type 預設 "07" 一般稅額
+});
+
+// 暫停 / 啟用 / 停用（DISABLED 無法復原）
+await invoices.track.setStatus({ managementNo: track.managementNo, year: 115, status: "PAUSED" });
+
+// 查詢某期字軌（查無資料時回傳 []）
+const tracks = await invoices.track.search({ year: 115, term: 6 });
+// → [{ managementNo, letters, startNumber, endNumber, usedNumber, remaining, status, … }]
+```
+
+每筆回應的 `CheckCode` 都會驗證（注意字軌 API 的前綴是 `HashIv=`，小寫 v，與開立 API 不同）；
+`verifyCheckCode: false` 可關閉。錯誤碼依手冊 §七 正規化：`LIB10004`／`LIB10016`（字軌已存在／範圍重疊）、
+`SET10006`（狀態未變或已停用）→ `CONFLICT`；`MOD10003` 與任何訊息為「查無資料」者 → `NOT_FOUND`
+（空的期別實際回 `INM10002`＋「查無資料」，`search` 會回傳 `[]`）；`INM10004`（參數格式錯誤，例如期別早於本期）→ `VALIDATION`。
+手冊未列的 `Flag=3` 實測為用畢（剩餘 0 張），對應 `status: "EXHAUSTED"`；停用後 ezPay 回報的結束號碼會等於起始號碼。
+ezPay 不會檢查字軌是否真為財政部配給本營業人的號碼，送出前請自行確認。
+
 ## 瀏覽器表單 POST（僅建立而不送出）
 
 對於瀏覽器直接 POST 至 ezPay 的流程——例如結果頁面由 ezPay 渲染的查詢（`DisplayFlag=1`）——

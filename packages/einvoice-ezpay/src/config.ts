@@ -12,8 +12,21 @@ export interface EzpayConfig extends BaseProviderConfig {
   /** Validate the built issue payload locally before sending (default `true`). */
   validatePayload?: boolean;
   /**
+   * 會員編號 — the ezPay platform member id (`CompanyID_`, e.g. `C54352706`).
+   * Needed only for the 字軌管理 API (`provider.track`), which is keyed by the
+   * member rather than the store.
+   */
+  companyId?: string;
+  /**
+   * The member's API HashKey for the 字軌管理 API, when it differs from the
+   * store's `hashKey` (ezPay lists it under 會員管理/基本資料). Default `hashKey`.
+   */
+  companyHashKey?: string;
+  /** The member's API HashIV for the 字軌管理 API. Default `hashIV`. */
+  companyHashIV?: string;
+  /**
    * Verify the `CheckCode` on issue-family responses (issue / issuePending /
-   * triggerIssue) to detect a tampered or mis-routed reply (default `true`).
+   * triggerIssue) and the 字軌 responses (`provider.track`) to detect a tampered or mis-routed reply (default `true`).
    */
   verifyCheckCode?: boolean;
 }
