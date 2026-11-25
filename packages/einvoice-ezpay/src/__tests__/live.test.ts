@@ -16,6 +16,15 @@ const live =
 // under load, which is transient. Offline suites never use this.
 const LIVE_OPTS = { retry: 2 } as const;
 
+/** The `InvoiceStatus` ezPay actually sent, read from the untouched response. */
+function wireInvoiceStatus(raw: unknown): string {
+  const result = (raw as { Result?: unknown }).Result;
+  const fields = (typeof result === "string" ? JSON.parse(result) : result) as
+    | Record<string, unknown>
+    | undefined;
+  return String(fields?.InvoiceStatus);
+}
+
 describe.skipIf(!live)("ezPay live (test env)", LIVE_OPTS, () => {
   const provider = createEzpayProvider({
     merchantId: process.env.EZPAY_MERCHANT_ID!,
@@ -48,10 +57,20 @@ describe.skipIf(!live)("ezPay live (test env)", LIVE_OPTS, () => {
   it("queries the issued invoice (SearchType 0: invoice + random)", async () => {
     const res = await provider.query({ invoiceNumber, providerOptions: { randomNum: randomCode } });
     expect(res.amount.totalAmount).toBe(105);
+    expect(res.status).toBe("ISSUED");
+    expect(wireInvoiceStatus(res.raw)).toBe("1");
   });
 
   it("voids the issued invoice (full lifecycle)", async () => {
     const res = await provider.void({ invoiceNumber, reason: "整合測試作廢" });
+    expect(res.status).toBe("VOIDED");
+  });
+
+  // Issue #13: after a void, invoice_search answers InvoiceStatus "2". Asserting
+  // the wire value too means a change on ezPay's side fails here, by name.
+  it("queries the voided invoice → VOIDED (wire InvoiceStatus 2)", async () => {
+    const res = await provider.query({ invoiceNumber, providerOptions: { randomNum: randomCode } });
+    expect(wireInvoiceStatus(res.raw)).toBe("2");
     expect(res.status).toBe("VOIDED");
   });
 });
