@@ -180,8 +180,11 @@ export async function ezpayCarrierCheck(
 
 /**
  * ezPay's "no invoice numbers left for this period" message. Observed live on
- * cinv (2026-11-24) as `已無任何本期(6)字軌資料可使用，請確認。` — the period
- * number varies and the trailing `。` is absent on `invoice_touch_issue`.
+ * cinv (2026-11-25, by issuing until the store ran out) as
+ * `已無任何本期(6)字軌資料可使用，請確認。` with code `LIB10001`, from both
+ * `invoice_issue` (B2C and B2B) and `invoice_touch_issue` — the latter without
+ * the trailing `。`. A held invoice (Status=0) is still accepted, since it takes
+ * no number until triggered.
  */
 const TRACK_EXHAUSTED = /已無.*字軌.*可使用/;
 
