@@ -521,8 +521,14 @@ function parseEzpayDate(value: unknown): Date {
   return new Date(`${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}+08:00`);
 }
 
+/**
+ * ezPay `invoice_search` → unified status. `InvoiceStatus` is `"1"` for an issued
+ * invoice and `"2"` once it is voided, on both lookup types; an allowance leaves
+ * it at `"1"` (verified live on the test host 2026-11-24, issue #13; the
+ * cross-border adapter maps the same field the same way). The merchant backend
+ * lists `0` as 待開立 and `3` as 預約開立 — neither is a void, and the unified
+ * model has no pending status, so everything other than `2` reads as ISSUED.
+ */
 function deriveStatus(result: Record<string, unknown>): InvoiceStatus {
-  const s = result.InvoiceStatus;
-  if (s === "0" || s === 0) return InvoiceStatus.VOIDED;
-  return InvoiceStatus.ISSUED;
+  return String(result.InvoiceStatus ?? "") === "2" ? InvoiceStatus.VOIDED : InvoiceStatus.ISSUED;
 }

@@ -566,6 +566,38 @@ describe("allowance / voidAllowance / query", () => {
     });
     expect(res.buyer.ubn).toBeUndefined();
   });
+
+  // Issue #13: invoice_search reports a voided invoice as InvoiceStatus "2"
+  // ("1" = issued). "0" (待開立) and "3" (預約開立) are not voids.
+  it.each([
+    ["2", "VOIDED"],
+    [2, "VOIDED"],
+    ["1", "ISSUED"],
+    [1, "ISSUED"],
+    ["0", "ISSUED"],
+    ["3", "ISSUED"],
+    [undefined, "ISSUED"],
+  ])("query maps InvoiceStatus %j → %s", async (wire, expected) => {
+    server.use(
+      http.post(url(EZPAY_ENDPOINTS.search), () =>
+        HttpResponse.json(
+          ezSuccess({
+            InvoiceNumber: "BB00000001",
+            RandomNum: "1234",
+            InvoiceStatus: wire,
+            Amt: 100,
+            TaxAmt: 5,
+            TotalAmt: 105,
+          }),
+        ),
+      ),
+    );
+    const res = await testProvider().query({
+      invoiceNumber: "BB00000001",
+      providerOptions: { randomNum: "1234" },
+    });
+    expect(res.status).toBe(expected);
+  });
 });
 
 describe("buildPostData / buildQueryPostData (encrypt without sending)", () => {
