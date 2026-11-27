@@ -65,6 +65,38 @@ describe("NatClient.parseNatCsv", () => {
 
     expect(() => NatClient.parseNatCsv(new TextEncoder().encode(csv))).toThrow(/D row has/);
   });
+
+  const dHead = "D,發票號碼,發票日期,序號,品名,數量,單位,單價,金額,單一欄位備註,相關號碼";
+
+  test("repairs an unquoted comma in 品名 (the platform also truncates the name)", () => {
+    const csv = [
+      "M,發票號碼,課稅別",
+      dHead,
+      "M,AB12345678,應稅",
+      "D,AB12345678,2024-07-04 22:52:44,1,課程方案 (原價 7,2,1,,5180,5180,,", // name split at "7,2"
+      "D,AB12345678,2024-07-04 22:52:44,2,課程方案 (原價 10,,1,,7380,7380,,", // split right before the cut
+      "",
+    ].join("\r\n");
+
+    const [invoice] = NatClient.parseNatCsv(new TextEncoder().encode(csv));
+
+    expect(invoice.items.map((i) => [i["品名"], i["數量"], i["單價"], i["金額"]])).toEqual([
+      ["課程方案 (原價 7,2", "1", "5180", "5180"],
+      ["課程方案 (原價 10,", "1", "7380", "7380"],
+    ]);
+  });
+
+  test("repairs an unquoted comma in 單一欄位備註", () => {
+    const csv = ["M,發票號碼,課稅別", dHead, "M,AB12345678,應稅", "D,AB12345678,2024-07-04,1,服務費,1,式,100,100,a,b,", ""].join("\r\n");
+    const [invoice] = NatClient.parseNatCsv(new TextEncoder().encode(csv));
+    expect(invoice.items[0]["單一欄位備註"]).toBe("a,b");
+    expect(invoice.items[0]["金額"]).toBe("100");
+  });
+
+  test("throws on an extra D cell that no single merge explains", () => {
+    const csv = ["M,發票號碼,課稅別", dHead, "M,AB12345678,應稅", "D,AB12345678,2024-07-04,1,服務費,1,式,x,100,100,,", ""].join("\r\n");
+    expect(() => NatClient.parseNatCsv(new TextEncoder().encode(csv))).toThrow(/D row has 12 columns, expected 11/);
+  });
 });
 
 describe("dedupeNatInvoices", () => {

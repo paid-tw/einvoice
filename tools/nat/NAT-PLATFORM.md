@@ -46,13 +46,22 @@ Flow (ORY-Hydra):
 3. **Submit:** `POST service-mc/act/login/api/client/doLogin` (JSON):
    `{ loginType:"U", userType:"B", loginChallenge:<X>, ban, customId:<帳號>, password,
       captchaToken, captcha:<5 digits> }`
-   → `200 { "redirectTo": "<sso/oauth2/auth?...&login_verifier=…>" }` on success (wrong
-   captcha → an error instead).
+   → `200 { "redirectTo": "<sso/oauth2/auth?...&login_verifier=…>" }` on success. The SPA
+   navigates at once, so the body is often unreadable by the time a listener gets it —
+   treat any 2xx as accepted and confirm by the page leaving `/accounts/login`. A wrong
+   captcha is `400` "Image verification code verification failed." (verified 2026-11-27).
 4. **Complete OAuth:** navigate `redirectTo` → `consent/doConsent?consent_challenge=…`
    → `…&consent_verifier=…` → `code` → dashboard, and `sessionStorage.token` is set.
 
-Automated end-to-end in `nat-session.ts` (`login()`; captcha solved by the OCR below;
-retries until accepted). Verified: logs in, extracts the JWT.
+Automated end-to-end in `nat-session.ts` (`login()`; captcha solved by the OCR below).
+Verified: logs in, extracts the JWT.
+
+⚠️ **Failed password submits lock the account** ("此帳號將被鎖定15分鐘" — an earlier
+version retried 8 times blindly and locked an account). `login()` reads each `doLogin`
+response and retries **only** a captcha rejection (or a click that never submitted);
+anything else — wrong credentials, a lock, an unrecognised message — stops at once with
+a `NatLoginError` carrying the platform's message (`classifyDoLogin`). Never script a
+login against an account whose credentials you have not just confirmed.
 
 ## 2. Captcha OCR (onnxruntime-web + jimp)
 
@@ -74,29 +83,62 @@ Screen `BTB411W`, three tabs: **線上查詢** (online, ≤200) / **非即時查
 **新增** (create an offline job). SPA chunks: `btb411w-online`, `btb411w-online-detail`,
 `btb411w-offline`, `btb411w-offline-add(-cb)`.
 
-### 3.1 Online query ★ (verified)
+### 3.1 Online query ★ (verified 2026-11-27)
 
-`GET service-m/btb/report/api/btb411w/invoice` with Bearer JWT. Query params (verified):
+`GET service-m/btb/report/api/btb411w/invoice` with Bearer JWT. Param names below come
+from the SPA's own generated API client (`btb411wQueryInvoice`), not from UI labels:
 
 | param | meaning |
 |-------|---------|
-| `invoiceDateBegin` / `invoiceDateEnd` | ISO `YYYY-MM-DDTHH:mm:ss.SSSZ` range |
-| `companyBan` | 營業人統編 |
-| `queryInvType` | **1 = 進項, 2 = 銷項** (銷&進 = both) |
-| `queryBusinessType` | 資料類型 (0 = 全部 / 有買受人統編 / 無買受人統編) |
+| `invoiceDateBegin` / `invoiceDateEnd` | **required**. Range ≤ 2 months (the SPA enforces it). See the date note below |
+| `companyBan` | **required**. 營業人統編 |
+| `queryInvType` | 1 = 進項, 2 = 銷項, 0 = 進銷項 |
+| `queryBusinessType` | 資料類型: 0 = 全部, 1 = 有買受人統編 (B2B), 2 = 無買受人統編 (B2C). ⚠️ see below |
 | `invStatus` | 發票狀態 (0 = 全部) |
 | `invType` | 發票類別 (`00` = 全部) |
+| `invoiceNumberBegin` / `invoiceNumberEnd` | number range, same 字軌. **Not** `invoiceNumberStart/End` (the UI model's names: those make the query 204) |
+| `sellerBan`, `buyerBan`, `senderBan`, `cellphoneBarcode` | optional filters |
+| `modifyDateBegin` / `modifyDateEnd` | 最後異動日期 range |
+| `page`, `size`, `sort` | Spring paging. **Default size is 20.** The SPA offers 10/20/50/100/200 |
 | `showMessage` | `true` |
 
-Response: `{ "content": [ { "token": "<JWT-ish blob encoding the invoice fields>", … } ] }`.
-Result columns seen in the UI: 發票號碼, 買受人註記欄, 發票日期, 銷售額合計, 應稅/零稅/免稅銷售額,
-營業稅, … The SPA also exposes optional filters: `invoiceNumberStart/End`, `buyerTaxId`,
-`buyerName`, `sellerId`, `sellerName`, `carrierType`/`carrierId`, `invoicePeriod` (期別),
-最後異動日期 range, 手機條碼.
+**Response: a Spring page**: `{ content, empty, first, last, number, numberOfElements,
+size, totalElements, totalPages }`. Read every page: a client that reads only `content`
+silently truncates at 20 rows. Example: B2B sales on one day were 81 rows over 5 pages.
+`queryInvoices` pages with `size=200` and checks the row count against `totalElements`.
 
-**Hard limit: 200 rows.** A single **month** of 進項 is typically well under 200 for a
-small business, so query per-month by date range. A **期別 (bimonthly)** or busy month
-can exceed 200 → use the offline job (§3.3).
+**HTTP 204 (empty body) = "nothing for these params".** Report it as such. Do not turn
+it into `{}`: that is how the businessType problem below stayed hidden. A **parameter
+error is `200 text/plain` "Parameter validation failed."**, not a 4xx. So a non-JSON
+2xx must throw with its first bytes (`parseApiResponse`).
+
+⚠️ **銷項 does not answer `queryBusinessType=0` (全部).** It always returns 204, even on days
+with sales. Neither does `queryInvType=0` with `queryBusinessType=0`. 銷項 answers per
+business type, so query 1 (B2B) and 2 (B2C) separately and merge them (`querySlices`).
+進項 answers `0`. With a number filter, `queryBusinessType=0` does find 銷項.
+
+**Number lookup** (`findInvoicesByNumber`): `invoiceNumberBegin = invoiceNumberEnd =
+<number>` works, but the date params stay required. The window is loose: a June 28–30
+window returned a July 1 invoice, and a March window returned nothing. So search near the
+expected date and dedupe across windows.
+
+**Dates: send the local calendar date with a literal `Z`**: `2024-07-10T00:00:00.000Z` ..
+`2024-07-10T23:59:59.999Z`. The server reads the wall-clock part as Asia/Taipei time and
+ignores the zone. "Fixing" this to true UTC (`2024-07-09T16:00:00.000Z` ..
+`2024-07-10T15:59:59.999Z`) shifts the window by 8 h: the 81-row day returned 48. (`iso()`
+in `nat-client.ts`; the same convention applies to the job endpoints.)
+
+**Rows are plain JSON objects**, not tokens. Fields seen: `invoiceNumber`, `invoiceDate`
+(`yyyymmdd`), `invoiceTime`, `businessType`, `sellerId`, `sellerName`, `buyerId`,
+`buyerName`, `salesAmount`, `taxAmount`, `totalAmount` (numbers), `zeroTaxSalesAmount`,
+`freeTaxSalesAmount`, `taxType`, `invType`, `extStatus`, … plus a `token`. The `token` is
+an opaque handle that the PDF/detail endpoints take. B2C rows come back with
+`businessType: 5` even when queried as `2`.
+
+**B2C (二聯式) amounts are tax-inclusive and not split:** `salesAmount === totalAmount` and
+`taxAmount === 0`. Example: a B2C invoice reads 3780 / 0 / 3780, while a B2B one reads
+9600 / 480 / 10080. A caller that needs net and tax for B2C must derive them (5%:
+`tax = total − round(total / 1.05)`).
 
 ### 3.1.1 進項 vs 銷項 (queryInvType) & how to tell them apart
 
@@ -142,7 +184,7 @@ All three verified live (created a 進項 job → completed → downloaded the X
 | **list jobs** | `btb411wQueryXlsxReportJob` | `GET  /api/btb411w/reportJob/xlsx` (PDF: `/reportJob/pdf`) |
 | **download** | `btb411wDownloadReport` | `POST /api/btb411w/download/{jobType}` → XLSX blob |
 
-**Create body** (verified) — note `companyBan` is an **array** and `queryType:"I"` is fixed
+**Create body** (verified; success is a **bare `200` with an empty body**) — note `companyBan` is an **array** and `queryType:"I"` is fixed
 (invoice; the 依期別/年月/日期 UI mode just resolves to `invStartDate`/`invEndDate`):
 ```json
 { "invStartDate":"2026-08-01T00:00:00.000Z", "invEndDate":"2026-08-31T23:59:59.999Z",
@@ -152,8 +194,11 @@ All three verified live (created a 進項 job → completed → downloaded the X
 `fileType` = `EXCEL` | `CSV`; `queryInvType` 1 進項 / 2 銷項; optional `invNoStart/End`,
 `sellerBan`/`buyerBan`, `lastProcessDateStart/End` (最後異動日期). **Range ≤ 2 months**.
 
-**List** `GET /api/btb411w/reportJob/xlsx?queryApplyDateStart=<ISO>&queryApplyDateEnd=<ISO>&showMessage=true&page=0&size=0`
-→ `{ content: [ { token } ] }`. Each `token` is a JWT whose `data` (base64 JSON) decodes to
+**List** `GET /api/btb411w/reportJob/xlsx?queryApplyDateStart=<ISO>&queryApplyDateEnd=<ISO>&processStatus=A&showMessage=true&page=0&size=200`
+→ a Spring page `{ content: [ { token } ], totalElements, … }`; 204 = no jobs.
+⚠️ **`processStatus` is required.** Without it the answer is `200 text/plain` "Parameter
+validation failed." for every `size` (an earlier `listJobs` broke on exactly this). `A`
+is all statuses, the SPA default. The 折讓 list (`btb412w`) has the same signature. Each `token` is a JWT whose `data` (base64 JSON) decodes to
 the job: `{ jobType, applyDate, ban, queryStartDate, queryEndDate, sellbuyType(1 進項),
 fileType, status, seqNo, filePath, dataCount, companyName, … }`. **`status:"2"` = 處理完成**
 (filePath + dataCount populated). Jobs completed near-instantly here (the "每2小時執行一次"
@@ -174,10 +219,16 @@ GET; not on bare tab open.)
   媒體申報檔下載(非即時), 申報第7條第4款…查詢, 第7條第4款零稅率進/銷項發票, 漏上傳資料清冊,
   未依限或未據實上傳明細. (Other screens: btb401w/402w/403w/404w… = 發票/折讓 upload etc.)
 
-## 5. Plan for a NAT client
+## 5. The NAT client (`nat-client.ts`)
 
-Playwright-based (Cloudflare): `login()` (OCR captcha, one session) → keep the context →
-`queryInvoices({from,to,invType})` via `context.request.get(...)` with the Bearer JWT →
-for > 200 rows, submit an offline job and poll `非即時查詢` for the download. Decode each
-result row's `token` (nested base64 JSON) into invoice fields. Reuse the OCR module
-(`ocr.ts`) verbatim.
+Playwright-based (Cloudflare): `login()` (OCR captcha, one session) → data calls via an
+in-page `fetch` with the Bearer JWT. `queryInvoices` does the online query: all pages,
+with the business-type slices merged. `findInvoicesByNumber` looks up by number. Past
+what the online query can reasonably page through, `exportInvoices` runs a 非即時 CSV job
+per month, polls, downloads and parses it. One month of 銷項 measured 15,459 invoices
+in ~30 s (2026-11-27).
+
+The M/D CSV has unquoted commas in free text. 買方名稱 is repaired on M rows. 品名 and
+單一欄位備註 are repaired on D rows, where the platform also truncates 品名, so a split
+piece can be empty. A row is repaired only when exactly one merge leaves the numeric
+columns numeric; otherwise parsing throws rather than shift values.

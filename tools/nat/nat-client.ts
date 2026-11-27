@@ -27,7 +27,14 @@ export interface ReportJob {
   ban: string; // the job's own 統編 (decoded from the token) — filter downloads to your company
 }
 
-const iso = (d: string, end = false) => `${d}T${end ? "23:59:59.999" : "00:00:00.000"}Z`;
+/**
+ * The platform's date params look like ISO-8601 UTC but are not: the server reads the
+ * wall-clock part as Asia/Taipei time and ignores the `Z`. So a local calendar date is sent
+ * as `<date>T00:00:00.000Z` .. `<date>T23:59:59.999Z`. Do NOT "fix" this to true UTC
+ * (`2024-07-09T16:00:00.000Z`): that shifts the window by 8 hours (verified 2026-11-27: one
+ * day's B2B sales dropped from 81 rows to 48).
+ */
+export const iso = (d: string, end = false) => `${d}T${end ? "23:59:59.999" : "00:00:00.000"}Z`;
 
 /** One invoice (財政部 M row), keyed by the CSV headers, with its line items (D rows). */
 export interface NatInvoice {
@@ -162,6 +169,147 @@ function normalizeMasterRow(row: string[], header: string[]): string[] {
   return [...row.slice(0, buyerName), `${row[buyerName]},${row[buyerName + 1]}`, ...row.slice(buyerName + 2)];
 }
 
+/** A Spring Data page — the shape of every paged list response. */
+export interface NatPage<T> {
+  content: T[];
+  empty: boolean;
+  first: boolean;
+  last: boolean;
+  number: number; // 0-based page index
+  numberOfElements: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+}
+
+/**
+ * One online-query (btb411w) row. Plain JSON fields — the `token` is only an opaque handle
+ * for the PDF/detail endpoints. Dates are `yyyymmdd`. **B2C (二聯式) rows carry
+ * `salesAmount === totalAmount` and `taxAmount === 0`**: the invoice is tax-inclusive, so
+ * MoF does not split the tax; a caller wanting net/tax for B2C must derive it.
+ */
+export interface NatInvoiceRow {
+  invoiceNumber: string;
+  invoiceDate: string; // yyyymmdd
+  invoiceTime?: string;
+  businessType: string | number; // 1 = 有買受人統編 (B2B); B2C rows were seen as 5
+  sellerId: string;
+  sellerName?: string;
+  buyerId: string;
+  buyerName?: string;
+  salesAmount: number | string;
+  taxAmount: number | string;
+  totalAmount: number | string;
+  token: string;
+  [field: string]: unknown;
+}
+
+/** Online-query 資料類型: 0 = 全部, 1 = 有買受人統編 (B2B), 2 = 無買受人統編 (B2C). */
+export type BusinessType = "0" | "1" | "2";
+
+/** One (queryInvType, queryBusinessType) request slice of an online query, and what it returned. */
+export interface QuerySlice {
+  invType: "1" | "2";
+  businessType: BusinessType;
+  /** `"no-content"` = HTTP 204, the platform's "nothing for these params". */
+  result: "rows" | "no-content";
+  totalElements: number;
+}
+
+/**
+ * The (invType, businessType) slices that cover a direction. 銷項 does not answer
+ * businessType 0 (全部) — 204 even on days with sales — so it is queried as B2B (1) +
+ * B2C (2) and merged. 進項 answers 0. 進銷項 (0) is split into 進項 + 銷項. An explicit
+ * businessType is passed through.
+ */
+export function querySlices(invType: InvType, businessType?: BusinessType): Array<{ invType: "1" | "2"; businessType: BusinessType }> {
+  const sales: Array<{ invType: "1" | "2"; businessType: BusinessType }> =
+    businessType && businessType !== "0"
+      ? [{ invType: "2", businessType }]
+      : [
+          { invType: "2", businessType: "1" },
+          { invType: "2", businessType: "2" },
+        ];
+  const purchases: Array<{ invType: "1" | "2"; businessType: BusinessType }> = [{ invType: "1", businessType: businessType ?? "0" }];
+  if (invType === "1") return purchases;
+  if (invType === "2") return sales;
+  return [...purchases, ...sales];
+}
+
+/** Raw in-page fetch result. */
+export interface RawResponse {
+  status: number;
+  contentType: string;
+  text: string;
+}
+
+/**
+ * Turn a raw response into JSON. **HTTP 204 → `null`**: the platform answers "nothing for
+ * these params" with an empty 204, which must not read as a successful empty result (that
+ * silently hid the businessType-0 problem). A 2xx that isn't JSON throws: parameter errors
+ * come back as `200 text/plain "Parameter validation failed."`, not as a 4xx.
+ */
+export function parseApiResponse<T>(method: string, url: string, r: RawResponse, opts: { allowEmpty?: boolean } = {}): T | null {
+  const where = `NAT ${method} ${url.split("?")[0]}`;
+  const snip = r.text.slice(0, 200);
+  const ct = r.contentType || "no content-type";
+  if (r.status < 200 || r.status >= 300) throw new Error(`${where} → HTTP ${r.status} (${ct}): ${snip}`);
+  if (r.status === 204) return null;
+  if (!r.text) {
+    // Job-create POSTs answer a bare 200 on success; everywhere else an empty 200 is anomalous.
+    if (opts.allowEmpty) return null;
+    throw new Error(`${where} → HTTP ${r.status} with an empty body (expected JSON, or 204 for no data)`);
+  }
+  try {
+    return JSON.parse(r.text) as T;
+  } catch {
+    throw new Error(`${where} → HTTP ${r.status} non-JSON body (${ct}): ${snip}`);
+  }
+}
+
+/** Fetch every page of a paged endpoint; checks the row count against totalElements. */
+export async function fetchAllPages<T>(
+  fetchPage: (page: number) => Promise<NatPage<T> | null>,
+  what: string,
+): Promise<{ rows: T[]; noContent: boolean }> {
+  const rows: T[] = [];
+  for (let page = 0; ; page++) {
+    const p = await fetchPage(page);
+    if (!p) {
+      if (page === 0) return { rows, noContent: true };
+      throw new Error(`${what}: page ${page} answered 204 after earlier pages had rows`);
+    }
+    rows.push(...(p.content ?? []));
+    if (p.last || !p.content?.length || page + 1 >= p.totalPages) {
+      if (rows.length !== p.totalElements) throw new Error(`${what}: got ${rows.length} row(s) but totalElements is ${p.totalElements}`);
+      return { rows, noContent: false };
+    }
+  }
+}
+
+/** Largest page size the SPA offers (10/20/50/100/200); the API's default is 20. */
+const PAGE_SIZE = 200;
+
+/**
+ * Repair a NAT D row where unquoted commas in a free-text column (seen live in 品名, e.g.
+ * "…(原價 7,360)") split it into extra cells. Each free-text column is tried as the merge
+ * site; the repair is accepted only if exactly one choice leaves 數量/單價/金額 numeric —
+ * otherwise the row is returned as-is and the caller's width check rejects it.
+ */
+function normalizeDetailRow(row: string[], header: string[]): string[] {
+  const extra = row.length - header.length;
+  if (extra < 1 || extra > 8) return row;
+  const numeric = ["數量", "單價", "金額"].map((h) => header.indexOf(h));
+  if (numeric.some((i) => i < 0)) return row;
+  const isNum = (v: string | undefined) => /^-?\d+(\.\d+)?$/.test(v ?? "");
+  const candidates = ["品名", "單一欄位備註"]
+    .map((h) => header.indexOf(h))
+    .filter((i) => i >= 0)
+    .map((i) => [...row.slice(0, i), row.slice(i, i + extra + 1).join(","), ...row.slice(i + extra + 1)])
+    .filter((r) => numeric.every((i) => isNum(r[i])));
+  return candidates.length === 1 ? candidates[0] : row;
+}
+
 export class NatClient {
   private constructor(
     readonly browser: Browser,
@@ -170,25 +318,29 @@ export class NatClient {
     readonly loginBan: string,
   ) {}
 
+  /** @internal Wrap an already-authenticated page (tests pass a fake `evaluate`). */
+  static fromPage(page: Pick<Page, "evaluate">, loginBan: string): NatClient {
+    return new NatClient(null as unknown as Browser, null as unknown as BrowserContext, page as Page, loginBan);
+  }
+
   /** Log in (automated captcha) and return a ready client. */
   static async login(): Promise<NatClient> {
     const s = await login();
     return new NatClient(s.browser, s.ctx, s.page, s.ban);
   }
 
-  /** In-page fetch → JSON. Reads the Bearer token from sessionStorage each call. */
-  private async apiJson<T>(method: "GET" | "POST", url: string, body?: unknown): Promise<T> {
+  /** In-page fetch → JSON, or `null` for HTTP 204 (see parseApiResponse). Reads the Bearer token from sessionStorage each call. */
+  private async apiJson<T>(method: "GET" | "POST", url: string, body?: unknown, opts: { allowEmpty?: boolean } = {}): Promise<T | null> {
     const r = await this.page.evaluate(
       async ({ method, url, body }) => {
         const headers: Record<string, string> = { Authorization: `Bearer ${sessionStorage.getItem("token")}` };
         if (body !== undefined) headers["Content-Type"] = "application/json";
         const res = await fetch(url, { method, headers, credentials: "include", body: body !== undefined ? JSON.stringify(body) : undefined });
-        return { status: res.status, text: await res.text() };
+        return { status: res.status, contentType: res.headers.get("content-type") || "", text: await res.text() };
       },
       { method, url, body },
     );
-    if (r.status < 200 || r.status >= 300) throw new Error(`NAT ${method} ${url} → ${r.status}: ${r.text.slice(0, 200)}`);
-    return (r.text ? JSON.parse(r.text) : {}) as T;
+    return parseApiResponse<T>(method, url, r, opts);
   }
 
   /** In-page fetch → binary (base64 across the boundary). */
@@ -215,8 +367,9 @@ export class NatClient {
   }
 
   /** 統編s this login can act for. */
-  authorizedCompanies(): Promise<Array<{ ban: string; companyName: string; closed: boolean }>> {
-    return this.apiJson("GET", "https://service-m.einvoice.nat.gov.tw/btb/settings/api/btb002i/company/authorized");
+  async authorizedCompanies(): Promise<Array<{ ban: string; companyName: string; closed: boolean }>> {
+    type Company = { ban: string; companyName: string; closed: boolean };
+    return (await this.apiJson<Company[]>("GET", "https://service-m.einvoice.nat.gov.tw/btb/settings/api/btb002i/company/authorized")) ?? [];
   }
 
   /** Resolve the credential's 統編 against the companies this login may access. */
@@ -228,22 +381,89 @@ export class NatClient {
   }
 
   /**
-   * Online invoice query (即時). Returns up to **200** rows; throws none for empty.
-   * Use a ≤1-month range so 進項 stays under 200; otherwise use the offline job.
+   * One page of the online invoice query (即時) for a single (invType, businessType) slice.
+   * Returns `null` on HTTP 204 (no rows for these params). Prefer queryInvoices().
    */
-  async queryInvoices(opts: { ban: string; from: string; to: string; invType: InvType }): Promise<Array<Record<string, unknown>>> {
+  queryInvoicePage(opts: {
+    ban: string;
+    from: string; // YYYY-MM-DD (range ≤ 2 months)
+    to: string;
+    invType: InvType;
+    businessType: BusinessType;
+    invoiceNumberBegin?: string;
+    invoiceNumberEnd?: string;
+    page?: number;
+    size?: number;
+  }): Promise<NatPage<NatInvoiceRow> | null> {
     const qs = new URLSearchParams({
       invoiceDateBegin: iso(opts.from),
       invoiceDateEnd: iso(opts.to, true),
       companyBan: opts.ban,
       queryInvType: opts.invType,
-      queryBusinessType: "0",
+      queryBusinessType: opts.businessType,
       invStatus: "0",
       invType: "00",
       showMessage: "true",
+      page: String(opts.page ?? 0),
+      size: String(opts.size ?? PAGE_SIZE),
     });
-    const r = await this.apiJson<{ content?: Array<Record<string, unknown>> }>("GET", `${API}/api/btb411w/invoice?${qs}`);
-    return r.content ?? [];
+    // The SPA's own names (from its generated API client) are invoiceNumberBegin/End;
+    // invoiceNumberStart/End (the UI model's names) make the query 204.
+    if (opts.invoiceNumberBegin) qs.set("invoiceNumberBegin", opts.invoiceNumberBegin);
+    if (opts.invoiceNumberEnd) qs.set("invoiceNumberEnd", opts.invoiceNumberEnd);
+    return this.apiJson<NatPage<NatInvoiceRow>>("GET", `${API}/api/btb411w/invoice?${qs}`);
+  }
+
+  /**
+   * Online invoice query (即時): every row in [from, to] (range ≤ 2 months), all pages, with
+   * the business-type slices `invType` needs merged (see querySlices — 銷項 is queried as
+   * B2B + B2C). `onSlice` reports each slice, including any that answered 204.
+   * Optional `invoiceNumberBegin`/`End` filter by number (same 字軌, 10 chars each).
+   */
+  async queryInvoices(opts: {
+    ban: string;
+    from: string;
+    to: string;
+    invType: InvType;
+    businessType?: BusinessType;
+    invoiceNumberBegin?: string;
+    invoiceNumberEnd?: string;
+    onSlice?: (slice: QuerySlice) => void;
+  }): Promise<NatInvoiceRow[]> {
+    const out = new Map<string, NatInvoiceRow>();
+    for (const slice of querySlices(opts.invType, opts.businessType)) {
+      const { rows, noContent } = await fetchAllPages(
+        (page) => this.queryInvoicePage({ ...opts, ...slice, page }),
+        `NAT invoice query ${slice.invType}/${slice.businessType} ${opts.from}..${opts.to}`,
+      );
+      opts.onSlice?.({ ...slice, result: noContent ? "no-content" : "rows", totalElements: rows.length });
+      for (const row of rows) out.set(`${row.sellerId}|${row.buyerId}|${row.invoiceNumber}|${row.invoiceDate}`, row);
+    }
+    return [...out.values()];
+  }
+
+  /**
+   * Find invoices by number within [from, to] (any length; queried in ≤1-month windows).
+   * A number can legitimately recur in a later 期別, hence an array.
+   */
+  async findInvoicesByNumber(opts: { ban: string; invoiceNumber: string; from: string; to: string; invType?: InvType }): Promise<NatInvoiceRow[]> {
+    if (!/^[A-Z]{2}\d{8}$/.test(opts.invoiceNumber)) throw new Error(`not an invoice number: ${opts.invoiceNumber}`);
+    // With a number filter the server does not confine hits to the date window (a 2022-07-01
+    // invoice also came back for a 2022-06-28..30 window), so de-duplicate across windows.
+    const found = new Map<string, NatInvoiceRow>();
+    for (const ym of monthsBetween(opts.from, opts.to)) {
+      const { from, to } = monthChunkRange(ym, opts.from, opts.to);
+      const rows = await this.queryInvoices({
+        ban: opts.ban,
+        from,
+        to,
+        invType: opts.invType ?? "2",
+        invoiceNumberBegin: opts.invoiceNumber,
+        invoiceNumberEnd: opts.invoiceNumber,
+      });
+      for (const r of rows) if (r.invoiceNumber === opts.invoiceNumber) found.set(`${r.sellerId}|${r.buyerId}|${r.invoiceDate}`, r);
+    }
+    return [...found.values()];
   }
 
   /** Create a 非即時 (async) report job. Range ≤ 2 months. Returns the raw response. */
@@ -257,22 +477,34 @@ export class NatClient {
       invType: "00",
       fileType: opts.fileType ?? "EXCEL",
       queryType: "I",
-    });
+    }, { allowEmpty: true }); // success is a bare 200 (verified 2026-11-27)
   }
 
   /** List report jobs applied within [applyFrom, applyTo] (defaults: today). Decodes each token. */
   async listJobs(opts: { applyFrom?: string; applyTo?: string } = {}): Promise<ReportJob[]> {
     const today = (await this.page.evaluate(() => new Date().toISOString().slice(0, 10))) as string;
-    const qs = new URLSearchParams({
-      queryApplyDateStart: iso(opts.applyFrom ?? today),
-      queryApplyDateEnd: iso(opts.applyTo ?? today, true),
-      showMessage: "true",
-      page: "0",
-      size: "500",
-    });
-    const r = await this.apiJson<{ content?: Array<{ token: string }> }>("GET", `${API}/api/btb411w/reportJob/xlsx?${qs}`);
+    return this.listReportJobs("btb411w", opts.applyFrom ?? today, opts.applyTo ?? today);
+  }
+
+  /**
+   * List one screen's 非即時 jobs applied in [applyFrom, applyTo]: all pages, tokens decoded,
+   * 204 = no jobs. `processStatus` is required — without it the API answers
+   * `200 text/plain "Parameter validation failed."`; `A` = all statuses (the SPA default).
+   */
+  private async listReportJobs(screen: "btb411w" | "btb412w", applyFrom: string, applyTo: string): Promise<ReportJob[]> {
+    const { rows } = await fetchAllPages((page) => {
+      const qs = new URLSearchParams({
+        queryApplyDateStart: iso(applyFrom),
+        queryApplyDateEnd: iso(applyTo, true),
+        processStatus: "A",
+        showMessage: "true",
+        page: String(page),
+        size: String(PAGE_SIZE),
+      });
+      return this.apiJson<NatPage<{ token: string }>>("GET", `${API}/api/${screen}/reportJob/xlsx?${qs}`);
+    }, `NAT ${screen} job list`);
     // spread decoded fields first, then the raw list token last (decoded has token:null)
-    return (r.content ?? []).map((c) => ({ ...NatClient.decodeJobToken(c.token), token: c.token }) as ReportJob);
+    return rows.map((c) => ({ ...NatClient.decodeJobToken(c.token), token: c.token }) as ReportJob);
   }
 
   /** Download a completed job's file (XLSX/CSV bytes). Pass a job from listJobs(). */
@@ -363,11 +595,12 @@ export class NatClient {
         } // skip header
         // Same strict-width policy as M rows: a D row that doesn't line up with its
         // header would silently shift line-item values, so refuse rather than corrupt it.
-        if (r.length !== dHead.length) {
-          throw new Error(`NAT D row has ${r.length} columns, expected ${dHead.length} — unrecognized delimiter corruption`);
+        const d = normalizeDetailRow(r, dHead);
+        if (d.length !== dHead.length) {
+          throw new Error(`NAT D row has ${d.length} columns, expected ${dHead.length} — unrecognized delimiter corruption`);
         }
         const item: Record<string, string> = {};
-        for (let i = 1; i < dHead.length; i++) item[dHead[i]] = r[i] ?? "";
+        for (let i = 1; i < dHead.length; i++) item[dHead[i]] = d[i] ?? "";
         invoices[invoices.length - 1]?.items.push(item);
       }
     }
@@ -386,21 +619,13 @@ export class NatClient {
       alwStatus: "0",
       fileType: opts.fileType ?? "EXCEL",
       queryType: "A",
-    });
+    }, { allowEmpty: true });
   }
 
   /** List 折讓 report jobs applied within [applyFrom, applyTo] (defaults today); decodes tokens. */
   async listAllowanceJobs(opts: { applyFrom?: string; applyTo?: string } = {}): Promise<ReportJob[]> {
     const today = (await this.page.evaluate(() => new Date().toISOString().slice(0, 10))) as string;
-    const qs = new URLSearchParams({
-      queryApplyDateStart: iso(opts.applyFrom ?? today),
-      queryApplyDateEnd: iso(opts.applyTo ?? today, true),
-      showMessage: "true",
-      page: "0",
-      size: "500", // return all of today's jobs, not just page 1 (else a completed job can be hidden)
-    });
-    const r = await this.apiJson<{ content?: Array<{ token: string }> }>("GET", `${API}/api/btb412w/reportJob/xlsx?${qs}`);
-    return (r.content ?? []).map((c) => ({ ...NatClient.decodeJobToken(c.token), token: c.token }) as ReportJob);
+    return this.listReportJobs("btb412w", opts.applyFrom ?? today, opts.applyTo ?? today);
   }
 
   /** Download a completed 折讓 job's file. */
@@ -430,7 +655,7 @@ if (import.meta.main) {
     const ban = company.ban;
     console.log("logged in; company:", company.companyName, ban);
     const rows = await c.queryInvoices({ ban, from: `${ym}-01`, to: `${ym}-${String(last).padStart(2, "0")}`, invType: "1" });
-    console.log(`進項 ${ym}: ${rows.length} row(s) (online, ≤200)`);
+    console.log(`進項 ${ym}: ${rows.length} row(s) (online, all pages)`);
   } finally {
     await c.close();
   }

@@ -36,8 +36,10 @@ carry Cloudflare's `cf_clearance` + the Bearer JWT — a bare fetch is 403'd).
 ```ts
 const c = await NatClient.login();                 // automated OCR-captcha login
 const [{ ban }] = await c.authorizedCompanies();
-// online (即時) — ≤200 rows, ≤1-month range:
+// online (即時) — all pages, range ≤ 2 months; 銷項 is queried B2B + B2C and merged:
 const rows = await c.queryInvoices({ ban, from: "2026-08-01", to: "2026-08-31", invType: "1" });
+// by number (search near the expected date):
+const [inv] = await c.findInvoicesByNumber({ ban, invoiceNumber: "AB12345678", from: "2026-08-01", to: "2026-08-03" });
 // offline (非即時) — any size / a 期別:
 await c.createReportJob({ ban, from: "2026-07-01", to: "2026-07-31", invType: "1", fileType: "EXCEL" });
 const jobs = await c.listJobs();                   // decodes each job token (status "2" = done)
@@ -48,6 +50,14 @@ await c.close();
 
 `invType`: `"0"` 進銷項 / `"1"` 進項 / `"2"` 銷項. Demo: `bun run nat-client.ts 2026-08`
 (online 進項 count for the month).
+
+Online rows are plain JSON (`invoiceNumber`, `invoiceDate` as `yyyymmdd`, `salesAmount`,
+`taxAmount`, `totalAmount`, …). **B2C rows are tax-inclusive and unsplit**
+(`salesAmount === totalAmount`, `taxAmount === 0`), so derive net and tax yourself.
+An HTTP 204 means "no rows for these params". `queryInvoices` reports it per slice via
+`onSlice`, and `queryInvoicePage` returns `null` for it. Login retries only captcha
+misses. A credential or lock error stops at once with the platform's message
+(`NatLoginError`), because repeated bad passwords lock the account for 15 minutes.
 
 ### exportInvoices — high-level bulk export
 
