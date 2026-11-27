@@ -444,7 +444,9 @@ export class NatClient {
 
   /**
    * Find invoices by number within [from, to] (any length; queried in ≤1-month windows).
-   * A number can legitimately recur in a later 期別, hence an array.
+   * A number can legitimately recur in a later 期別, hence an array. Pass at least the whole
+   * bimonthly 期別, not a few days around a system's own date: that date can lag MoF's
+   * invoiceDate by weeks (one invoice was 20 days earlier at MoF than in the issuer's DB).
    */
   async findInvoicesByNumber(opts: { ban: string; invoiceNumber: string; from: string; to: string; invType?: InvType }): Promise<NatInvoiceRow[]> {
     if (!/^[A-Z]{2}\d{8}$/.test(opts.invoiceNumber)) throw new Error(`not an invoice number: ${opts.invoiceNumber}`);

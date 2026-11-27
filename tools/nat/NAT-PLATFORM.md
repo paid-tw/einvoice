@@ -119,8 +119,15 @@ business type, so query 1 (B2B) and 2 (B2C) separately and merge them (`querySli
 
 **Number lookup** (`findInvoicesByNumber`): `invoiceNumberBegin = invoiceNumberEnd =
 <number>` works, but the date params stay required. The window is loose: a June 28–30
-window returned a July 1 invoice, and a March window returned nothing. So search near the
-expected date and dedupe across windows.
+window returned a July 1 invoice, and a March window returned nothing. Dedupe across
+windows.
+
+⚠️ **Search the whole bimonthly filing period (期別), or wider, never just a few days.**
+An issuing system's own date can lag MoF's `invoiceDate` by weeks. One invoice was
+recorded locally as 2022-06-29, but MoF holds it as 2022-06-09, 20 days earlier. A ±10-day
+window around the local date missed it; only a scan of the full period found it
+(reported 2026-11-27). Each month costs one query per business-type slice, so a full
+period is cheap.
 
 **Dates: send the local calendar date with a literal `Z`**: `2024-07-10T00:00:00.000Z` ..
 `2024-07-10T23:59:59.999Z`. The server reads the wall-clock part as Asia/Taipei time and

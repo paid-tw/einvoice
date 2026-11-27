@@ -38,8 +38,9 @@ const c = await NatClient.login();                 // automated OCR-captcha logi
 const [{ ban }] = await c.authorizedCompanies();
 // online (即時) — all pages, range ≤ 2 months; 銷項 is queried B2B + B2C and merged:
 const rows = await c.queryInvoices({ ban, from: "2026-08-01", to: "2026-08-31", invType: "1" });
-// by number (search near the expected date):
-const [inv] = await c.findInvoicesByNumber({ ban, invoiceNumber: "AB12345678", from: "2026-08-01", to: "2026-08-03" });
+// by number: search the whole bimonthly 期別 (or wider), not a few days around your own
+// record's date, which can lag MoF's invoiceDate by weeks:
+const [inv] = await c.findInvoicesByNumber({ ban, invoiceNumber: "AB12345678", from: "2026-07-01", to: "2026-08-31" });
 // offline (非即時) — any size / a 期別:
 await c.createReportJob({ ban, from: "2026-07-01", to: "2026-07-31", invType: "1", fileType: "EXCEL" });
 const jobs = await c.listJobs();                   // decodes each job token (status "2" = done)
