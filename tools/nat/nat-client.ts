@@ -28,13 +28,35 @@ export interface ReportJob {
 }
 
 /**
- * The platform's date params look like ISO-8601 UTC but are not: the server reads the
- * wall-clock part as Asia/Taipei time and ignores the `Z`. So a local calendar date is sent
- * as `<date>T00:00:00.000Z` .. `<date>T23:59:59.999Z`. Do NOT "fix" this to true UTC
- * (`2024-07-09T16:00:00.000Z`): that shifts the window by 8 hours (verified 2026-11-27: one
- * day's B2B sales dropped from 81 rows to 48).
+ * A Taipei calendar date as the UTC instant the platform expects (what the SPA's date
+ * picker sends via `Date#toISOString()`): `iso("2024-07-10")` = `2024-07-09T16:00:00.000Z`,
+ * `iso("2024-07-10", true)` = `2024-07-10T15:59:59.999Z`. The server converts to Taipei and
+ * then keeps only the date. Sending `<date>T00:00:00Z..<date>T23:59:59Z` instead covers
+ * **two** days: a one-day query returned that day plus the next (48 + 33 rows), and a
+ * one-day CSV job held 625 + 454 invoices (verified 2026-11-27). Sub-day times are
+ * truncated to the date, so one day is the finest window.
  */
-export const iso = (d: string, end = false) => `${d}T${end ? "23:59:59.999" : "00:00:00.000"}Z`;
+export const iso = (d: string, end = false): string =>
+  new Date(Date.parse(`${d}T00:00:00+08:00`) + (end ? 86_400_000 - 1 : 0)).toISOString();
+
+/** Today's date in Asia/Taipei (the portal's zone), YYYY-MM-DD. */
+export const taipeiToday = (): string => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" });
+
+/** Whether a decoded job was created for the range starting at `from` (YYYY-MM-DD). */
+export const jobStartsOn = (job: Pick<ReportJob, "queryStartDate">, from: string): boolean =>
+  Date.parse(job.queryStartDate) === Date.parse(iso(from));
+
+/** YYYY-MM-DD plus `n` days. */
+function addDays(d: string, n: number): string {
+  const t = new Date(`${d}T00:00:00Z`);
+  t.setUTCDate(t.getUTCDate() + n);
+  return t.toISOString().slice(0, 10);
+}
+
+/** Whole days from `a` to `b` (YYYY-MM-DD). */
+function daysBetween(a: string, b: string): number {
+  return Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86_400_000);
+}
 
 /** One invoice (財政部 M row), keyed by the CSV headers, with its line items (D rows). */
 export interface NatInvoice {
@@ -192,7 +214,7 @@ export interface NatInvoiceRow {
   invoiceNumber: string;
   invoiceDate: string; // yyyymmdd
   invoiceTime?: string;
-  businessType: string | number; // 1 = 有買受人統編 (B2B); B2C rows were seen as 5
+  businessType: string | number; // 1 = B2B; B2C rows come back as 5 (queried as 2)
   sellerId: string;
   sellerName?: string;
   buyerId: string;
@@ -207,33 +229,30 @@ export interface NatInvoiceRow {
 /** Online-query 資料類型: 0 = 全部, 1 = 有買受人統編 (B2B), 2 = 無買受人統編 (B2C). */
 export type BusinessType = "0" | "1" | "2";
 
-/** One (queryInvType, queryBusinessType) request slice of an online query, and what it returned. */
+/** One online request the query was split into, and what it returned. */
 export interface QuerySlice {
-  invType: "1" | "2";
+  from: string;
+  to: string;
+  invType: InvType;
   businessType: BusinessType;
-  /** `"no-content"` = HTTP 204, the platform's "nothing for these params". */
+  /** `"no-content"` = HTTP 204 with the platform's no-data alert. */
   result: "rows" | "no-content";
   totalElements: number;
 }
 
 /**
- * The (invType, businessType) slices that cover a direction. 銷項 does not answer
- * businessType 0 (全部) — 204 even on days with sales — so it is queried as B2B (1) +
- * B2C (2) and merged. 進項 answers 0. 進銷項 (0) is split into 進項 + 銷項. An explicit
- * businessType is passed through.
+ * The online query refuses a result over its row limit (200): it answers **204 with no body**
+ * and an `x-inv-alert: BTB-BTB411W-0017-W` header whose `x-inv-params` are
+ * `["200", "<actual total>"]`. An empty result is also 204, but with `INV-SELECT-0001-W`.
  */
-export function querySlices(invType: InvType, businessType?: BusinessType): Array<{ invType: "1" | "2"; businessType: BusinessType }> {
-  const sales: Array<{ invType: "1" | "2"; businessType: BusinessType }> =
-    businessType && businessType !== "0"
-      ? [{ invType: "2", businessType }]
-      : [
-          { invType: "2", businessType: "1" },
-          { invType: "2", businessType: "2" },
-        ];
-  const purchases: Array<{ invType: "1" | "2"; businessType: BusinessType }> = [{ invType: "1", businessType: businessType ?? "0" }];
-  if (invType === "1") return purchases;
-  if (invType === "2") return sales;
-  return [...purchases, ...sales];
+export class NatOverLimitError extends Error {
+  constructor(
+    readonly limit: number,
+    readonly total: number,
+  ) {
+    super(`NAT online query has ${total} rows, over the online limit of ${limit}`);
+    this.name = "NatOverLimitError";
+  }
 }
 
 /** Raw in-page fetch result. */
@@ -241,20 +260,36 @@ export interface RawResponse {
   status: number;
   contentType: string;
   text: string;
+  /** `x-inv-alert` — the platform's message code, e.g. INV-SELECT-0001-S/W, BTB-BTB411W-0017-W. */
+  alert?: string;
+  /** `x-inv-params` — URL-encoded JSON array of the message's arguments. */
+  alertParams?: string;
 }
 
+const ALERT_NO_DATA = "INV-SELECT-0001-W";
+const ALERT_OVER_LIMIT = "BTB-BTB411W-0017-W";
+
 /**
- * Turn a raw response into JSON. **HTTP 204 → `null`**: the platform answers "nothing for
- * these params" with an empty 204, which must not read as a successful empty result (that
- * silently hid the businessType-0 problem). A 2xx that isn't JSON throws: parameter errors
- * come back as `200 text/plain "Parameter validation failed."`, not as a 4xx.
+ * Turn a raw response into JSON. An HTTP 204 is resolved by its `x-inv-alert` header:
+ * no-data (or no header) → `null`; over the row limit → NatOverLimitError; any other alert →
+ * an error naming it. Never read a 204 as `{}`: an over-limit 204 looks exactly like "no
+ * rows" and silently hid busy days. A 2xx that isn't JSON throws: parameter errors come back
+ * as `200 text/plain "Parameter validation failed."`, not as a 4xx.
  */
 export function parseApiResponse<T>(method: string, url: string, r: RawResponse, opts: { allowEmpty?: boolean } = {}): T | null {
   const where = `NAT ${method} ${url.split("?")[0]}`;
   const snip = r.text.slice(0, 200);
   const ct = r.contentType || "no content-type";
   if (r.status < 200 || r.status >= 300) throw new Error(`${where} → HTTP ${r.status} (${ct}): ${snip}`);
-  if (r.status === 204) return null;
+  if (r.status === 204) {
+    if (!r.alert || r.alert === ALERT_NO_DATA) return null;
+    let params: string[] = [];
+    try {
+      params = JSON.parse(decodeURIComponent(r.alertParams ?? "[]")) as string[];
+    } catch {}
+    if (r.alert === ALERT_OVER_LIMIT) throw new NatOverLimitError(Number(params[0]), Number(params[1]));
+    throw new Error(`${where} → HTTP 204 with alert ${r.alert} ${JSON.stringify(params)}`);
+  }
   if (!r.text) {
     // Job-create POSTs answer a bare 200 on success; everywhere else an empty 200 is anomalous.
     if (opts.allowEmpty) return null;
@@ -336,7 +371,13 @@ export class NatClient {
         const headers: Record<string, string> = { Authorization: `Bearer ${sessionStorage.getItem("token")}` };
         if (body !== undefined) headers["Content-Type"] = "application/json";
         const res = await fetch(url, { method, headers, credentials: "include", body: body !== undefined ? JSON.stringify(body) : undefined });
-        return { status: res.status, contentType: res.headers.get("content-type") || "", text: await res.text() };
+        return {
+          status: res.status,
+          contentType: res.headers.get("content-type") || "",
+          text: await res.text(),
+          alert: res.headers.get("x-inv-alert") ?? undefined,
+          alertParams: res.headers.get("x-inv-params") ?? undefined,
+        };
       },
       { method, url, body },
     );
@@ -381,8 +422,8 @@ export class NatClient {
   }
 
   /**
-   * One page of the online invoice query (即時) for a single (invType, businessType) slice.
-   * Returns `null` on HTTP 204 (no rows for these params). Prefer queryInvoices().
+   * One page of the online invoice query (即時). Returns `null` when there are no rows and
+   * throws NatOverLimitError when the result is over 200 rows. Prefer queryInvoices().
    */
   queryInvoicePage(opts: {
     ban: string;
@@ -415,10 +456,12 @@ export class NatClient {
   }
 
   /**
-   * Online invoice query (即時): every row in [from, to] (range ≤ 2 months), all pages, with
-   * the business-type slices `invType` needs merged (see querySlices — 銷項 is queried as
-   * B2B + B2C). `onSlice` reports each slice, including any that answered 204.
-   * Optional `invoiceNumberBegin`/`End` filter by number (same 字軌, 10 chars each).
+   * Online invoice query (即時): every row in [from, to] (range ≤ 2 months). The platform
+   * refuses any result over 200 rows, so an over-limit request is split: 進銷項 into 進項 +
+   * 銷項, then 全部 into B2B + B2C, then the date range in halves. A single day of a single
+   * type that is still over 200 rows cannot be read online — that throws NatOverLimitError;
+   * use exportInvoices (the 非即時 CSV job) for it. `onSlice` reports each request that
+   * answered, including empty ones. Optional `invoiceNumberBegin`/`End` filter by number.
    */
   async queryInvoices(opts: {
     ban: string;
@@ -431,14 +474,33 @@ export class NatClient {
     onSlice?: (slice: QuerySlice) => void;
   }): Promise<NatInvoiceRow[]> {
     const out = new Map<string, NatInvoiceRow>();
-    for (const slice of querySlices(opts.invType, opts.businessType)) {
-      const { rows, noContent } = await fetchAllPages(
-        (page) => this.queryInvoicePage({ ...opts, ...slice, page }),
-        `NAT invoice query ${slice.invType}/${slice.businessType} ${opts.from}..${opts.to}`,
-      );
-      opts.onSlice?.({ ...slice, result: noContent ? "no-content" : "rows", totalElements: rows.length });
-      for (const row of rows) out.set(`${row.sellerId}|${row.buyerId}|${row.invoiceNumber}|${row.invoiceDate}`, row);
-    }
+    const run = async (from: string, to: string, invType: InvType, businessType: BusinessType): Promise<void> => {
+      try {
+        const { rows, noContent } = await fetchAllPages(
+          (page) => this.queryInvoicePage({ ...opts, from, to, invType, businessType, page }),
+          `NAT invoice query ${invType}/${businessType} ${from}..${to}`,
+        );
+        opts.onSlice?.({ from, to, invType, businessType, result: noContent ? "no-content" : "rows", totalElements: rows.length });
+        for (const row of rows) out.set(`${row.sellerId}|${row.buyerId}|${row.invoiceNumber}|${row.invoiceDate}`, row);
+      } catch (e) {
+        if (!(e instanceof NatOverLimitError)) throw e;
+        if (invType === "0") {
+          await run(from, to, "1", businessType);
+          await run(from, to, "2", businessType);
+        } else if (businessType === "0") {
+          await run(from, to, invType, "1");
+          await run(from, to, invType, "2");
+        } else if (from < to) {
+          const mid = addDays(from, Math.floor(daysBetween(from, to) / 2));
+          await run(from, mid, invType, businessType);
+          await run(addDays(mid, 1), to, invType, businessType);
+        } else {
+          e.message = `NAT online query ${invType}/${businessType} on ${from} has ${e.total} rows, over the online limit of ${e.limit} — use exportInvoices for it`;
+          throw e;
+        }
+      }
+    };
+    await run(opts.from, opts.to, opts.invType, opts.businessType ?? "0");
     return [...out.values()];
   }
 
@@ -450,8 +512,6 @@ export class NatClient {
    */
   async findInvoicesByNumber(opts: { ban: string; invoiceNumber: string; from: string; to: string; invType?: InvType }): Promise<NatInvoiceRow[]> {
     if (!/^[A-Z]{2}\d{8}$/.test(opts.invoiceNumber)) throw new Error(`not an invoice number: ${opts.invoiceNumber}`);
-    // With a number filter the server does not confine hits to the date window (a 2022-07-01
-    // invoice also came back for a 2022-06-28..30 window), so de-duplicate across windows.
     const found = new Map<string, NatInvoiceRow>();
     for (const ym of monthsBetween(opts.from, opts.to)) {
       const { from, to } = monthChunkRange(ym, opts.from, opts.to);
@@ -484,7 +544,7 @@ export class NatClient {
 
   /** List report jobs applied within [applyFrom, applyTo] (defaults: today). Decodes each token. */
   async listJobs(opts: { applyFrom?: string; applyTo?: string } = {}): Promise<ReportJob[]> {
-    const today = (await this.page.evaluate(() => new Date().toISOString().slice(0, 10))) as string;
+    const today = taipeiToday();
     return this.listReportJobs("btb411w", opts.applyFrom ?? today, opts.applyTo ?? today);
   }
 
@@ -546,7 +606,7 @@ export class NatClient {
               j.sellbuyType === opts.invType &&
               j.fileType === "CSV" &&
               j.status === "2" &&
-              j.queryStartDate?.startsWith(ym) &&
+              jobStartsOn(j, from) &&
               Date.parse(j.applyDate) >= stamp - 60_000,
           )
           .sort((a, b) => b.seqNo - a.seqNo)[0];
@@ -626,7 +686,7 @@ export class NatClient {
 
   /** List 折讓 report jobs applied within [applyFrom, applyTo] (defaults today); decodes tokens. */
   async listAllowanceJobs(opts: { applyFrom?: string; applyTo?: string } = {}): Promise<ReportJob[]> {
-    const today = (await this.page.evaluate(() => new Date().toISOString().slice(0, 10))) as string;
+    const today = taipeiToday();
     return this.listReportJobs("btb412w", opts.applyFrom ?? today, opts.applyTo ?? today);
   }
 

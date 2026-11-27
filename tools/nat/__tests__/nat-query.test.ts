@@ -2,7 +2,7 @@
 // Playwright page: its evaluate() answers by URL instead of running the in-browser fetch.
 // All data is fabricated.
 import { describe, expect, test } from "bun:test";
-import { NatClient, fetchAllPages, iso, parseApiResponse, querySlices, type NatPage, type RawResponse } from "../nat-client.ts";
+import { NatClient, NatOverLimitError, fetchAllPages, iso, jobStartsOn, parseApiResponse, type NatPage, type QuerySlice, type RawResponse } from "../nat-client.ts";
 
 const BAN = "12345678";
 
@@ -50,11 +50,37 @@ function fakeClient(handler: (url: URL) => RawResponse) {
 }
 
 const json = (body: unknown): RawResponse => ({ status: 200, contentType: "application/json", text: JSON.stringify(body) });
-const noContent: RawResponse = { status: 204, contentType: "", text: "" };
+const noContent: RawResponse = { status: 204, contentType: "", text: "", alert: "INV-SELECT-0001-W", alertParams: "%5B%5D" };
+// What the platform sends for a result over the 200-row online limit (seen live).
+const overLimit = (total: number): RawResponse => ({
+  status: 204,
+  contentType: "",
+  text: "",
+  alert: "BTB-BTB411W-0017-W",
+  alertParams: encodeURIComponent(JSON.stringify(["200", String(total)])),
+});
+/** The Taipei date a query's invoiceDateBegin stands for. */
+const dayOf = (instant: string | null) => new Date(Date.parse(instant!) + 8 * 3_600_000).toISOString().slice(0, 10);
 
 describe("parseApiResponse", () => {
-  test("204 is null, not an empty object", () => {
+  test("a no-data 204 (or one without an alert header) is null, not an empty object", () => {
     expect(parseApiResponse("GET", "https://x/api", noContent)).toBeNull();
+    expect(parseApiResponse("GET", "https://x/api", { status: 204, contentType: "", text: "" })).toBeNull();
+  });
+
+  test("an over-limit 204 throws NatOverLimitError with the limit and the real total", () => {
+    let err: unknown;
+    try {
+      parseApiResponse("GET", "https://x/api", overLimit(339));
+    } catch (e) {
+      err = e;
+    }
+    expect(err).toBeInstanceOf(NatOverLimitError);
+    expect(err).toMatchObject({ limit: 200, total: 339 });
+  });
+
+  test("a 204 with an unknown alert throws instead of reading as empty", () => {
+    expect(() => parseApiResponse("GET", "https://x/api", { status: 204, contentType: "", text: "", alert: "X-1-E" })).toThrow("alert X-1-E");
   });
 
   test("a non-JSON 200 throws with status, content-type and the first bytes", () => {
@@ -76,21 +102,16 @@ describe("parseApiResponse", () => {
 });
 
 describe("iso", () => {
-  test("keeps the local calendar date with a literal Z (the server ignores the zone)", () => {
-    expect(iso("2024-07-10")).toBe("2024-07-10T00:00:00.000Z");
-    expect(iso("2024-07-10", true)).toBe("2024-07-10T23:59:59.999Z");
+  test("sends a Taipei calendar day as its true UTC instants", () => {
+    // <date>T00:00:00Z..T23:59:59Z would cover that day AND the next (verified live)
+    expect(iso("2024-07-10")).toBe("2024-07-09T16:00:00.000Z");
+    expect(iso("2024-07-10", true)).toBe("2024-07-10T15:59:59.999Z");
+    expect(iso("2024-03-01")).toBe("2024-02-29T16:00:00.000Z");
   });
-});
 
-describe("querySlices", () => {
-  test("銷項 is split into B2B + B2C; 進項 uses 全部; 進銷項 is both", () => {
-    expect(querySlices("2")).toEqual([
-      { invType: "2", businessType: "1" },
-      { invType: "2", businessType: "2" },
-    ]);
-    expect(querySlices("1")).toEqual([{ invType: "1", businessType: "0" }]);
-    expect(querySlices("0").map((s) => `${s.invType}/${s.businessType}`)).toEqual(["1/0", "2/1", "2/2"]);
-    expect(querySlices("2", "2")).toEqual([{ invType: "2", businessType: "2" }]);
+  test("jobStartsOn matches a decoded job's queryStartDate by instant", () => {
+    expect(jobStartsOn({ queryStartDate: "2024-06-30T16:00:00Z" }, "2024-07-01")).toBe(true);
+    expect(jobStartsOn({ queryStartDate: "2024-07-01T00:00:00Z" }, "2024-07-01")).toBe(false);
   });
 });
 
@@ -102,47 +123,77 @@ describe("fetchAllPages", () => {
 });
 
 describe("NatClient.queryInvoices", () => {
-  test("reads every page (81 rows at size 20 → 5 pages)", async () => {
+  test("reads every page (81 rows at size 20 → 5 pages) with one 全部 query", async () => {
     const all = Array.from({ length: 81 }, (_, i) => row(i));
-    const { client, urls } = fakeClient((u) => {
-      if (u.searchParams.get("queryBusinessType") === "2") return noContent;
-      return json(page(all, Number(u.searchParams.get("page")), 20));
-    });
+    const { client, urls } = fakeClient((u) => json(page(all, Number(u.searchParams.get("page")), 20)));
     const rows = await client.queryInvoices({ ban: BAN, from: "2024-07-10", to: "2024-07-10", invType: "2" });
     expect(rows).toHaveLength(81);
-    const b2b = urls.filter((u) => u.searchParams.get("queryBusinessType") === "1");
-    expect(b2b.map((u) => u.searchParams.get("page"))).toEqual(["0", "1", "2", "3", "4"]);
-    expect(b2b[0].searchParams.get("invoiceDateBegin")).toBe("2024-07-10T00:00:00.000Z");
+    expect(urls.map((u) => u.searchParams.get("page"))).toEqual(["0", "1", "2", "3", "4"]);
+    expect(urls[0].searchParams.get("queryBusinessType")).toBe("0");
+    expect(urls[0].searchParams.get("invoiceDateBegin")).toBe("2024-07-09T16:00:00.000Z");
+    expect(urls[0].searchParams.get("invoiceDateEnd")).toBe("2024-07-10T15:59:59.999Z");
   });
 
-  test("merges the B2B and B2C slices for 銷項 and never sends businessType 0", async () => {
+  test("an over-limit result is split into B2B + B2C and merged (B2C rows come back as type 5)", async () => {
     const b2b = [row(1), row(2)];
     const b2c = [row(3, { businessType: "5", buyerId: "0000000000", salesAmount: 105, taxAmount: 0 })];
-    const slices: unknown[] = [];
-    const { client, urls } = fakeClient((u) => json(page(u.searchParams.get("queryBusinessType") === "1" ? b2b : b2c, 0, 200)));
+    const slices: QuerySlice[] = [];
+    const { client, urls } = fakeClient((u) => {
+      const bt = u.searchParams.get("queryBusinessType");
+      return bt === "0" ? overLimit(250) : json(page(bt === "1" ? b2b : b2c, 0, 200));
+    });
     const rows = await client.queryInvoices({ ban: BAN, from: "2022-12-05", to: "2022-12-05", invType: "2", onSlice: (s) => slices.push(s) });
     expect(rows.map((r) => r.invoiceNumber)).toEqual(["AB00000001", "AB00000002", "AB00000003"]);
-    expect(urls.map((u) => u.searchParams.get("queryBusinessType"))).toEqual(["1", "2"]);
-    expect(slices).toEqual([
-      { invType: "2", businessType: "1", result: "rows", totalElements: 2 },
-      { invType: "2", businessType: "2", result: "rows", totalElements: 1 },
-    ]);
+    expect(urls.map((u) => u.searchParams.get("queryBusinessType"))).toEqual(["0", "1", "2"]);
+    expect(slices.map((s) => `${s.businessType}:${s.totalElements}`)).toEqual(["1:2", "2:1"]);
   });
 
-  test("reports a 204 slice as no-content", async () => {
-    const slices: Array<{ result: string }> = [];
+  test("進銷項 over the limit splits into 進項 + 銷項 first", async () => {
+    const { client, urls } = fakeClient((u) => (u.searchParams.get("queryInvType") === "0" ? overLimit(300) : json(page([row(Number(u.searchParams.get("queryInvType")))], 0, 200))));
+    const rows = await client.queryInvoices({ ban: BAN, from: "2024-07-10", to: "2024-07-10", invType: "0" });
+    expect(rows).toHaveLength(2);
+    expect(urls.map((u) => `${u.searchParams.get("queryInvType")}/${u.searchParams.get("queryBusinessType")}`)).toEqual(["0/0", "1/0", "2/0"]);
+  });
+
+  test("a single type still over the limit is bisected by day", async () => {
+    // 4 days × 120 B2B rows: any 2+ day window is over 200, a single day is not
+    const { client, urls } = fakeClient((u) => {
+      const from = dayOf(u.searchParams.get("invoiceDateBegin"));
+      const to = dayOf(u.searchParams.get("invoiceDateEnd"));
+      if (u.searchParams.get("queryBusinessType") === "0") return overLimit(480);
+      if (u.searchParams.get("queryBusinessType") === "2") return noContent;
+      if (from !== to) return overLimit(240);
+      const n = Number(from.slice(-2));
+      return json(page(Array.from({ length: 120 }, (_, i) => row(n * 1000 + i)), 0, 200));
+    });
+    const rows = await client.queryInvoices({ ban: BAN, from: "2024-07-01", to: "2024-07-04", invType: "2" });
+    expect(rows).toHaveLength(480);
+    const singleDays = urls
+      .filter((u) => u.searchParams.get("queryBusinessType") === "1")
+      .map((u) => `${dayOf(u.searchParams.get("invoiceDateBegin"))}..${dayOf(u.searchParams.get("invoiceDateEnd"))}`);
+    expect(singleDays).toEqual(["2024-07-01..2024-07-04", "2024-07-01..2024-07-02", "2024-07-01..2024-07-01", "2024-07-02..2024-07-02", "2024-07-03..2024-07-04", "2024-07-03..2024-07-03", "2024-07-04..2024-07-04"]);
+  });
+
+  test("one day of one type over the limit throws and points at exportInvoices", async () => {
+    const { client } = fakeClient((u) => (u.searchParams.get("queryBusinessType") === "1" ? noContent : overLimit(625)));
+    await expect(client.queryInvoices({ ban: BAN, from: "2024-07-10", to: "2024-07-10", invType: "2" })).rejects.toThrow(
+      "NAT online query 2/2 on 2024-07-10 has 625 rows, over the online limit of 200 — use exportInvoices for it",
+    );
+  });
+
+  test("reports a no-data 204 as no-content", async () => {
+    const slices: QuerySlice[] = [];
     const { client } = fakeClient(() => noContent);
     const rows = await client.queryInvoices({ ban: BAN, from: "2024-07-10", to: "2024-07-10", invType: "2", onSlice: (s) => slices.push(s) });
     expect(rows).toEqual([]);
-    expect(slices.map((s) => s.result)).toEqual(["no-content", "no-content"]);
+    expect(slices.map((s) => s.result)).toEqual(["no-content"]);
   });
 
   test("findInvoicesByNumber sends invoiceNumberBegin/End and matches exactly", async () => {
-    const { client, urls } = fakeClient((u) =>
-      json(page(u.searchParams.get("queryBusinessType") === "1" ? [row(7)] : [], 0, 200)),
-    );
-    const found = await client.findInvoicesByNumber({ ban: BAN, invoiceNumber: "AB00000007", from: "2022-07-01", to: "2022-07-01" });
-    expect(found.map((r) => r.invoiceNumber)).toEqual(["AB00000007"]);
+    const { client, urls } = fakeClient(() => json(page([row(7)], 0, 200)));
+    const found = await client.findInvoicesByNumber({ ban: BAN, invoiceNumber: "AB00000007", from: "2022-07-01", to: "2022-08-31" });
+    expect(found.map((r) => r.invoiceNumber)).toEqual(["AB00000007"]); // deduped across the two month windows
+    expect(urls).toHaveLength(2);
     expect(urls[0].searchParams.get("invoiceNumberBegin")).toBe("AB00000007");
     expect(urls[0].searchParams.get("invoiceNumberEnd")).toBe("AB00000007");
     expect(urls[0].searchParams.has("invoiceNumberStart")).toBe(false);

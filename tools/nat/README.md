@@ -36,7 +36,8 @@ carry Cloudflare's `cf_clearance` + the Bearer JWT — a bare fetch is 403'd).
 ```ts
 const c = await NatClient.login();                 // automated OCR-captcha login
 const [{ ban }] = await c.authorizedCompanies();
-// online (即時) — all pages, range ≤ 2 months; 銷項 is queried B2B + B2C and merged:
+// online (即時) — range ≤ 2 months; splits around the 200-row limit, throws
+// NatOverLimitError when one day of one type is still over it (then use exportInvoices):
 const rows = await c.queryInvoices({ ban, from: "2026-08-01", to: "2026-08-31", invType: "1" });
 // by number: search the whole bimonthly 期別 (or wider), not a few days around your own
 // record's date, which can lag MoF's invoiceDate by weeks:
@@ -55,8 +56,10 @@ await c.close();
 Online rows are plain JSON (`invoiceNumber`, `invoiceDate` as `yyyymmdd`, `salesAmount`,
 `taxAmount`, `totalAmount`, …). **B2C rows are tax-inclusive and unsplit**
 (`salesAmount === totalAmount`, `taxAmount === 0`), so derive net and tax yourself.
-An HTTP 204 means "no rows for these params". `queryInvoices` reports it per slice via
-`onSlice`, and `queryInvoicePage` returns `null` for it. Login retries only captcha
+An HTTP 204 is either "no rows" or "over the 200-row limit"; only the `x-inv-alert` header
+tells which. `queryInvoicePage` returns `null` for no rows and throws `NatOverLimitError`
+(which carries the real total) for over-limit. Dates go out as the true UTC instants of
+Taipei days (`iso()`); `<date>T00:00:00Z` would silently cover the next day too. Login retries only captcha
 misses. A credential or lock error stops at once with the platform's message
 (`NatLoginError`), because repeated bad passwords lock the account for 15 minutes.
 

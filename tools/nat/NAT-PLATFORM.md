@@ -102,45 +102,59 @@ from the SPA's own generated API client (`btb411wQueryInvoice`), not from UI lab
 | `page`, `size`, `sort` | Spring paging. **Default size is 20.** The SPA offers 10/20/50/100/200 |
 | `showMessage` | `true` |
 
+**Dates: send the true UTC instants of Taipei calendar days**, as the SPA's date picker
+does (`Date#toISOString()`): 2024-07-10 is `2024-07-09T16:00:00.000Z` ..
+`2024-07-10T15:59:59.999Z` (`iso()` in `nat-client.ts`). The server converts to Taipei and
+keeps only the **date**, so one day is the finest window. ⚠️ `<date>T00:00:00Z` ..
+`<date>T23:59:59Z` covers **two** days. A one-day query returned 48 rows of that day plus
+33 of the next. A one-day CSV job held 625 + 454 invoices. A month's query picked up the
+next month's 1st. (Verified 2026-11-27. The client used that wrong form until then, so
+exports taken before it include each range's following day; see §3.3.)
+
 **Response: a Spring page**: `{ content, empty, first, last, number, numberOfElements,
-size, totalElements, totalPages }`. Read every page: a client that reads only `content`
-silently truncates at 20 rows. Example: B2B sales on one day were 81 rows over 5 pages.
-`queryInvoices` pages with `size=200` and checks the row count against `totalElements`.
+size, totalElements, totalPages }`. The default size is 20, so read every page. A client
+that reads only `content` silently truncates at 20 rows. `queryInvoices` pages with
+`size=200` and checks the row count against `totalElements`.
 
-**HTTP 204 (empty body) = "nothing for these params".** Report it as such. Do not turn
-it into `{}`: that is how the businessType problem below stayed hidden. A **parameter
-error is `200 text/plain` "Parameter validation failed."**, not a 4xx. So a non-JSON
-2xx must throw with its first bytes (`parseApiResponse`).
+⚠️⚠️ **Hard limit: 200 rows per query, and an over-limit result looks like "no data".**
+Both answer **HTTP 204 with an empty body**. Only the `x-inv-alert` header tells them
+apart (`x-inv-params` is a URL-encoded JSON array):
 
-⚠️ **銷項 does not answer `queryBusinessType=0` (全部).** It always returns 204, even on days
-with sales. Neither does `queryInvType=0` with `queryBusinessType=0`. 銷項 answers per
-business type, so query 1 (B2B) and 2 (B2C) separately and merge them (`querySlices`).
-進項 answers `0`. With a number filter, `queryBusinessType=0` does find 銷項.
+| `x-inv-alert` | `x-inv-params` | meaning |
+|---|---|---|
+| `INV-SELECT-0001-S` | `[]` | 200, rows in the body |
+| `INV-SELECT-0001-W` | `[]` | 204, no rows |
+| `BTB-BTB411W-0017-W` | `["200","339"]` | 204, **339 rows, over the limit of 200** |
 
-**Number lookup** (`findInvoicesByNumber`): `invoiceNumberBegin = invoiceNumberEnd =
-<number>` works, but the date params stay required. The window is loose: a June 28–30
-window returned a July 1 invoice, and a March window returned nothing. Dedupe across
-windows.
+This one behaviour explains every "never answers" symptom seen earlier. 銷項 with
+`queryBusinessType=0` looked dead, but it works on any day under 200 rows; busy days are
+over the limit. Some B2C invoices were missing from per-type scans because those days'
+B2C results were over the limit too. `parseApiResponse` returns `null` for no-data and
+throws `NatOverLimitError(limit, total)` for over-limit. `queryInvoices` splits an
+over-limit request in this order: 進銷項 → 進項 + 銷項, then 全部 → B2B + B2C, then the date
+range in halves. A single day of one type that is still over 200 cannot be read online
+and throws. Use `exportInvoices` (the 非即時 CSV job) for that. A month of B2B sales took
+10 requests (1,340 rows). One busy day had 577 B2C invoices, which only the job can
+return.
 
+A **parameter error is `200 text/plain` "Parameter validation failed."**, not a 4xx. So a
+non-JSON 2xx must throw with its first bytes.
+
+**Number lookup** (`findInvoicesByNumber`): set `invoiceNumberBegin = invoiceNumberEnd =
+<number>`. The date params stay required, and with true-UTC dates the window is strict.
 ⚠️ **Search the whole bimonthly filing period (期別), or wider, never just a few days.**
 An issuing system's own date can lag MoF's `invoiceDate` by weeks. One invoice was
 recorded locally as 2022-06-29, but MoF holds it as 2022-06-09, 20 days earlier. A ±10-day
 window around the local date missed it; only a scan of the full period found it
-(reported 2026-11-27). Each month costs one query per business-type slice, so a full
-period is cheap.
-
-**Dates: send the local calendar date with a literal `Z`**: `2024-07-10T00:00:00.000Z` ..
-`2024-07-10T23:59:59.999Z`. The server reads the wall-clock part as Asia/Taipei time and
-ignores the zone. "Fixing" this to true UTC (`2024-07-09T16:00:00.000Z` ..
-`2024-07-10T15:59:59.999Z`) shifts the window by 8 h: the 81-row day returned 48. (`iso()`
-in `nat-client.ts`; the same convention applies to the job endpoints.)
+(reported 2026-11-27). A number filter keeps every result tiny, so a full period costs one
+request per month.
 
 **Rows are plain JSON objects**, not tokens. Fields seen: `invoiceNumber`, `invoiceDate`
 (`yyyymmdd`), `invoiceTime`, `businessType`, `sellerId`, `sellerName`, `buyerId`,
 `buyerName`, `salesAmount`, `taxAmount`, `totalAmount` (numbers), `zeroTaxSalesAmount`,
 `freeTaxSalesAmount`, `taxType`, `invType`, `extStatus`, … plus a `token`. The `token` is
-an opaque handle that the PDF/detail endpoints take. B2C rows come back with
-`businessType: 5` even when queried as `2`.
+an opaque handle that the PDF/detail endpoints take. `businessType` is `1` for B2B. B2C
+rows come back as `5`, whether they are queried as `2` or `0`.
 
 **B2C (二聯式) amounts are tax-inclusive and not split:** `salesAmount === totalAmount` and
 `taxAmount === 0`. Example: a B2C invoice reads 3780 / 0 / 3780, while a B2B one reads
@@ -202,7 +216,13 @@ All three verified live (created a 進項 job → completed → downloaded the X
 `sellerBan`/`buyerBan`, `lastProcessDateStart/End` (最後異動日期). **Range ≤ 2 months**.
 
 **List** `GET /api/btb411w/reportJob/xlsx?queryApplyDateStart=<ISO>&queryApplyDateEnd=<ISO>&processStatus=A&showMessage=true&page=0&size=200`
-→ a Spring page `{ content: [ { token } ], totalElements, … }`; 204 = no jobs.
+→ a Spring page `{ content: [ { token } ], totalElements, … }`; 204 = no jobs. The apply
+dates and the create body's `invStartDate`/`invEndDate` follow the same true-UTC
+convention as §3.1. ⚠️ A job created with `<date>T00:00:00Z..T23:59:59Z` exports one extra
+day. Monthly archives made before 2026-11-27 include the next month's 1st; `exportInvoices`
+dedupes exact overlaps, but a standalone month file does not. Match a decoded job to its
+request by instant (`jobStartsOn`), not by string prefix: `queryStartDate` reads
+`2024-06-30T16:00:00Z` for July.
 ⚠️ **`processStatus` is required.** Without it the answer is `200 text/plain` "Parameter
 validation failed." for every `size` (an earlier `listJobs` broke on exactly this). `A`
 is all statuses, the SPA default. The 折讓 list (`btb412w`) has the same signature. Each `token` is a JWT whose `data` (base64 JSON) decodes to
@@ -229,10 +249,10 @@ GET; not on bare tab open.)
 ## 5. The NAT client (`nat-client.ts`)
 
 Playwright-based (Cloudflare): `login()` (OCR captcha, one session) → data calls via an
-in-page `fetch` with the Bearer JWT. `queryInvoices` does the online query: all pages,
-with the business-type slices merged. `findInvoicesByNumber` looks up by number. Past
-what the online query can reasonably page through, `exportInvoices` runs a 非即時 CSV job
-per month, polls, downloads and parses it. One month of 銷項 measured 15,459 invoices
+in-page `fetch` with the Bearer JWT. `queryInvoices` does the online query. It reads all
+pages and splits around the 200-row limit, throwing when a single day is still over it.
+`findInvoicesByNumber` looks up by number. `exportInvoices` is the complete path: it runs
+a 非即時 CSV job per month, polls, downloads and parses it. One month of 銷項 measured 15,459 invoices
 in ~30 s (2026-11-27).
 
 The M/D CSV has unquoted commas in free text. 買方名稱 is repaired on M rows. 品名 and

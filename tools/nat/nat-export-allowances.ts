@@ -2,7 +2,7 @@
 //   NAT_OP_ITEM='<your 1Password item>' bun run nat-export-allowances.ts [fromYm] [toYm]
 //   OUTDIR=/path/to/dir  overrides the output directory (default ./out/nat-allowances).
 import { mkdirSync, writeFileSync, readFileSync, existsSync, statSync, renameSync, rmSync, chmodSync } from "node:fs";
-import { NatClient, isMonthFinal } from "./nat-client.ts";
+import { NatClient, isMonthFinal, jobStartsOn } from "./nat-client.ts";
 
 const fromYm = process.argv[2] ?? "2020-02";
 // Resolve "current month" in Asia/Taipei (the portal's zone), not the host's.
@@ -66,7 +66,7 @@ try {
         await new Promise((r) => setTimeout(r, 3000));
         // match THIS month's job for THIS company, applied in this run, newest first
         job = (await client.listAllowanceJobs())
-          .filter((j) => j.ban === ban && j.sellbuyType === "0" && j.fileType === "CSV" && j.status === "2" && j.queryStartDate?.startsWith(ym) && Date.parse(j.applyDate) >= stamp - 120_000)
+          .filter((j) => j.ban === ban && j.sellbuyType === "0" && j.fileType === "CSV" && j.status === "2" && jobStartsOn(j, `${ym}-01`) && Date.parse(j.applyDate) >= stamp - 120_000)
           .sort((a, b) => b.seqNo - a.seqNo)[0];
       }
       if (!job) { console.log(`${ym}  ⚠️ job not ready (timeout)`); failed++; continue; }
