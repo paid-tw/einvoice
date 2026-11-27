@@ -18,9 +18,13 @@ import { ctcGreedyDecode, digitsOnly } from "./lib/captcha.ts";
 const MODEL = join(import.meta.dir, "ocr-model/ddddocr.onnx");
 const CHARSET: string[] = JSON.parse(readFileSync(join(import.meta.dir, "ocr-model/charset.json"), "utf8"));
 
+// The model's declared output shape is symbolic, so every run logs a harmless
+// "VerifyOutputSizes" warning from the ORT core; log errors only.
+ort.env.logLevel = "error";
+
 let _session: ort.InferenceSession | null = null;
 async function session() {
-  if (!_session) _session = await ort.InferenceSession.create(MODEL);
+  if (!_session) _session = await ort.InferenceSession.create(MODEL, { logSeverityLevel: 3 });
   return _session;
 }
 
